@@ -1,0 +1,3 @@
+import com.teammanduk.adego.convention.configureComposeAndroid
+
+configureComposeAndroid()
