@@ -12,4 +12,5 @@ configureHiltAndroid()
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":core:navigation"))
 }
