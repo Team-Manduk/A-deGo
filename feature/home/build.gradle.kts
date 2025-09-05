@@ -4,8 +4,4 @@ plugins {
     alias(libs.plugins.adego.android.feature)
 }
 
-setNamespace("feature.main")
-
-dependencies {
-    implementation(projects.feature.home)
-}
+setNamespace("feature.home")
