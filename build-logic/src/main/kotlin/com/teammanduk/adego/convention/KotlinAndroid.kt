@@ -7,11 +7,11 @@ import com.teammanduk.adego.extentions.libs
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.project
 import org.gradle.kotlin.dsl.provideDelegate
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import kotlin.collections.plus
 
 internal fun Project.configureKotlinAndroid() {
     pluginManager.apply("org.jetbrains.kotlin.android")
@@ -32,6 +32,8 @@ internal fun Project.configureKotlinAndroid() {
         configureKotlin()
 
         dependencies {
+            implementation(project(":core:domain"))
+            
             implementation(libs.findLibrary("kotlin-standard").get())
             coreLibraryDesugaring(libs.findLibrary("android-desugarJdkLibs").get())
         }
