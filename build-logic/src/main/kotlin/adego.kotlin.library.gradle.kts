@@ -1,7 +1,7 @@
-import com.teammanduk.adego.convention.configureKotlin
+import com.teammanduk.adego.convention.configureKotlinJvmLibrary
 
 plugins {
     kotlin("jvm")
 }
 
-configureKotlin()
+configureKotlinJvmLibrary()
