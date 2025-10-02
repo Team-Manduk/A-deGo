@@ -1,3 +1,6 @@
+.gitignore
+CLAUDE.md
+
 # Gradle files
 .gradle/
 build/
