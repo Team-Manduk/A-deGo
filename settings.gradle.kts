@@ -25,6 +25,8 @@ include(":app")
 include(
     ":feature:main",
     ":feature:home",
+    ":feature:create",
+    ":feature:map",
 )
 include(
     ":core:designsystem",
