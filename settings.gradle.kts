@@ -22,5 +22,18 @@ dependencyResolutionManagement {
 
 rootProject.name = "A-dego"
 include(":app")
-include(":feature:main")
-include(":core:designsystem")
+include(
+    ":feature:main",
+    ":feature:home",
+    ":feature:create",
+    ":feature:map",
+)
+include(
+    ":core:designsystem",
+    ":core:navigation",
+    ":core:data-api",
+    ":core:remote",
+    ":core:data",
+    ":core:domain",
+    ":core:model",
+)

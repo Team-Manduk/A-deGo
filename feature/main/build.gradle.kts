@@ -7,5 +7,7 @@ plugins {
 setNamespace("feature.main")
 
 dependencies {
-
+    implementation(projects.feature.home)
+    implementation(projects.feature.create)
+    implementation(projects.feature.map)
 }

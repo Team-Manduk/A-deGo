@@ -92,13 +92,16 @@ androidx-constraintlayout = { group = "androidx.constraintlayout", name = "const
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "jetbrainsKotlinJvm" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 
-adego-android-application = {id = "adego.android.application"}
-adego-android-feature = {id = "adego.android.feature"}
-adego-android-library = {id = "adego.android.library"}
-adego-android-compose = {id = "adego.android.compose"}
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+adego-android-application = { id = "adego.android.application" }
+adego-android-feature = { id = "adego.android.feature" }
+adego-android-library = { id = "adego.android.library" }
+adego-android-compose = { id = "adego.android.compose" }
+adego-kotlin-library = { id = "adego.kotlin.library" }
