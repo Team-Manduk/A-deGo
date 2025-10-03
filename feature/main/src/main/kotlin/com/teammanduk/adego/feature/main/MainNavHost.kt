@@ -25,8 +25,21 @@ internal fun MainNavHost(
             navController = navigator.navController,
             startDestination = navigator.startDestination
         ) {
-            homeNavGraph()
-            createNavGraph()
+            homeNavGraph(
+                onNavigateToCreate = navigator::navigateToCreate,
+                onNavigateToSettings = { /* TODO: 설정 화면 구현 */ },
+                onJoinWithCode = { code ->
+                    /* TODO: 초대 코드로 입장 구현 */
+                }
+            )
+            createNavGraph(
+                onNavigateBack = { navigator.navController.navigateUp() },
+                onNavigateToSelectPlace = navigator::navigateToSelectPlace,
+                onCreateMeeting = { place, hour, minute ->
+                    /* TODO: 모임 생성 로직 구현 */
+                    navigator.navController.navigateUp()
+                }
+            )
             mapNavGraph()
         }
     }
