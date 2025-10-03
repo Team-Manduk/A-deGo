@@ -13,6 +13,12 @@ fun NavController.navigateToCreate(
     navigate(Route.Create, navOptions)
 }
 
+fun NavController.navigateToSelectPlace(
+    navOptions: NavOptions? = null
+) {
+    navigate(Route.SelectPlace, navOptions)
+}
+
 fun NavGraphBuilder.createNavGraph(
     onNavigateBack: () -> Unit,
     onNavigateToSelectPlace: () -> Unit,
