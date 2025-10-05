@@ -3,7 +3,6 @@ package com.teammanduk.adego.feature.create
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,10 +10,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -23,9 +27,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,18 +39,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.teammanduk.adego.core.designsystem.component.AdegoDatePicker
+import com.teammanduk.adego.core.designsystem.component.AdegoTimePicker
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 internal fun CreateRoute(
     onNavigateBack: () -> Unit = {},
     onNavigateToSelectPlace: () -> Unit = {},
     onCreateMeeting: (String, Int, Int) -> Unit = { _, _, _ -> },
+    selectedPlaceFromNav: String? = null,
 ) {
     CreateScreen(
         onNavigateBack = onNavigateBack,
         onNavigateToSelectPlace = onNavigateToSelectPlace,
         onCreateMeeting = onCreateMeeting,
+        selectedPlaceFromNav = selectedPlaceFromNav,
     )
 }
 
@@ -53,14 +66,28 @@ private fun CreateScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSelectPlace: () -> Unit,
     onCreateMeeting: (String, Int, Int) -> Unit,
+    selectedPlaceFromNav: String? = null,
 ) {
-    var selectedPlace by remember { mutableStateOf("") }
-    var selectedHour by remember { mutableStateOf("") }
-    var selectedMinute by remember { mutableStateOf("") }
+    var selectedPlace by rememberSaveable { mutableStateOf("") }
+
+    // Navigation에서 전달받은 장소 정보 업데이트
+    LaunchedEffect(selectedPlaceFromNav) {
+        selectedPlaceFromNav?.let {
+            if (it.isNotEmpty()) {
+                selectedPlace = it
+            }
+        }
+    }
+    var selectedDate by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedHour by rememberSaveable { mutableStateOf<Int?>(null) }
+    var selectedMinute by rememberSaveable { mutableStateOf<Int?>(null) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
             .background(AdegoTheme.colors.background)
     ) {
         // 상단 바
@@ -96,13 +123,16 @@ private fun CreateScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 타이틀
+            val dateFormat = SimpleDateFormat("MM월 dd일", Locale.KOREAN)
+            val displayDate = selectedDate?.let { dateFormat.format(Date(it)) } ?: "날짜 선택"
+            val displayTime = if (selectedHour != null && selectedMinute != null) {
+                String.format("%02d시 %02d분", selectedHour, selectedMinute)
+            } else {
+                "00시 00분"
+            }
+
             Text(
-                text = buildString {
-                    append(selectedHour.ifEmpty { "00" })
-                    append("시 ")
-                    append(selectedMinute.ifEmpty { "00" })
-                    append("분 모임 시작!")
-                },
+                text = "$displayTime 모임 시작!",
                 style = AdegoTheme.typography.headlineLarge,
                 color = AdegoTheme.colors.main500,
                 textAlign = TextAlign.Center
@@ -127,12 +157,31 @@ private fun CreateScreen(
                     onValueChange = { },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onNavigateToSelectPlace() },
+                        .clickable {
+                            onNavigateToSelectPlace()
+                        },
                     enabled = false,
+                    placeholder = {
+                        Text(
+                            text = "모임 장소를 선택해 주세요",
+                            style = AdegoTheme.typography.bodyLarge,
+                            color = AdegoTheme.colors.line500
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = AdegoTheme.colors.main500,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
                     colors = OutlinedTextFieldDefaults.colors(
                         disabledBorderColor = AdegoTheme.colors.main500,
                         disabledContainerColor = Color.Transparent,
                         disabledTextColor = AdegoTheme.colors.onBackground,
+                        disabledPlaceholderColor = AdegoTheme.colors.line500,
+                        disabledLeadingIconColor = AdegoTheme.colors.main500
                     ),
                     shape = RoundedCornerShape(8.dp)
                 )
@@ -156,56 +205,70 @@ private fun CreateScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // 날짜 선택
                     OutlinedTextField(
-                        value = selectedHour,
-                        onValueChange = {
-                            if (it.isEmpty() || (it.toIntOrNull() != null && it.toInt() in 0..23)) {
-                                selectedHour = it
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
+                        value = if (selectedDate != null) displayDate else "",
+                        onValueChange = { },
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { showDatePicker = true },
+                        enabled = false,
                         placeholder = {
                             Text(
-                                text = "시",
+                                text = "날짜 선택",
+                                style = AdegoTheme.typography.bodyLarge,
                                 color = AdegoTheme.colors.line500
                             )
                         },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.DateRange,
+                                contentDescription = null,
+                                tint = AdegoTheme.colors.main500,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AdegoTheme.colors.main500,
-                            unfocusedBorderColor = AdegoTheme.colors.main500,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
+                            disabledBorderColor = AdegoTheme.colors.main500,
+                            disabledContainerColor = Color.Transparent,
+                            disabledTextColor = AdegoTheme.colors.onBackground,
+                            disabledPlaceholderColor = AdegoTheme.colors.line500,
+                            disabledLeadingIconColor = AdegoTheme.colors.main500
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        textStyle = AdegoTheme.typography.bodyLarge.copy(
-                            textAlign = TextAlign.Center
-                        )
+                        shape = RoundedCornerShape(8.dp)
                     )
 
+                    // 시간 선택
                     OutlinedTextField(
-                        value = selectedMinute,
-                        onValueChange = {
-                            if (it.isEmpty() || (it.toIntOrNull() != null && it.toInt() in 0..59)) {
-                                selectedMinute = it
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
+                        value = if (selectedHour != null && selectedMinute != null) displayTime else "",
+                        onValueChange = { },
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { showTimePicker = true },
+                        enabled = false,
                         placeholder = {
                             Text(
-                                text = "분",
+                                text = "시간 선택",
+                                style = AdegoTheme.typography.bodyLarge,
                                 color = AdegoTheme.colors.line500
                             )
                         },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = AdegoTheme.colors.main500,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AdegoTheme.colors.main500,
-                            unfocusedBorderColor = AdegoTheme.colors.main500,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
+                            disabledBorderColor = AdegoTheme.colors.main500,
+                            disabledContainerColor = Color.Transparent,
+                            disabledTextColor = AdegoTheme.colors.onBackground,
+                            disabledPlaceholderColor = AdegoTheme.colors.line500,
+                            disabledLeadingIconColor = AdegoTheme.colors.main500
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        textStyle = AdegoTheme.typography.bodyLarge.copy(
-                            textAlign = TextAlign.Center
-                        )
+                        shape = RoundedCornerShape(8.dp)
                     )
                 }
             }
@@ -215,19 +278,19 @@ private fun CreateScreen(
             // 모임 생성하기 버튼
             Button(
                 onClick = {
-                    val hour = selectedHour.toIntOrNull() ?: 0
-                    val minute = selectedMinute.toIntOrNull() ?: 0
+                    val hour = selectedHour ?: 0
+                    val minute = selectedMinute ?: 0
                     onCreateMeeting(selectedPlace, hour, minute)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(bottom = 32.dp),
+                    .padding(bottom = 32.dp)
+                    .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AdegoTheme.colors.main500
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = selectedPlace.isNotEmpty() && selectedHour.isNotEmpty() && selectedMinute.isNotEmpty()
+                enabled = selectedPlace.isNotEmpty() && selectedDate != null && selectedHour != null && selectedMinute != null
             ) {
                 Text(
                     text = "모임 생성하기",
@@ -237,6 +300,26 @@ private fun CreateScreen(
             }
         }
     }
+
+    // DatePicker
+    AdegoDatePicker(
+        show = showDatePicker,
+        onDismiss = { showDatePicker = false },
+        onConfirm = { selectedDate = it },
+        initialDate = selectedDate
+    )
+
+    // TimePicker
+    AdegoTimePicker(
+        show = showTimePicker,
+        onDismiss = { showTimePicker = false },
+        onConfirm = { hour, minute ->
+            selectedHour = hour
+            selectedMinute = minute
+        },
+        initialHour = selectedHour ?: 0,
+        initialMinute = selectedMinute ?: 0
+    )
 }
 
 @Preview(showBackground = true, showSystemUi = true)
