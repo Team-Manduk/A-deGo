@@ -26,6 +26,7 @@ internal class MainNavigator(
             launchSingleTop = true
         }
     }
+    
 
     fun navigateHome() {
         navController.navigateToHome(navOptions)
@@ -36,11 +37,15 @@ internal class MainNavigator(
     }
 
     fun navigateToSelectPlace() {
-        navController.navigateToSelectPlace(navOptions)
+        navController.navigateToSelectPlace()
     }
 
-    fun navigateToMap() {
-        navController.navigateToMap(navOptions)
+    fun navigateToMap(hour: Int, minute: Int) {
+        navController.navigateToMap(hour, minute, navOptions)
+    }
+
+    fun navigateBack() {
+        navController.navigateUp()
     }
 }
 

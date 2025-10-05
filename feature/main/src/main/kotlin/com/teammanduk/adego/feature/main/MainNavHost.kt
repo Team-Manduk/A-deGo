@@ -33,11 +33,12 @@ internal fun MainNavHost(
                 }
             )
             createNavGraph(
-                onNavigateBack = { navigator.navController.navigateUp() },
+                navController = navigator.navController,
+                onNavigateBack = navigator::navigateBack,
                 onNavigateToSelectPlace = navigator::navigateToSelectPlace,
                 onCreateMeeting = { place, hour, minute ->
                     /* TODO: 모임 생성 로직 구현 */
-                    navigator.navController.navigateUp()
+                    navigator.navigateToMap(hour, minute)
                 }
             )
             mapNavGraph()
