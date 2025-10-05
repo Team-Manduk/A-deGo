@@ -155,7 +155,8 @@ private fun HomeScreen(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = AdegoTheme.colors.main500
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = inviteCode.isNotEmpty()
                 ) {
                     Text(
                         text = "입장",
