@@ -1,6 +1,9 @@
 .gitignore
 CLAUDE.md
 
+# Claude Code
+.claude/
+
 # Gradle files
 .gradle/
 build/

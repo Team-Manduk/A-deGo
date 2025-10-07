@@ -1,5 +1,6 @@
 package com.teammanduk.adego.feature.create
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,12 +23,23 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.model.Place
 
@@ -40,11 +51,6 @@ internal fun SelectPlaceRoute(
     viewModel: SelectPlaceViewModel = hiltViewModel()
 ) {
     val searchResult by viewModel.currentSearchResult.collectAsStateWithLifecycle()
-
-    // 초기 테스트 데이터 로드 (지도 중심 위경도)
-    LaunchedEffect(Unit) {
-        viewModel.searchByCoordinates(35.1979, 129.0758)
-    }
 
     Scaffold(
         topBar = {
@@ -68,9 +74,9 @@ internal fun SelectPlaceRoute(
     ) { paddingValues ->
         SelectPlaceScreen(
             searchResult = searchResult,
-            onMapClick = { lat, lng ->
-                // TODO: 실제 지도 클릭 시 호출
-                viewModel.searchByCoordinates(lat, lng)
+            onMapClick = { latLng ->
+                viewModel.searchByCoordinates(latLng.latitude, latLng.longitude)
+                Log.d("SelectPlaceRoute", "onMapClick: $latLng");
             },
             onPlaceSelected = {
                 viewModel.confirmSelection()
@@ -84,16 +90,26 @@ internal fun SelectPlaceRoute(
 @Composable
 private fun SelectPlaceScreen(
     searchResult: Place?,
-    onMapClick: (Double, Double) -> Unit,
+    onMapClick: (LatLng) -> Unit,
     onPlaceSelected: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // searchResult에서 위치 정보를 가져오거나 기본값 사용
+    val selectedPosition = remember(searchResult) {
+        if (searchResult != null) {
+            LatLng(searchResult.latitude, searchResult.longitude)
+        } else {
+            LatLng(35.1979, 129.0758) // 기본 위치
+        }
+    }
+
     Box(
         modifier = modifier.fillMaxSize()
     ) {
-        // 지도 Placeholder
+        // 지도 표시
         MapPlaceholder(
             modifier = Modifier.fillMaxSize(),
+            selectedPosition = selectedPosition,
             onMapClick = onMapClick
         )
 
@@ -136,20 +152,33 @@ private fun SelectPlaceScreen(
 @Composable
 private fun MapPlaceholder(
     modifier: Modifier = Modifier,
-    onMapClick: (Double, Double) -> Unit
+    selectedPosition: LatLng,
+    onMapClick: (LatLng) -> Unit
 ) {
-    Box(
-        modifier = modifier
-            .background(Color(0xFFE0E0E0)),
-        contentAlignment = Alignment.Center
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(selectedPosition, 15f)
+    }
+
+    LaunchedEffect(selectedPosition) {
+        cameraPositionState.position = CameraPosition.fromLatLngZoom(selectedPosition, 15f)
+    }
+
+    GoogleMap(
+        modifier = modifier,
+        cameraPositionState = cameraPositionState,
+        properties = MapProperties(
+            isMyLocationEnabled = false
+        ),
+        uiSettings = MapUiSettings(
+            zoomControlsEnabled = true,
+            myLocationButtonEnabled = false
+        ),
+        onMapClick = onMapClick
     ) {
-        Icon(
-            imageVector = Icons.Default.LocationOn,
-            contentDescription = "지도 영역",
-            tint = Color(0xFF757575),
-            modifier = Modifier.padding(32.dp)
+        Marker(
+            state = MarkerState(position = selectedPosition),
+            title = "선택한 위치"
         )
-        // TODO: 실제 Google Maps Compose 연동 시 onMapClick 사용
     }
 }
 

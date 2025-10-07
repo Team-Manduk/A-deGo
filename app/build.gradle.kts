@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.adego.android.application)
     alias(libs.plugins.adego.android.compose)
@@ -13,6 +16,20 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Google Maps API Key
+        val secretsProperties = Properties()
+        val secretsPropertiesFile = rootProject.file("secrets.properties")
+        if (secretsPropertiesFile.exists()) {
+            secretsProperties.load(FileInputStream(secretsPropertiesFile))
+        } else {
+            val localDefaultsFile = rootProject.file("local.defaults.properties")
+            if (localDefaultsFile.exists()) {
+                secretsProperties.load(FileInputStream(localDefaultsFile))
+            }
+        }
+        val mapsApiKey = secretsProperties.getProperty("MAPS_API_KEY", "")
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
 //    buildTypes {

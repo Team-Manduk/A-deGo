@@ -5,3 +5,8 @@ plugins {
 }
 
 setNamespace("feature.map")
+
+dependencies {
+    implementation(libs.google.maps.compose)
+    implementation(libs.play.services.maps)
+}

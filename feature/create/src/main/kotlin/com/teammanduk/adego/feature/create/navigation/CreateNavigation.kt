@@ -44,18 +44,7 @@ fun NavGraphBuilder.createNavGraph(
     composable<Route.SelectPlace> {
         SelectPlaceRoute(
             onBackClick = onNavigateBack,
-            onPlaceSelected = {
-                // TODO: ViewModel/Repository 구현 시
-                // - CreateViewModel의 StateFlow에 선택된 장소 정보 업데이트
-                // - CreateScreen에서 StateFlow를 관찰하여 자동으로 UI 업데이트
-                // 예: viewModel.updateSelectedPlace(placeName, placeAddress)
-
-                // 임시: 이전 화면(Create)의 savedStateHandle에 장소 정보 저장 (테스트용)
-                navController.previousBackStackEntry
-                    ?.savedStateHandle
-                    ?.set("selected_place", "부산 북구 만덕대로 291")
-                onNavigateBack()
-            }
+            onPlaceSelected = onNavigateBack
         )
     }
 }
