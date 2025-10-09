@@ -21,29 +21,31 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
-
-@Composable
-internal fun SelectPlaceRoute(
-    onBackClick: () -> Unit = {},
-    onPlaceSelected: () -> Unit = {}
-) {
-    SelectPlaceScreen(
-        onBackClick = onBackClick,
-        onPlaceSelected = onPlaceSelected
-    )
-}
+import com.teammanduk.adego.core.model.Place
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SelectPlaceScreen(
-    onBackClick: () -> Unit,
-    onPlaceSelected: () -> Unit
+internal fun SelectPlaceRoute(
+    onBackClick: () -> Unit = {},
+    onPlaceSelected: () -> Unit = {},
+    viewModel: SelectPlaceViewModel = hiltViewModel()
 ) {
+    val searchResult by viewModel.currentSearchResult.collectAsStateWithLifecycle()
+
+    // 초기 테스트 데이터 로드 (지도 중심 위경도)
+    LaunchedEffect(Unit) {
+        viewModel.searchByCoordinates(35.1979, 129.0758)
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -64,45 +66,68 @@ private fun SelectPlaceScreen(
             )
         }
     ) { paddingValues ->
-        Box(
+        SelectPlaceScreen(
+            searchResult = searchResult,
+            onMapClick = { lat, lng ->
+                // TODO: 실제 지도 클릭 시 호출
+                viewModel.searchByCoordinates(lat, lng)
+            },
+            onPlaceSelected = {
+                viewModel.confirmSelection()
+                onPlaceSelected()
+            },
+            modifier = Modifier.padding(paddingValues)
+        )
+    }
+}
+
+@Composable
+private fun SelectPlaceScreen(
+    searchResult: Place?,
+    onMapClick: (Double, Double) -> Unit,
+    onPlaceSelected: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
+        // 지도 Placeholder
+        MapPlaceholder(
+            modifier = Modifier.fillMaxSize(),
+            onMapClick = onMapClick
+        )
+
+        // 하단 장소 정보 카드 + 버튼
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 지도 Placeholder
-            MapPlaceholder(
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // 하단 장소 정보 카드 + 버튼
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            searchResult?.let { place ->
                 PlaceInfoCard(
-                    placeName = "부산 북구 만덕대로 291",
-                    placeAddress = "부산 북구 만덕동 607-1"
+                    placeName = place.name,
+                    placeAddress = place.address
                 )
+            }
 
-                Button(
-                    onClick = onPlaceSelected,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = AdegoTheme.colors.main500
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Text(
-                        text = "모임 장소 선택하기",
-                        style = AdegoTheme.typography.titleLarge,
-                        color = AdegoTheme.colors.onMain500
-                    )
-                }
+            Button(
+                onClick = onPlaceSelected,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AdegoTheme.colors.main500
+                ),
+                shape = RoundedCornerShape(12.dp),
+                enabled = searchResult != null
+            ) {
+                Text(
+                    text = "모임 장소 선택하기",
+                    style = AdegoTheme.typography.titleLarge,
+                    color = AdegoTheme.colors.onMain500
+                )
             }
         }
     }
@@ -110,7 +135,8 @@ private fun SelectPlaceScreen(
 
 @Composable
 private fun MapPlaceholder(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onMapClick: (Double, Double) -> Unit
 ) {
     Box(
         modifier = modifier
@@ -123,6 +149,7 @@ private fun MapPlaceholder(
             tint = Color(0xFF757575),
             modifier = Modifier.padding(32.dp)
         )
+        // TODO: 실제 Google Maps Compose 연동 시 onMapClick 사용
     }
 }
 

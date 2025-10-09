@@ -27,10 +27,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.teammanduk.adego.core.designsystem.component.AdegoDatePicker
 import com.teammanduk.adego.core.designsystem.component.AdegoTimePicker
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
@@ -52,12 +52,16 @@ internal fun CreateRoute(
     onNavigateToSelectPlace: () -> Unit = {},
     onCreateMeeting: (String, Int, Int) -> Unit = { _, _, _ -> },
     selectedPlaceFromNav: String? = null,
+    viewModel: CreateViewModel = hiltViewModel()
 ) {
+    val selectedPlace by viewModel.selectedPlace.collectAsStateWithLifecycle()
+
     CreateScreen(
         onNavigateBack = onNavigateBack,
         onNavigateToSelectPlace = onNavigateToSelectPlace,
         onCreateMeeting = onCreateMeeting,
         selectedPlaceFromNav = selectedPlaceFromNav,
+        selectedPlaceFromViewModel = selectedPlace
     )
 }
 
@@ -67,17 +71,10 @@ private fun CreateScreen(
     onNavigateToSelectPlace: () -> Unit,
     onCreateMeeting: (String, Int, Int) -> Unit,
     selectedPlaceFromNav: String? = null,
+    selectedPlaceFromViewModel: com.teammanduk.adego.core.model.Place? = null
 ) {
-    var selectedPlace by rememberSaveable { mutableStateOf("") }
-
-    // Navigation에서 전달받은 장소 정보 업데이트
-    LaunchedEffect(selectedPlaceFromNav) {
-        selectedPlaceFromNav?.let {
-            if (it.isNotEmpty()) {
-                selectedPlace = it
-            }
-        }
-    }
+    // ViewModel에서 전달받은 장소 정보 사용
+    val selectedPlace = selectedPlaceFromViewModel?.name ?: ""
     var selectedDate by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedHour by rememberSaveable { mutableStateOf<Int?>(null) }
     var selectedMinute by rememberSaveable { mutableStateOf<Int?>(null) }

@@ -2,7 +2,7 @@ import com.teammanduk.adego.convention.configureHiltAndroid
 import com.teammanduk.adego.convention.configureKotlinAndroid
 import com.teammanduk.adego.extentions.implementation
 
-plugins{
+plugins {
     id("adego.android.library")
     id("adego.android.compose")
 }
@@ -13,4 +13,10 @@ configureHiltAndroid()
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:navigation"))
+    implementation(project(":core:domain"))
+    implementation(project(":core:model"))
+
+    // Lifecycle
+    val libs = project.extensions.getByType<VersionCatalogsExtension>().named("libs")
+    implementation(libs.findLibrary("androidx.lifecycle.runtime.compose").get())
 }
