@@ -63,8 +63,8 @@ fun NavGraphBuilder.createNavGraph(
             onBackClick = {
                 navController.popBackStack()
             },
-            onPlaceClick = { placeName ->
-                // TODO: 선택한 장소를 ViewModel에 저장하고 SelectPlaceScreen으로 돌아가기
+            onPlaceClick = {
+                // 선택한 장소가 ViewModel에 저장되었으므로 SelectPlaceScreen으로 돌아가기
                 navController.popBackStack()
             }
         )
