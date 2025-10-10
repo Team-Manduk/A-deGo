@@ -30,6 +30,11 @@ android {
         }
         val mapsApiKey = secretsProperties.getProperty("MAPS_API_KEY", "")
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
 //    buildTypes {
@@ -41,11 +46,11 @@ android {
 //            )
 //        }
 //    }
-    buildFeatures {
-        compose = true
-    }
 }
 
 dependencies {
     implementation(projects.feature.main)
+
+    // Google Places API
+    implementation(libs.play.services.places)
 }
