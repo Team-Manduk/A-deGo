@@ -13,6 +13,9 @@ sealed interface Route {
     data object SelectPlace: Route
 
     @Serializable
+    data object SearchPlace: Route
+
+    @Serializable
     data class Map(
         val hour: Int,
         val minute: Int

@@ -2,6 +2,7 @@ package com.teammanduk.adego.feature.create
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,11 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -48,6 +52,7 @@ import com.teammanduk.adego.core.model.Place
 internal fun SelectPlaceRoute(
     onBackClick: () -> Unit = {},
     onPlaceSelected: () -> Unit = {},
+    onSearchClick: () -> Unit = {},
     viewModel: SelectPlaceViewModel = hiltViewModel()
 ) {
     val searchResult by viewModel.currentSearchResult.collectAsStateWithLifecycle()
@@ -82,6 +87,7 @@ internal fun SelectPlaceRoute(
                 viewModel.confirmSelection()
                 onPlaceSelected()
             },
+            onSearchClick = onSearchClick,
             modifier = Modifier.padding(paddingValues)
         )
     }
@@ -92,6 +98,7 @@ private fun SelectPlaceScreen(
     searchResult: Place?,
     onMapClick: (LatLng) -> Unit,
     onPlaceSelected: () -> Unit,
+    onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // searchResult에서 위치 정보를 가져오거나 기본값 사용
@@ -111,6 +118,38 @@ private fun SelectPlaceScreen(
             modifier = Modifier.fillMaxSize(),
             selectedPosition = selectedPosition,
             onMapClick = onMapClick
+        )
+
+        // 상단 검색창
+        OutlinedTextField(
+            value = "",
+            onValueChange = { },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .clickable { onSearchClick() },
+            enabled = false,
+            placeholder = {
+                Text(
+                    text = "장소를 검색하세요",
+                    style = AdegoTheme.typography.bodyLarge,
+                    color = Color(0xFF9E9E9E)
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = AdegoTheme.colors.main500
+                )
+            },
+            colors = OutlinedTextFieldDefaults.colors(
+                disabledBorderColor = AdegoTheme.colors.main500,
+                disabledContainerColor = Color.White,
+                disabledPlaceholderColor = Color(0xFF9E9E9E),
+                disabledLeadingIconColor = AdegoTheme.colors.main500
+            ),
+            shape = RoundedCornerShape(12.dp)
         )
 
         // 하단 장소 정보 카드 + 버튼
