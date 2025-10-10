@@ -57,6 +57,11 @@ internal fun SelectPlaceRoute(
 ) {
     val searchResult by viewModel.currentSearchResult.collectAsStateWithLifecycle()
 
+    // LaunchedEffect를 사용하여 선택된 장소가 있을 때 searchResult 업데이트
+    LaunchedEffect(Unit) {
+        // ViewModel이 생성될 때 이미 selectedPlace의 변경을 감지하고 있음
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

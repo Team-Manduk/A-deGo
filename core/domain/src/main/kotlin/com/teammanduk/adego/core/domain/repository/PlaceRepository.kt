@@ -12,4 +12,5 @@ interface PlaceRepository {
     // 검색/임시 선택 장소
     fun getCurrentSearchResult(): Flow<Place?>
     suspend fun searchPlaceByCoordinates(latitude: Double, longitude: Double): Place?
+    suspend fun searchPlacesByText(query: String): List<Place>
 }

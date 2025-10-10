@@ -3,6 +3,7 @@ package com.teammanduk.adego.feature.create
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,13 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,15 +39,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
+import com.teammanduk.adego.core.model.Place
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SearchPlaceRoute(
     onBackClick: () -> Unit = {},
-    onPlaceClick: (String) -> Unit = {},
-    viewModel: SelectPlaceViewModel = hiltViewModel()
+    onPlaceClick: () -> Unit = {},
+    viewModel: SearchPlaceViewModel = hiltViewModel()
 ) {
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -65,7 +74,15 @@ internal fun SearchPlaceRoute(
         }
     ) { paddingValues ->
         SearchPlaceScreen(
-            onPlaceClick = onPlaceClick,
+            searchResults = searchResults,
+            isLoading = isLoading,
+            onSearchQueryChange = { query ->
+                viewModel.searchPlaces(query)
+            },
+            onPlaceClick = { place ->
+                viewModel.selectPlace(place)
+                onPlaceClick()
+            },
             modifier = Modifier.padding(paddingValues)
         )
     }
@@ -73,18 +90,13 @@ internal fun SearchPlaceRoute(
 
 @Composable
 private fun SearchPlaceScreen(
-    onPlaceClick: (String) -> Unit,
+    searchResults: List<Place>,
+    isLoading: Boolean,
+    onSearchQueryChange: (String) -> Unit,
+    onPlaceClick: (Place) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by rememberSaveable { mutableStateOf("") }
-
-    // 임시 검색 결과 데이터 (실제로는 ViewModel에서 가져와야 함)
-    val searchResults = listOf(
-        "스타벅스 강남역점",
-        "카페 베네 서울역점",
-        "투썸플레이스 홍대입구점",
-        "이디야커피 신촌점"
-    )
 
     Column(
         modifier = modifier
@@ -96,7 +108,10 @@ private fun SearchPlaceScreen(
         // 검색 입력창
         OutlinedTextField(
             value = searchQuery,
-            onValueChange = { searchQuery = it },
+            onValueChange = { query ->
+                searchQuery = query
+                onSearchQueryChange(query)
+            },
             modifier = Modifier.fillMaxWidth(),
             placeholder = {
                 Text(
@@ -124,32 +139,60 @@ private fun SearchPlaceScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 검색 결과 리스트
-        if (searchQuery.isNotEmpty()) {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(searchResults) { place ->
-                    SearchResultItem(
-                        placeName = place,
-                        onClick = { onPlaceClick(place) }
+        // 검색 결과 표시
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                isLoading -> {
+                    // 로딩 중
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = AdegoTheme.colors.main500
                     )
                 }
-            }
-        } else {
-            // 검색 전 안내 메시지
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "검색어를 입력해주세요",
-                    style = AdegoTheme.typography.bodyLarge,
-                    color = Color(0xFF9E9E9E)
-                )
+                searchQuery.isEmpty() -> {
+                    // 검색 전 안내 메시지
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "검색어를 입력해주세요",
+                            style = AdegoTheme.typography.bodyLarge,
+                            color = Color(0xFF9E9E9E)
+                        )
+                    }
+                }
+                searchResults.isEmpty() -> {
+                    // 검색 결과 없음
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(top = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "검색 결과가 없습니다",
+                            style = AdegoTheme.typography.bodyLarge,
+                            color = Color(0xFF9E9E9E)
+                        )
+                    }
+                }
+                else -> {
+                    // 검색 결과 리스트
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(searchResults) { place ->
+                            SearchResultItem(
+                                place = place,
+                                onClick = { onPlaceClick(place) }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -157,7 +200,7 @@ private fun SearchPlaceScreen(
 
 @Composable
 private fun SearchResultItem(
-    placeName: String,
+    place: Place,
     onClick: () -> Unit
 ) {
     Row(
@@ -169,15 +212,31 @@ private fun SearchResultItem(
             )
             .clickable(onClick = onClick)
             .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // 위치 아이콘
+        Icon(
+            imageVector = Icons.Default.LocationOn,
+            contentDescription = null,
+            tint = AdegoTheme.colors.main500,
+            modifier = Modifier.size(24.dp)
+        )
+
+        // 장소 정보
         Column(
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = placeName,
+                text = place.name,
                 style = AdegoTheme.typography.titleLarge,
                 color = AdegoTheme.colors.onBackground
+            )
+            Text(
+                text = place.address,
+                style = AdegoTheme.typography.bodySmall,
+                color = Color(0xFF757575)
             )
         }
     }

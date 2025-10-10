@@ -45,7 +45,13 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Places API (New) REST API Response Models
+// Places API (New) REST API Request/Response Models
+@Serializable
+private data class TextSearchRequest(
+    val textQuery: String,
+    val languageCode: String = "ko"
+)
+
 @Serializable
 private data class NearbySearchRequest(
     val includedTypes: List<String>,
@@ -68,6 +74,11 @@ private data class Circle(
 private data class Center(
     val latitude: Double,
     val longitude: Double
+)
+
+@Serializable
+private data class TextSearchResponse(
+    val places: List<PlaceResult> = emptyList()
 )
 
 @Serializable
@@ -377,6 +388,78 @@ class PlaceRepositoryImpl @Inject constructor(
             latitude = latitude,
             longitude = longitude
         )
+    }
+
+    /**
+     * Places API Text Search를 사용하여 텍스트 쿼리로 장소를 검색합니다.
+     */
+    override suspend fun searchPlacesByText(query: String): List<Place> = withContext(Dispatchers.IO) {
+        return@withContext try {
+            if (query.isBlank()) {
+                Log.d("PlaceRepository", "검색 쿼리가 비어있습니다")
+                return@withContext emptyList()
+            }
+
+            Log.d("PlaceRepository", "Text Search 시작: query=$query")
+
+            // API 키 가져오기
+            val apiKey = getApiKey()
+            if (apiKey.isEmpty()) {
+                Log.e("PlaceRepository", "API 키를 찾을 수 없습니다")
+                return@withContext emptyList()
+            }
+
+            // Request Body 생성
+            val requestBody = TextSearchRequest(
+                textQuery = query,
+                languageCode = "ko"
+            )
+
+            // Ktor를 사용한 API 호출
+            val response = httpClient.post("https://places.googleapis.com/v1/places:searchText") {
+                contentType(ContentType.Application.Json)
+                header("X-Goog-Api-Key", apiKey)
+                header("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location")
+                header("Accept-Language", "ko")
+                setBody(requestBody)
+            }
+
+            val responseBody = response.bodyAsText()
+            Log.d("PlaceRepository", "Text Search 응답 코드: ${response.status.value}")
+            Log.d("PlaceRepository", "Text Search 응답: $responseBody")
+
+            if (response.status.value !in 200..299) {
+                Log.e("PlaceRepository", "Text Search 요청 실패: ${response.status.value}")
+                return@withContext emptyList()
+            }
+
+            // 응답 파싱
+            val searchResponse = response.body<TextSearchResponse>()
+            Log.d("PlaceRepository", "Text Search: ${searchResponse.places.size}개 장소 발견")
+
+            // 장소 목록 변환
+            searchResponse.places.mapNotNull { placeResult ->
+                val name = placeResult.displayName?.text
+                val address = placeResult.formattedAddress
+                val location = placeResult.location
+
+                if (name != null && address != null && location != null) {
+                    Log.d("PlaceRepository", "장소 발견: $name at ($address)")
+                    Place(
+                        name = name,
+                        address = address,
+                        latitude = location.latitude,
+                        longitude = location.longitude
+                    )
+                } else {
+                    Log.w("PlaceRepository", "불완전한 장소 정보: name=$name, address=$address, location=$location")
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PlaceRepository", "Text Search failed", e)
+            emptyList()
+        }
     }
 
     /**
