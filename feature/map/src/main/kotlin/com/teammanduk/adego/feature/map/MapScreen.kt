@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -33,16 +34,21 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,8 +69,6 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import kotlinx.coroutines.launch
@@ -80,32 +84,174 @@ private data class Participant(
 
 @Composable
 internal fun MapRoute(
+    roomId: String,
     meetingTime: String = "00시 00분",
+    viewModel: MapViewModel,
 ) {
-    MapScreen(
-        meetingTime = meetingTime
-    )
+    val room by viewModel.room.collectAsState()
+    val participants by viewModel.participants.collectAsState()
+    val selectedParticipantIndex by viewModel.selectedParticipantIndex.collectAsState()
+    val isInitialLocationLoaded by viewModel.isInitialLocationLoaded.collectAsState()
+
+    // 위치 권한 요청
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            android.util.Log.d("A-degoLogTag", "[MapScreen] 위치 권한 승인됨 - 위치 추적 시작")
+            viewModel.startLocationTracking()
+        } else {
+            android.util.Log.w("A-degoLogTag", "[MapScreen] 위치 권한 거부됨")
+        }
+    }
+
+    // 화면 진입 시 권한 요청
+    LaunchedEffect(Unit) {
+        android.util.Log.d("A-degoLogTag", "[MapScreen] 위치 권한 요청 시작")
+        locationPermissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
+    }
+
+    // 초기 위치를 로드할 때까지 로딩 화면 표시
+    if (!isInitialLocationLoaded) {
+        LoadingScreen()
+    } else {
+        MapScreen(
+            roomId = roomId,
+            meetingTime = meetingTime,
+            participants = participants,
+            selectedParticipantIndex = selectedParticipantIndex,
+            onParticipantSelected = viewModel::onParticipantSelected,
+            destination = room?.destination,
+            currentUserId = viewModel.userId
+        )
+    }
+}
+
+@Composable
+private fun LoadingScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .background(Color.White),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                color = AdegoTheme.colors.main500,
+                strokeWidth = 4.dp
+            )
+            Text(
+                text = "현재 위치를 가져오는 중...",
+                style = AdegoTheme.typography.bodyLarge,
+                color = AdegoTheme.colors.onBackground
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MapScreen(
-    meetingTime: String
+    roomId: String,
+    meetingTime: String,
+    participants: List<com.teammanduk.adego.core.model.Participant>,
+    selectedParticipantIndex: Int,
+    onParticipantSelected: (Int) -> Unit,
+    destination: com.teammanduk.adego.core.model.Place?,
+    currentUserId: String
 ) {
-    // 임시 참가자 데이터
-    val participants = remember {
-        listOf(
-            Participant("홍길동", 0, "잠시 후 도착", Color(0xFFE53935)),
-            Participant("김철수", 300, "도착중", Color(0xFF5C6BC0)),
-            Participant("이영희", 500, "도착중", Color(0xFF43A047)),
-            Participant("박민수", 800, "도착중", Color(0xFFD81B60)),
-            Participant("최영수", 1200, "도착중", Color(0xFF00ACC1))
-        )
+    // 임시: UI 전용 Participant 데이터로 변환
+    val uiParticipants = remember(participants) {
+        participants.mapIndexed { index, participant ->
+            // profileColor가 비어있거나 유효하지 않으면 기본 색상 사용
+            val parsedColor = try {
+                if (participant.profileColor.isNotEmpty()) {
+                    Color(android.graphics.Color.parseColor(participant.profileColor))
+                } else {
+                    Color(0xFFE53935) // 기본 빨강
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("A-degoLogTag", "[MapScreen] profileColor 파싱 실패: ${participant.profileColor}, 기본 색상 사용")
+                Color(0xFFE53935) // 기본 빨강
+            }
+
+            Participant(
+                name = participant.name,
+                distanceInMeters = participant.route?.distanceInMeters ?: 0,
+                status = if (participant.route?.eta != null) "도착중" else "대기중",
+                color = parsedColor
+            )
+        }
     }
 
-    val pagerState = rememberPagerState(pageCount = { participants.size })
+    val pagerState = rememberPagerState(
+        pageCount = { uiParticipants.size },
+        initialPage = selectedParticipantIndex
+    )
     val coroutineScope = rememberCoroutineScope()
     var showInviteDialog by remember { mutableStateOf(false) }
+
+    // 현재 사용자 찾기
+    val currentUser = remember(participants, currentUserId) {
+        participants.find { it.userId == currentUserId }
+    }
+
+    // 초기 렌더링 여부 추적
+    var isInitialRender by remember { mutableStateOf(true) }
+
+    // 지도 카메라 위치 설정 - 현재 사용자 위치가 반드시 있어야 함
+    val cameraPositionState = rememberCameraPositionState {
+        currentUser?.location?.let { location ->
+            android.util.Log.d("A-degoLogTag", "[MapScreen] 카메라 초기화: 현재 사용자 위치 lat=${location.latitude}, lng=${location.longitude}")
+            position = CameraPosition.fromLatLngZoom(
+                LatLng(location.latitude, location.longitude),
+                15f
+            )
+        } ?: run {
+            // 이 경우는 발생하면 안 됨 (로딩 화면에서 위치를 받은 후에만 여기 도달)
+            android.util.Log.w("A-degoLogTag", "[MapScreen] 경고: 현재 사용자 위치가 없음")
+            position = CameraPosition.fromLatLngZoom(LatLng(37.5665, 126.9780), 15f)
+        }
+    }
+
+    // 현재 사용자의 위치가 업데이트되면 카메라 이동 (초기 렌더링은 제외)
+    LaunchedEffect(currentUser?.location) {
+        currentUser?.location?.let { location ->
+            if (isInitialRender) {
+                // 초기 렌더링: 애니메이션 없이 바로 이동
+                android.util.Log.d("A-degoLogTag", "[MapScreen] 초기 카메라 위치 설정: lat=${location.latitude}, lng=${location.longitude}")
+                cameraPositionState.move(
+                    com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(
+                        LatLng(location.latitude, location.longitude),
+                        15f
+                    )
+                )
+                isInitialRender = false
+            } else {
+                // 이후 업데이트: 부드럽게 애니메이션
+                android.util.Log.d("A-degoLogTag", "[MapScreen] 현재 사용자 위치 업데이트: lat=${location.latitude}, lng=${location.longitude}")
+                cameraPositionState.animate(
+                    com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(
+                        LatLng(location.latitude, location.longitude),
+                        15f
+                    ),
+                    durationMs = 1000
+                )
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -113,7 +259,30 @@ private fun MapScreen(
             .systemBarsPadding()
     ) {
         // 전체 화면 지도
-        MapPlaceholder(modifier = Modifier.fillMaxSize())
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState,
+            properties = MapProperties(
+                isMyLocationEnabled = false
+            ),
+            uiSettings = MapUiSettings(
+                zoomControlsEnabled = false,
+                myLocationButtonEnabled = false,
+                compassEnabled = false,
+                mapToolbarEnabled = false
+            )
+        ) {
+            // 목적지 마커 추가
+            destination?.let {
+                com.google.maps.android.compose.Marker(
+                    state = com.google.maps.android.compose.rememberMarkerState(
+                        position = LatLng(it.latitude, it.longitude)
+                    ),
+                    title = it.name,
+                    snippet = "목적지"
+                )
+            }
+        }
 
         // 상단 영역
         Column(
@@ -149,7 +318,7 @@ private fun MapScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "모임인원: ${participants.size}명",
+                        text = "모임인원: ${uiParticipants.size}명",
                         style = AdegoTheme.typography.bodyLarge,
                         color = AdegoTheme.colors.highlight500
                     )
@@ -184,7 +353,7 @@ private fun MapScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                participants.forEachIndexed { index, participant ->
+                uiParticipants.forEachIndexed { index, participant ->
                     val isSelected = pagerState.currentPage == index
                     val iconSize by animateDpAsState(
                         targetValue = if (isSelected) 40.dp else 32.dp,
@@ -249,169 +418,36 @@ private fun MapScreen(
             }
         }
 
-        // 하단 참가자 카드 (스와이프)
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        ) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 32.dp),
-                pageSpacing = 16.dp
-            ) { page ->
-                ParticipantCard(
-                    participant = participants[page],
-                    currentPage = pagerState.currentPage,
-                    totalPages = participants.size,
-                    onPreviousClick = {
-                        coroutineScope.launch {
-                            if (pagerState.currentPage > 0) {
-                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
-                            }
-                        }
-                    },
-                    onNextClick = {
-                        coroutineScope.launch {
-                            if (pagerState.currentPage < participants.size - 1) {
-                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+        // 지도 위 참가자 위치 마커들
+        participants.forEach { participant ->
+            participant.location?.let { location ->
+                // 위도/경도를 화면 좌표로 변환
+                val projection = cameraPositionState.projection
+                val screenPosition = projection?.toScreenLocation(
+                    LatLng(location.latitude, location.longitude)
                 )
-            }
-        }
 
-        // 지도 위 참가자 위치 마커들 (상단/하단 패딩으로 영역 제한)
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 200.dp, bottom = 240.dp)  // 상단 섹션과 하단 카드 영역 제외
-        ) {
-            val screenWidth = maxWidth
-            val screenHeight = maxHeight
+                screenPosition?.let { screenPos ->
+                    val isSelected = uiParticipants.getOrNull(pagerState.currentPage)?.name == participant.name
 
-            participants.forEachIndexed { index, participant ->
-                // TODO: 실제 위치 데이터로 대체 필요
-                // 임시로 위치 표시 (일부는 화면 밖, 다양한 방향으로 분산)
-                val offsetX = when (participant.name) {
-                    "홍길동" -> screenWidth / 2  // 화면 내
-                    "김철수" -> screenWidth + 100.dp  // 화면 밖 (오른쪽)
-                    "이영희" -> screenWidth / 2  // 화면 밖 (아래)
-                    "박민수" -> -100.dp  // 화면 밖 (왼쪽)
-                    "최영수" -> screenWidth / 2  // 화면 밖 (위)
-                    else -> 150.dp
-                }
-                val offsetY = when (participant.name) {
-                    "홍길동" -> screenHeight / 2  // 화면 내
-                    "김철수" -> screenHeight / 2  // 화면 밖 (오른쪽)
-                    "이영희" -> screenHeight + 100.dp  // 화면 밖 (아래)
-                    "박민수" -> screenHeight / 2  // 화면 밖 (왼쪽)
-                    "최영수" -> -50.dp  // 화면 밖 (위)
-                    else -> screenHeight / 2
-                }
+                    // 참가자 색상 찾기
+                    val participantColor = uiParticipants.find { it.name == participant.name }?.color
+                        ?: Color(0xFFE53935)
 
-                // 경계값 정의 (dp) - 이제 padding된 영역 내부 기준
-                val topBound = 0.dp
-                val bottomBound = screenHeight
-                val leftBound = 16.dp
-                val rightBound = screenWidth - 80.dp
-
-                val isSelected = pagerState.currentPage == index
-                val isOutOfBounds = offsetX < leftBound || offsetX > rightBound ||
-                        offsetY < topBound || offsetY > bottomBound
-
-                if (isOutOfBounds) {
-                    // 화면 밖 참가자 - 말풍선으로 표시
-                    // 실제 위치를 경계 내로 제한 (말풍선을 표시할 위치)
-                    val edgeX = offsetX.coerceIn(leftBound, rightBound)
-                    val edgeY = offsetY.coerceIn(topBound, bottomBound)
-
-                    // 말풍선 위치에서 실제 위치로의 방향 (꼬리 방향)
-                    val dx = (offsetX - edgeX).value
-                    val dy = (offsetY - edgeY).value
-                    val angle = atan2(dy, dx)
+                    // px를 dp로 변환
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    val offsetX = with(density) { (screenPos.x - 28f).toDp() }
+                    val offsetY = with(density) { (screenPos.y - 28f).toDp() }
 
                     Box(
                         modifier = Modifier
-                            .padding(start = edgeX, top = edgeY)
-                            .size(48.dp)
-                            .align(Alignment.TopStart)
-                            .drawBehind {
-                                // 원형 배경
-                                drawCircle(
-                                    color = participant.color,
-                                    radius = 20.dp.toPx(),
-                                    center = center
-                                )
-
-                                // 말풍선 꼬리 (삼각형)
-                                val tailSize = 10.dp.toPx()
-                                val circleRadius = 20.dp.toPx()
-
-                                // 각도에 따른 꼬리 시작점 계산
-                                val tailBaseX = center.x + kotlin.math.cos(angle) * circleRadius
-                                val tailBaseY = center.y + kotlin.math.sin(angle) * circleRadius
-                                val tailTipX = tailBaseX + kotlin.math.cos(angle) * tailSize
-                                val tailTipY = tailBaseY + kotlin.math.sin(angle) * tailSize
-
-                                // 삼각형 양 옆 점 계산
-                                val perpAngle1 = angle + Math.PI / 2
-                                val perpAngle2 = angle - Math.PI / 2
-                                val baseOffset = 6.dp.toPx()
-
-                                val point1X = tailBaseX + kotlin.math.cos(perpAngle1) * baseOffset
-                                val point1Y = tailBaseY + kotlin.math.sin(perpAngle1) * baseOffset
-                                val point2X = tailBaseX + kotlin.math.cos(perpAngle2) * baseOffset
-                                val point2Y = tailBaseY + kotlin.math.sin(perpAngle2) * baseOffset
-
-                                val tailPath = Path().apply {
-                                    moveTo(point1X.toFloat(), point1Y.toFloat())
-                                    lineTo(tailTipX.toFloat(), tailTipY.toFloat())
-                                    lineTo(point2X.toFloat(), point2Y.toFloat())
-                                    close()
-                                }
-                                drawPath(tailPath, participant.color)
-
-                                // 흰색 테두리 - 원
-                                drawCircle(
-                                    color = androidx.compose.ui.graphics.Color.White,
-                                    radius = 20.dp.toPx(),
-                                    center = center,
-                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                                )
-
-                                // 흰색 테두리 - 꼬리
-                                drawPath(
-                                    tailPath,
-                                    color = androidx.compose.ui.graphics.Color.White,
-                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = participant.name,
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                } else {
-                    // 화면 내 참가자 - 일반 마커
-                    Box(
-                        modifier = Modifier
-                            .padding(start = offsetX, top = offsetY)
-                            .size(56.dp)
-                            .align(Alignment.TopStart),
+                            .offset(x = offsetX, y = offsetY)
+                            .size(56.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         // 심장 박동 동심원 애니메이션 (선택된 경우만)
                         if (isSelected) {
-                            val infiniteTransition = rememberInfiniteTransition(label = "mapPulse")
+                            val infiniteTransition = rememberInfiniteTransition(label = "mapPulse_${participant.userId}")
                             val pulseScale by infiniteTransition.animateFloat(
                                 initialValue = 1f,
                                 targetValue = 1.5f,
@@ -433,7 +469,7 @@ private fun MapScreen(
                                 modifier = Modifier
                                     .size(40.dp * pulseScale)
                                     .clip(CircleShape)
-                                    .background(participant.color.copy(alpha = pulseAlpha))
+                                    .background(participantColor.copy(alpha = pulseAlpha))
                             )
                         }
 
@@ -442,7 +478,8 @@ private fun MapScreen(
                             modifier = Modifier
                                 .size(40.dp)
                                 .clip(CircleShape)
-                                .background(participant.color),
+                                .background(participantColor)
+                                .border(2.dp, Color.White, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -456,39 +493,51 @@ private fun MapScreen(
                 }
             }
         }
+
+        // 하단 참가자 카드 (스와이프)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 32.dp),
+                pageSpacing = 16.dp
+            ) { page ->
+                ParticipantCard(
+                    participant = uiParticipants[page],
+                    currentPage = pagerState.currentPage,
+                    totalPages = uiParticipants.size,
+                    onPreviousClick = {
+                        coroutineScope.launch {
+                            if (pagerState.currentPage > 0) {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            }
+                        }
+                    },
+                    onNextClick = {
+                        coroutineScope.launch {
+                            if (pagerState.currentPage < uiParticipants.size - 1) {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
     }
 
     // 초대 다이얼로그
     if (showInviteDialog) {
         InviteDialog(
-            inviteCode = "ABC123",
+            inviteCode = roomId,
             onDismiss = { showInviteDialog = false }
         )
-    }
-}
-
-@Composable
-private fun MapPlaceholder(
-    modifier: Modifier = Modifier
-) {
-    // 서울 강남역 근처 좌표 (기본값)
-    val gangnam = LatLng(37.498095, 127.027610)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(gangnam, 15f)
-    }
-
-    GoogleMap(
-        modifier = modifier,
-        cameraPositionState = cameraPositionState,
-        properties = MapProperties(
-            isMyLocationEnabled = false
-        ),
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = false,
-            myLocationButtonEnabled = false
-        )
-    ) {
-        // 마커는 필요시 추가
     }
 }
 
@@ -736,7 +785,13 @@ private fun InviteDialog(
 private fun MapScreenPreview() {
     AdegoTheme {
         MapScreen(
-            meetingTime = "14시 30분"
+            roomId = "preview123",
+            meetingTime = "14시 30분",
+            participants = emptyList(),
+            selectedParticipantIndex = 0,
+            onParticipantSelected = {},
+            destination = null,
+            currentUserId = "preview_user"
         )
     }
 }

@@ -4,6 +4,7 @@ import java.io.FileInputStream
 plugins {
     alias(libs.plugins.adego.android.application)
     alias(libs.plugins.adego.android.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {

@@ -50,18 +50,54 @@ import java.util.Locale
 internal fun CreateRoute(
     onNavigateBack: () -> Unit = {},
     onNavigateToSelectPlace: () -> Unit = {},
-    onCreateMeeting: (String, Int, Int) -> Unit = { _, _, _ -> },
+    onNavigateToMap: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },  // roomId, userId, hour, minute으로 Map 화면 이동
     selectedPlaceFromNav: String? = null,
     viewModel: CreateViewModel = hiltViewModel()
 ) {
     val selectedPlace by viewModel.selectedPlace.collectAsStateWithLifecycle()
+    val isCreating by viewModel.isCreating.collectAsStateWithLifecycle()
+    val createdRoomInfo by viewModel.createdRoomInfo.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+
+    // 방 생성 성공 시 Map 화면으로 이동
+    androidx.compose.runtime.LaunchedEffect(createdRoomInfo) {
+        createdRoomInfo?.let { info ->
+            onNavigateToMap(info.roomId, info.userId, info.hour, info.minute)
+            viewModel.clearCreatedRoomInfo()
+        }
+    }
+
+    // 에러 표시
+    error?.let { errorMessage ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            title = { Text("방 생성 실패") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { viewModel.clearError() }) {
+                    Text("확인")
+                }
+            }
+        )
+    }
 
     CreateScreen(
         onNavigateBack = onNavigateBack,
         onNavigateToSelectPlace = onNavigateToSelectPlace,
-        onCreateMeeting = onCreateMeeting,
+        onCreateRoom = { roomName, dateMillis, hour, minute ->
+            // TODO: 실제 userId, userName으로 교체
+            viewModel.createRoom(
+                roomName = roomName,
+                dateMillis = dateMillis,
+                hour = hour,
+                minute = minute,
+                userId = "user_${System.currentTimeMillis()}", // 임시 userId
+                userName = "사용자" // 임시 userName
+            )
+        },
         selectedPlaceFromNav = selectedPlaceFromNav,
-        selectedPlaceFromViewModel = selectedPlace
+        selectedPlaceFromViewModel = selectedPlace,
+        isCreating = isCreating
     )
 }
 
@@ -69,15 +105,21 @@ internal fun CreateRoute(
 private fun CreateScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSelectPlace: () -> Unit,
-    onCreateMeeting: (String, Int, Int) -> Unit,
+    onCreateRoom: (roomName: String, dateMillis: Long, hour: Int, minute: Int) -> Unit,
     selectedPlaceFromNav: String? = null,
-    selectedPlaceFromViewModel: com.teammanduk.adego.core.model.Place? = null
+    selectedPlaceFromViewModel: com.teammanduk.adego.core.model.Place? = null,
+    isCreating: Boolean = false
 ) {
     // ViewModel에서 전달받은 장소 정보 사용
     val selectedPlace = selectedPlaceFromViewModel?.name ?: ""
-    var selectedDate by rememberSaveable { mutableStateOf<Long?>(null) }
-    var selectedHour by rememberSaveable { mutableStateOf<Int?>(null) }
-    var selectedMinute by rememberSaveable { mutableStateOf<Int?>(null) }
+    var roomName by rememberSaveable { mutableStateOf("") }
+
+    // 현재 날짜와 시간을 초기값으로 설정
+    val currentCalendar = java.util.Calendar.getInstance()
+    var selectedDate by rememberSaveable { mutableStateOf<Long?>(currentCalendar.timeInMillis) }
+    var selectedHour by rememberSaveable { mutableStateOf<Int?>(currentCalendar.get(java.util.Calendar.HOUR_OF_DAY)) }
+    var selectedMinute by rememberSaveable { mutableStateOf<Int?>(currentCalendar.get(java.util.Calendar.MINUTE)) }
+
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
 
@@ -275,9 +317,14 @@ private fun CreateScreen(
             // 모임 생성하기 버튼
             Button(
                 onClick = {
-                    val hour = selectedHour ?: 0
-                    val minute = selectedMinute ?: 0
-                    onCreateMeeting(selectedPlace, hour, minute)
+                    val dateMillis = selectedDate ?: return@Button
+                    val hour = selectedHour ?: return@Button
+                    val minute = selectedMinute ?: return@Button
+
+                    // 방 이름 생성 (장소명 + 시간)
+                    val generatedRoomName = "$selectedPlace 모임"
+
+                    onCreateRoom(generatedRoomName, dateMillis, hour, minute)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -287,13 +334,20 @@ private fun CreateScreen(
                     containerColor = AdegoTheme.colors.main500
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = selectedPlace.isNotEmpty() && selectedDate != null && selectedHour != null && selectedMinute != null
+                enabled = !isCreating && selectedPlace.isNotEmpty() && selectedDate != null && selectedHour != null && selectedMinute != null
             ) {
-                Text(
-                    text = "모임 생성하기",
-                    style = AdegoTheme.typography.titleLarge,
-                    color = AdegoTheme.colors.onMain500
-                )
+                if (isCreating) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = AdegoTheme.colors.onMain500
+                    )
+                } else {
+                    Text(
+                        text = "모임 생성하기",
+                        style = AdegoTheme.typography.titleLarge,
+                        color = AdegoTheme.colors.onMain500
+                    )
+                }
             }
         }
     }
@@ -314,8 +368,8 @@ private fun CreateScreen(
             selectedHour = hour
             selectedMinute = minute
         },
-        initialHour = selectedHour ?: 0,
-        initialMinute = selectedMinute ?: 0
+        initialHour = selectedHour ?: currentCalendar.get(java.util.Calendar.HOUR_OF_DAY),
+        initialMinute = selectedMinute ?: currentCalendar.get(java.util.Calendar.MINUTE)
     )
 }
 
@@ -326,7 +380,7 @@ private fun CreateScreenPreview() {
         CreateScreen(
             onNavigateBack = {},
             onNavigateToSelectPlace = {},
-            onCreateMeeting = { _, _, _ -> },
+            onCreateRoom = { _, _, _, _ -> },
         )
     }
 }

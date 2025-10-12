@@ -29,18 +29,18 @@ internal fun MainNavHost(
                 onNavigateToCreate = navigator::navigateToCreate,
                 onNavigateToSettings = { /* TODO: 설정 화면 구현 */ },
                 onJoinWithCode = { code ->
-                    // TODO: 초대 코드로 서버에서 모임 정보 조회 후 시간 정보 가져오기
-                    // 임시: 기본 시간(0시 0분)으로 Map 화면 이동
-                    navigator.navigateToMap(0, 0)
+                    // TODO: 초대 코드로 서버에서 모임 정보 조회 후 시간, userId 정보 가져오기
+                    // 임시: 코드를 roomId로, 임시 userId 생성, 기본 시간(0시 0분)으로 Map 화면 이동
+                    val tempUserId = "user_${System.currentTimeMillis()}"
+                    navigator.navigateToMap(code, tempUserId, 0, 0)
                 }
             )
             createNavGraph(
                 navController = navigator.navController,
                 onNavigateBack = navigator::navigateBack,
                 onNavigateToSelectPlace = navigator::navigateToSelectPlace,
-                onCreateMeeting = { place, hour, minute ->
-                    /* TODO: 모임 생성 로직 구현 */
-                    navigator.navigateToMap(hour, minute)
+                onCreateMeeting = { roomId, userId, hour, minute ->
+                    navigator.navigateToMap(roomId, userId, hour, minute)
                 }
             )
             mapNavGraph()
