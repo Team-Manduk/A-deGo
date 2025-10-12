@@ -11,4 +11,5 @@ dependencies {
     implementation(projects.feature.create)
     implementation(projects.feature.map)
     implementation(projects.core.data)
+    implementation(projects.core.remote)
 }

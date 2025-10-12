@@ -17,6 +17,8 @@ sealed interface Route {
 
     @Serializable
     data class Map(
+        val roomId: String,
+        val userId: String,
         val hour: Int,
         val minute: Int
     ): Route
