@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
@@ -92,6 +93,7 @@ internal fun MapRoute(
     val participants by viewModel.participants.collectAsState()
     val selectedParticipantIndex by viewModel.selectedParticipantIndex.collectAsState()
     val isInitialLocationLoaded by viewModel.isInitialLocationLoaded.collectAsState()
+    val participantDistances by viewModel.participantDistances.collectAsState()
 
     // 위치 권한 요청
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -126,6 +128,7 @@ internal fun MapRoute(
             roomId = roomId,
             meetingTime = meetingTime,
             participants = participants,
+            participantDistances = participantDistances,
             selectedParticipantIndex = selectedParticipantIndex,
             onParticipantSelected = viewModel::onParticipantSelected,
             destination = room?.destination,
@@ -167,6 +170,7 @@ private fun MapScreen(
     roomId: String,
     meetingTime: String,
     participants: List<com.teammanduk.adego.core.model.Participant>,
+    participantDistances: List<ParticipantDistance>,
     selectedParticipantIndex: Int,
     onParticipantSelected: (Int) -> Unit,
     destination: com.teammanduk.adego.core.model.Place?,
@@ -341,77 +345,111 @@ private fun MapScreen(
                 }
             }
 
-            // 참가자 아이콘 바
-            Row(
+            // 참가자 트래킹 바 (거리 기반 배치)
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
                         color = Color(0xFFD6E9F5),
                         shape = RoundedCornerShape(32.dp)
                     )
-                    .padding(horizontal = 12.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .height(56.dp)
             ) {
-                uiParticipants.forEachIndexed { index, participant ->
-                    val isSelected = pagerState.currentPage == index
-                    val iconSize by animateDpAsState(
-                        targetValue = if (isSelected) 40.dp else 32.dp,
-                        animationSpec = spring(
-                            dampingRatio = 0.7f,
-                            stiffness = 200f
-                        ),
-                        label = "iconSize"
-                    )
+                val barWidth = maxWidth - 24.dp // padding 제외한 실제 트래킹바 너비
 
+                // 약속장소 아이콘 (왼쪽 끝, 0%)
+                destination?.let {
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp),
+                            .align(Alignment.CenterStart)
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(AdegoTheme.colors.main500),
                         contentAlignment = Alignment.Center
                     ) {
-                        // 심장 박동 동심원 애니메이션 (선택된 경우만)
-                        if (isSelected) {
-                            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-                            val pulseScale by infiniteTransition.animateFloat(
-                                initialValue = 1f,
-                                targetValue = 1.4f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(1000)
-                                ),
-                                label = "pulseScale"
-                            )
-                            val pulseAlpha by infiniteTransition.animateFloat(
-                                initialValue = 0.6f,
-                                targetValue = 0f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(1000)
-                                ),
-                                label = "pulseAlpha"
-                            )
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "약속장소",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
 
-                            Box(
-                                modifier = Modifier
-                                    .size(iconSize * pulseScale)
-                                    .clip(CircleShape)
-                                    .background(participant.color.copy(alpha = pulseAlpha))
-                            )
-                        }
+                // 참가자 아이콘들 (거리 기반 위치)
+                participantDistances.forEach { participantDistance ->
+                    val participant = uiParticipants.find {
+                        it.name == participantDistance.participant.name
+                    }
 
-                        // 메인 아이콘
+                    participant?.let { uiParticipant ->
+                        val index = uiParticipants.indexOf(uiParticipant)
+                        val isSelected = pagerState.currentPage == index
+
+                        val iconSize by animateDpAsState(
+                            targetValue = if (isSelected) 40.dp else 32.dp,
+                            animationSpec = spring(
+                                dampingRatio = 0.7f,
+                                stiffness = 200f
+                            ),
+                            label = "iconSize"
+                        )
+
+                        // normalizedPosition: 0.0f (약속장소) ~ 1.0f (가장 먼 곳)
+                        // 실제 offset 계산: 약속장소 아이콘 너비(32dp) + 여백(8dp) + 비율에 따른 위치
+                        val offsetX = 40.dp + (barWidth - 80.dp) * participantDistance.normalizedPosition
+
                         Box(
                             modifier = Modifier
+                                .offset(x = offsetX, y = 0.dp)
                                 .size(iconSize)
-                                .clip(CircleShape)
-                                .background(participant.color),
+                                .align(Alignment.CenterStart),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = participant.name,
-                                tint = Color.White,
-                                modifier = Modifier.size(if (isSelected) 24.dp else 20.dp)
-                            )
+                            // 심장 박동 동심원 애니메이션 (선택된 경우만)
+                            if (isSelected) {
+                                val infiniteTransition = rememberInfiniteTransition(label = "pulse_${uiParticipant.name}")
+                                val pulseScale by infiniteTransition.animateFloat(
+                                    initialValue = 1f,
+                                    targetValue = 1.4f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(1000)
+                                    ),
+                                    label = "pulseScale"
+                                )
+                                val pulseAlpha by infiniteTransition.animateFloat(
+                                    initialValue = 0.6f,
+                                    targetValue = 0f,
+                                    animationSpec = infiniteRepeatable(
+                                        animation = tween(1000)
+                                    ),
+                                    label = "pulseAlpha"
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .size(iconSize * pulseScale)
+                                        .clip(CircleShape)
+                                        .background(uiParticipant.color.copy(alpha = pulseAlpha))
+                                )
+                            }
+
+                            // 메인 아이콘
+                            Box(
+                                modifier = Modifier
+                                    .size(iconSize)
+                                    .clip(CircleShape)
+                                    .background(uiParticipant.color),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = uiParticipant.name,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(if (isSelected) 24.dp else 20.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -788,6 +826,7 @@ private fun MapScreenPreview() {
             roomId = "preview123",
             meetingTime = "14시 30분",
             participants = emptyList(),
+            participantDistances = emptyList(),
             selectedParticipantIndex = 0,
             onParticipantSelected = {},
             destination = null,

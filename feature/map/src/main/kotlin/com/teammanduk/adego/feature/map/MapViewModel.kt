@@ -19,6 +19,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+/**
+ * 참가자의 거리 정보
+ * @param participant 참가자 정보
+ * @param distanceInMeters 약속장소까지의 거리 (미터)
+ * @param normalizedPosition 트래킹바 위치 (0.0f = 약속장소, 1.0f = 가장 먼 사람)
+ */
+data class ParticipantDistance(
+    val participant: Participant,
+    val distanceInMeters: Int,
+    val normalizedPosition: Float
+)
 
 @HiltViewModel(assistedFactory = MapViewModel.Factory::class)
 class MapViewModel @AssistedInject constructor(
@@ -69,6 +85,26 @@ class MapViewModel @AssistedInject constructor(
     // 초기 위치 로딩 상태
     private val _isInitialLocationLoaded = MutableStateFlow(false)
     val isInitialLocationLoaded: StateFlow<Boolean> = _isInitialLocationLoaded.asStateFlow()
+
+    // 참가자 거리 정보 (트래킹바용)
+    private val _participantDistances = MutableStateFlow<List<ParticipantDistance>>(emptyList())
+    val participantDistances: StateFlow<List<ParticipantDistance>> = _participantDistances.asStateFlow()
+
+    init {
+        // 방 정보와 참가자 정보가 변경될 때마다 거리 계산
+        viewModelScope.launch {
+            kotlinx.coroutines.flow.combine(room, participants) { r, p ->
+                Pair(r, p)
+            }.collect { (currentRoom, currentParticipants) ->
+                currentRoom?.destination?.let { destination ->
+                    _participantDistances.value = calculateParticipantDistances(
+                        participants = currentParticipants,
+                        destination = destination
+                    )
+                }
+            }
+        }
+    }
 
     // 위치 추적 시작 (외부에서 호출 가능하도록 public으로 변경)
     fun startLocationTracking() {
@@ -125,6 +161,79 @@ class MapViewModel @AssistedInject constructor(
     // 에러 메시지 초기화
     fun clearError() {
         _error.value = null
+    }
+
+    /**
+     * 참가자들의 약속장소까지 거리 계산
+     * TODO: 나중에 route 정보가 있으면 경로 기반 거리로 변경
+     */
+    private fun calculateParticipantDistances(
+        participants: List<Participant>,
+        destination: com.teammanduk.adego.core.model.Place
+    ): List<ParticipantDistance> {
+        // 위치 정보가 있는 참가자만 필터링
+        val participantsWithLocation = participants.filter { it.location != null }
+
+        if (participantsWithLocation.isEmpty()) {
+            return emptyList()
+        }
+
+        // 각 참가자의 거리 계산
+        val distances = participantsWithLocation.map { participant ->
+            val location = participant.location!!
+
+            // TODO: route 정보가 있으면 route.distanceInMeters 사용
+            // 현재는 직선 거리 계산 (Haversine)
+            val distanceInMeters = calculateHaversineDistance(
+                lat1 = location.latitude,
+                lon1 = location.longitude,
+                lat2 = destination.latitude,
+                lon2 = destination.longitude
+            )
+
+            ParticipantDistance(
+                participant = participant,
+                distanceInMeters = distanceInMeters,
+                normalizedPosition = 0f // 아래에서 계산
+            )
+        }
+
+        // 가장 먼 거리 찾기
+        val maxDistance = distances.maxOfOrNull { it.distanceInMeters } ?: 1
+
+        // normalized position 계산 (0.0f ~ 1.0f)
+        return distances.map { distance ->
+            distance.copy(
+                normalizedPosition = if (maxDistance > 0) {
+                    distance.distanceInMeters.toFloat() / maxDistance.toFloat()
+                } else {
+                    0f
+                }
+            )
+        }
+    }
+
+    /**
+     * Haversine 공식을 사용한 두 지점 간 직선 거리 계산 (미터)
+     */
+    private fun calculateHaversineDistance(
+        lat1: Double,
+        lon1: Double,
+        lat2: Double,
+        lon2: Double
+    ): Int {
+        val earthRadiusMeters = 6371000.0 // 지구 반지름 (미터)
+
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+
+        val a = sin(dLat / 2) * sin(dLat / 2) +
+                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                sin(dLon / 2) * sin(dLon / 2)
+
+        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+        return (earthRadiusMeters * c).toInt()
     }
 
     override fun onCleared() {

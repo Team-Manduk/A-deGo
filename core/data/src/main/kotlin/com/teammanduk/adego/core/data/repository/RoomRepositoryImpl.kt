@@ -106,21 +106,28 @@ class RoomRepositoryImpl @Inject constructor(
         userName: String
     ): Result<Unit> {
         return try {
+            Log.d(TAG, "[Repository] 방 참여 시작 - roomId: $roomId, userId: $userId")
+
             // 방 존재 여부 확인
             val room = roomDataSource.getRoom(roomId).getOrNull()
                 ?: return Result.failure(Exception("Room not found"))
+
+            // 참여자 색상 생성
+            val profileColor = generateColorFromUserId(userId)
+            Log.d(TAG, "[Repository] joinRoom - userId=$userId -> profileColor=$profileColor")
 
             // 참여자 추가
             val participant = ParticipantDto(
                 userId = userId,
                 name = userName,
-                profileColor = generateColorFromUserId(userId),
+                profileColor = profileColor,
                 location = null,
                 route = null
             )
 
             roomDataSource.addParticipant(roomId, participant)
         } catch (e: Exception) {
+            Log.e(TAG, "[Repository] 방 참여 실패", e)
             Result.failure(e)
         }
     }
