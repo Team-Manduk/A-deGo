@@ -93,7 +93,6 @@ internal fun MapRoute(
     val participants by viewModel.participants.collectAsState()
     val selectedParticipantIndex by viewModel.selectedParticipantIndex.collectAsState()
     val isInitialLocationLoaded by viewModel.isInitialLocationLoaded.collectAsState()
-    val participantDistances by viewModel.participantDistances.collectAsState()
 
     // 위치 권한 요청
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -128,7 +127,6 @@ internal fun MapRoute(
             roomId = roomId,
             meetingTime = meetingTime,
             participants = participants,
-            participantDistances = participantDistances,
             selectedParticipantIndex = selectedParticipantIndex,
             onParticipantSelected = viewModel::onParticipantSelected,
             destination = room?.destination,
@@ -170,7 +168,6 @@ private fun MapScreen(
     roomId: String,
     meetingTime: String,
     participants: List<com.teammanduk.adego.core.model.Participant>,
-    participantDistances: List<ParticipantDistance>,
     selectedParticipantIndex: Int,
     onParticipantSelected: (Int) -> Unit,
     destination: com.teammanduk.adego.core.model.Place?,
@@ -377,14 +374,16 @@ private fun MapScreen(
                     }
                 }
 
-                // 참가자 아이콘들 (거리 기반 위치)
-                participantDistances.forEach { participantDistance ->
-                    val participant = uiParticipants.find {
-                        it.name == participantDistance.participant.name
-                    }
+                // 거리 정보가 있는 참가자들로 필터링 및 정규화
+                val participantsWithDistance = participants.filter { it.distanceToDestination != null }
+                val maxDistance = participantsWithDistance.maxOfOrNull { it.distanceToDestination!! } ?: 1
 
-                    participant?.let { uiParticipant ->
-                        val index = uiParticipants.indexOf(uiParticipant)
+                // 참가자 아이콘들 (거리 기반 위치)
+                participantsWithDistance.forEach { participant ->
+                    val uiParticipant = uiParticipants.find { it.name == participant.name }
+
+                    uiParticipant?.let { uiPart ->
+                        val index = uiParticipants.indexOf(uiPart)
                         val isSelected = pagerState.currentPage == index
 
                         val iconSize by animateDpAsState(
@@ -397,8 +396,14 @@ private fun MapScreen(
                         )
 
                         // normalizedPosition: 0.0f (약속장소) ~ 1.0f (가장 먼 곳)
+                        val normalizedPosition = if (maxDistance > 0) {
+                            (participant.distanceToDestination!!.toFloat() / maxDistance.toFloat()).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+
                         // 실제 offset 계산: 약속장소 아이콘 너비(32dp) + 여백(8dp) + 비율에 따른 위치
-                        val offsetX = 40.dp + (barWidth - 80.dp) * participantDistance.normalizedPosition
+                        val offsetX = 40.dp + (barWidth - 80.dp) * normalizedPosition
 
                         Box(
                             modifier = Modifier
@@ -409,7 +414,7 @@ private fun MapScreen(
                         ) {
                             // 심장 박동 동심원 애니메이션 (선택된 경우만)
                             if (isSelected) {
-                                val infiniteTransition = rememberInfiniteTransition(label = "pulse_${uiParticipant.name}")
+                                val infiniteTransition = rememberInfiniteTransition(label = "pulse_${uiPart.name}")
                                 val pulseScale by infiniteTransition.animateFloat(
                                     initialValue = 1f,
                                     targetValue = 1.4f,
@@ -431,7 +436,7 @@ private fun MapScreen(
                                     modifier = Modifier
                                         .size(iconSize * pulseScale)
                                         .clip(CircleShape)
-                                        .background(uiParticipant.color.copy(alpha = pulseAlpha))
+                                        .background(uiPart.color.copy(alpha = pulseAlpha))
                                 )
                             }
 
@@ -440,12 +445,12 @@ private fun MapScreen(
                                 modifier = Modifier
                                     .size(iconSize)
                                     .clip(CircleShape)
-                                    .background(uiParticipant.color),
+                                    .background(uiPart.color),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Person,
-                                    contentDescription = uiParticipant.name,
+                                    contentDescription = uiPart.name,
                                     tint = Color.White,
                                     modifier = Modifier.size(if (isSelected) 24.dp else 20.dp)
                                 )
@@ -826,7 +831,6 @@ private fun MapScreenPreview() {
             roomId = "preview123",
             meetingTime = "14시 30분",
             participants = emptyList(),
-            participantDistances = emptyList(),
             selectedParticipantIndex = 0,
             onParticipantSelected = {},
             destination = null,
