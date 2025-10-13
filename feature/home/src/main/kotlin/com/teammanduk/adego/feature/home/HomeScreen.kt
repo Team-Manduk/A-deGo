@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,18 +32,48 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 
 @Composable
 internal fun HomeRoute(
     onNavigateToCreate: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onJoinWithCode: (String) -> Unit = {},
+    onNavigateToMap: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
+    val isJoining by viewModel.isJoining.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val joinedRoomInfo by viewModel.joinedRoomInfo.collectAsStateWithLifecycle()
+
+    // 방 참여 성공 시 Map 화면으로 이동
+    androidx.compose.runtime.LaunchedEffect(joinedRoomInfo) {
+        joinedRoomInfo?.let { info ->
+            onNavigateToMap(info.roomId, info.userId, info.hour, info.minute)
+            viewModel.clearJoinedRoomInfo()
+        }
+    }
+
+    // 에러 표시
+    error?.let { errorMessage ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            title = { Text("방 참여 실패") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { viewModel.clearError() }) {
+                    Text("확인")
+                }
+            }
+        )
+    }
+
     HomeScreen(
         onNavigateToCreate = onNavigateToCreate,
         onNavigateToSettings = onNavigateToSettings,
-        onJoinWithCode = onJoinWithCode,
+        onJoinWithCode = { code -> viewModel.joinRoomWithCode(code) },
+        isJoining = isJoining
     )
 }
 
@@ -51,6 +82,7 @@ private fun HomeScreen(
     onNavigateToCreate: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onJoinWithCode: (String) -> Unit,
+    isJoining: Boolean = false
 ) {
     var inviteCode by remember { mutableStateOf("") }
 
@@ -156,13 +188,20 @@ private fun HomeScreen(
                         containerColor = AdegoTheme.colors.main500
                     ),
                     shape = RoundedCornerShape(8.dp),
-                    enabled = inviteCode.isNotEmpty()
+                    enabled = inviteCode.isNotEmpty() && !isJoining
                 ) {
-                    Text(
-                        text = "입장",
-                        style = AdegoTheme.typography.titleSmall,
-                        color = AdegoTheme.colors.onMain500
-                    )
+                    if (isJoining) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = AdegoTheme.colors.onMain500
+                        )
+                    } else {
+                        Text(
+                            text = "입장",
+                            style = AdegoTheme.typography.titleSmall,
+                            color = AdegoTheme.colors.onMain500
+                        )
+                    }
                 }
             }
 
