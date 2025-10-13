@@ -32,6 +32,10 @@ android {
         val mapsApiKey = secretsProperties.getProperty("MAPS_API_KEY", "")
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+
+        // ODsay API Key
+        val odsayApiKey = secretsProperties.getProperty("ODSAY_API_KEY", "")
+        buildConfigField("String", "ODSAY_API_KEY", "\"$odsayApiKey\"")
     }
 
     buildFeatures {
