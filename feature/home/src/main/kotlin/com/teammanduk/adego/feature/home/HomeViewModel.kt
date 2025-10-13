@@ -60,6 +60,7 @@ class HomeViewModel @Inject constructor(
                         val tempUserName = "사용자"
 
                         // 3. 방 참여
+                        Log.d(TAG, "[HomeViewModel] 방 참여 시도 - userId: $tempUserId, userName: $tempUserName")
                         val joinResult = roomRepository.joinRoom(
                             roomId = inviteCode,
                             userId = tempUserId,

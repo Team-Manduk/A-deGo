@@ -95,6 +95,7 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
     ): Result<Unit> {
         return try {
             Log.d(TAG, "[Firebase] 참여자 추가 시작: ${participantDto.userId} -> room $roomId")
+            Log.d(TAG, "[Firebase] 참여자 정보 - name: ${participantDto.name}, profileColor: ${participantDto.profileColor}")
             database.child("participants")
                 .child(roomId)
                 .child(participantDto.userId)
@@ -114,10 +115,12 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val participants = mutableListOf<ParticipantDto>()
                 snapshot.children.forEach { child ->
-                    child.getValue(ParticipantDto::class.java)?.let {
-                        participants.add(it)
+                    child.getValue(ParticipantDto::class.java)?.let { participant ->
+                        Log.d(TAG, "[Firebase] 참여자 불러옴 - userId: ${participant.userId}, name: ${participant.name}, profileColor: ${participant.profileColor}")
+                        participants.add(participant)
                     }
                 }
+                Log.d(TAG, "[Firebase] 총 ${participants.size}명의 참여자 불러옴")
                 trySend(participants)
             }
 
