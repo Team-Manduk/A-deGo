@@ -147,10 +147,55 @@ class RoomRepositoryImpl @Inject constructor(
     }
 
     override fun observeParticipants(roomId: String): Flow<List<Participant>> {
-        return roomDataSource.observeParticipants(roomId)
-            .map { participants ->
-                participants.map { it.toModel() }
+        // Room 정보와 참가자 정보를 combine하여 거리 계산
+        return kotlinx.coroutines.flow.combine(
+            roomDataSource.observeRoom(roomId),
+            roomDataSource.observeParticipants(roomId)
+        ) { roomDto, participantDtos ->
+            val destination = roomDto?.destination
+
+            participantDtos.map { participantDto ->
+                val participant = participantDto.toModel()
+
+                // 목적지와 참가자 위치가 모두 있으면 거리 계산
+                val location = participant.location
+                val distance = if (destination != null && location != null) {
+                    calculateHaversineDistance(
+                        lat1 = location.latitude,
+                        lon1 = location.longitude,
+                        lat2 = destination.latitude,
+                        lon2 = destination.longitude
+                    )
+                } else {
+                    null
+                }
+
+                participant.copy(distanceToDestination = distance)
             }
+        }
+    }
+
+    /**
+     * Haversine 공식을 사용한 두 지점 간 직선 거리 계산 (미터)
+     */
+    private fun calculateHaversineDistance(
+        lat1: Double,
+        lon1: Double,
+        lat2: Double,
+        lon2: Double
+    ): Int {
+        val earthRadiusMeters = 6371000.0 // 지구 반지름 (미터)
+
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+
+        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
+                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
+                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
+
+        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
+
+        return (earthRadiusMeters * c).toInt()
     }
 
     override suspend fun updateMyLocation(
