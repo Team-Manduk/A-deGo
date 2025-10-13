@@ -15,10 +15,24 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/**
+ * 지도 화면의 UI 상태
+ */
+data class MapUiState(
+    val room: Room? = null,
+    val participants: List<Participant> = emptyList(),
+    val selectedParticipantIndex: Int = 0,
+    val isLocationTrackingActive: Boolean = false,
+    val isInitialLocationLoaded: Boolean = false,
+    val error: String? = null,
+    val showInviteDialog: Boolean = false
+)
 
 @HiltViewModel(assistedFactory = MapViewModel.Factory::class)
 class MapViewModel @AssistedInject constructor(
@@ -36,41 +50,24 @@ class MapViewModel @AssistedInject constructor(
         ): MapViewModel
     }
 
-    // 방 정보
-    val room: StateFlow<Room?> = roomRepository.observeRoom(roomId)
-        .catch { emit(null) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
+    // UI 상태 통합
+    private val _uiState = MutableStateFlow(MapUiState())
+    val uiState: StateFlow<MapUiState> = combine(
+        roomRepository.observeRoom(roomId).catch { emit(null) },
+        roomRepository.observeParticipants(roomId).catch { emit(emptyList()) },
+        _uiState
+    ) { room, participants, currentState ->
+        currentState.copy(
+            room = room,
+            participants = participants
         )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = MapUiState()
+    )
 
-    // 참가자 목록
-    val participants: StateFlow<List<Participant>> = roomRepository.observeParticipants(roomId)
-        .catch { emit(emptyList()) }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    // 현재 선택된 참가자 인덱스
-    private val _selectedParticipantIndex = MutableStateFlow(0)
-    val selectedParticipantIndex: StateFlow<Int> = _selectedParticipantIndex.asStateFlow()
-
-    // 에러 상태
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
-
-    // 위치 추적 활성화 여부
-    private val _isLocationTrackingActive = MutableStateFlow(false)
-    val isLocationTrackingActive: StateFlow<Boolean> = _isLocationTrackingActive.asStateFlow()
-
-    // 초기 위치 로딩 상태
-    private val _isInitialLocationLoaded = MutableStateFlow(false)
-    val isInitialLocationLoaded: StateFlow<Boolean> = _isInitialLocationLoaded.asStateFlow()
-
-    // 위치 추적 시작 (외부에서 호출 가능하도록 public으로 변경)
+    // 위치 추적 시작
     fun startLocationTracking() {
         viewModelScope.launch {
             try {
@@ -78,21 +75,31 @@ class MapViewModel @AssistedInject constructor(
                 locationRepository.observeLocationUpdates()
                     .catch { e ->
                         Log.e(TAG, "[MapViewModel] 위치 추적 실패", e)
-                        _error.value = "위치 추적 실패: ${e.message}"
-                        _isLocationTrackingActive.value = false
+                        _uiState.update { it.copy(
+                            error = "위치 추적 실패: ${e.message}",
+                            isLocationTrackingActive = false
+                        ) }
                     }
                     .collect { location ->
                         Log.d(TAG, "[MapViewModel] 위치 업데이트 수신: lat=${location.latitude}, lng=${location.longitude}")
-                        _isLocationTrackingActive.value = true
-                        if (!_isInitialLocationLoaded.value) {
-                            Log.d(TAG, "[MapViewModel] 초기 위치 로드 완료")
-                            _isInitialLocationLoaded.value = true
+
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                isLocationTrackingActive = true,
+                                isInitialLocationLoaded = if (!currentState.isInitialLocationLoaded) {
+                                    Log.d(TAG, "[MapViewModel] 초기 위치 로드 완료")
+                                    true
+                                } else {
+                                    currentState.isInitialLocationLoaded
+                                }
+                            )
                         }
+
                         updateMyLocation(location)
                     }
             } catch (e: Exception) {
                 Log.e(TAG, "[MapViewModel] 위치 추적 시작 실패", e)
-                _error.value = "위치 추적 시작 실패: ${e.message}"
+                _uiState.update { it.copy(error = "위치 추적 시작 실패: ${e.message}") }
             }
         }
     }
@@ -113,18 +120,47 @@ class MapViewModel @AssistedInject constructor(
             Log.d(TAG, "[MapViewModel] Firebase 위치 업데이트 완료")
         } catch (e: Exception) {
             Log.e(TAG, "[MapViewModel] 위치 업데이트 실패", e)
-            _error.value = "위치 업데이트 실패: ${e.message}"
+            _uiState.update { it.copy(error = "위치 업데이트 실패: ${e.message}") }
         }
     }
 
-    // 선택된 참가자 인덱스 변경
-    fun onParticipantSelected(index: Int) {
-        _selectedParticipantIndex.value = index
+    // MVI 패턴: Intent 처리를 위한 단일 진입점
+    fun onAction(intent: MapIntent) {
+        when (intent) {
+            is MapIntent.SelectParticipant -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.ClearError -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.ShowInviteDialog -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.DismissInviteDialog -> {
+                _uiState.update { reduce(it, intent) }
+            }
+        }
     }
 
-    // 에러 메시지 초기화
+    // MVI 패턴: 순수 함수로 상태 변환 처리
+    private fun reduce(state: MapUiState, intent: MapIntent): MapUiState {
+        return when (intent) {
+            is MapIntent.SelectParticipant -> state.copy(selectedParticipantIndex = intent.index)
+            MapIntent.ClearError -> state.copy(error = null)
+            MapIntent.ShowInviteDialog -> state.copy(showInviteDialog = true)
+            MapIntent.DismissInviteDialog -> state.copy(showInviteDialog = false)
+        }
+    }
+
+    // 하위 호환성을 위한 래퍼 함수들 (추후 제거 예정)
+    @Deprecated("Use onAction(MapIntent.SelectParticipant) instead")
+    fun onParticipantSelected(index: Int) {
+        onAction(MapIntent.SelectParticipant(index))
+    }
+
+    @Deprecated("Use onAction(MapIntent.ClearError) instead")
     fun clearError() {
-        _error.value = null
+        onAction(MapIntent.ClearError)
     }
 
     override fun onCleared() {

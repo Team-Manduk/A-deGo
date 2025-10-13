@@ -1,5 +1,8 @@
 package com.teammanduk.adego.feature.map
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -44,9 +47,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -58,9 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -73,7 +72,6 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import kotlinx.coroutines.launch
-import kotlin.math.atan2
 
 // 참가자 데이터 클래스
 private data class Participant(
@@ -83,16 +81,14 @@ private data class Participant(
     val color: Color
 )
 
+
 @Composable
 internal fun MapRoute(
     roomId: String,
     meetingTime: String = "00시 00분",
     viewModel: MapViewModel,
 ) {
-    val room by viewModel.room.collectAsState()
-    val participants by viewModel.participants.collectAsState()
-    val selectedParticipantIndex by viewModel.selectedParticipantIndex.collectAsState()
-    val isInitialLocationLoaded by viewModel.isInitialLocationLoaded.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
 
     // 위치 권한 요청
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -119,18 +115,23 @@ internal fun MapRoute(
         )
     }
 
-    // 초기 위치를 로드할 때까지 로딩 화면 표시
-    if (!isInitialLocationLoaded) {
+    // 현재 사용자 찾기
+    val currentUser = uiState.participants.find { it.userId == viewModel.userId }
+
+    // 초기 위치를 로드하고 참가자 정보가 있을 때까지 로딩 화면 표시
+    if (!uiState.isInitialLocationLoaded || uiState.participants.isEmpty() || currentUser?.location == null) {
         LoadingScreen()
     } else {
         MapScreen(
             roomId = roomId,
             meetingTime = meetingTime,
-            participants = participants,
-            selectedParticipantIndex = selectedParticipantIndex,
-            onParticipantSelected = viewModel::onParticipantSelected,
-            destination = room?.destination,
-            currentUserId = viewModel.userId
+            participants = uiState.participants,
+            selectedParticipantIndex = uiState.selectedParticipantIndex,
+            onAction = viewModel::onAction,
+            destination = uiState.room?.destination,
+            currentUserId = viewModel.userId,
+            initialLocation = currentUser.location!!,
+            showInviteDialog = uiState.showInviteDialog
         )
     }
 }
@@ -169,9 +170,11 @@ private fun MapScreen(
     meetingTime: String,
     participants: List<com.teammanduk.adego.core.model.Participant>,
     selectedParticipantIndex: Int,
-    onParticipantSelected: (Int) -> Unit,
+    onAction: (MapIntent) -> Unit,
     destination: com.teammanduk.adego.core.model.Place?,
-    currentUserId: String
+    currentUserId: String,
+    initialLocation: com.teammanduk.adego.core.model.ParticipantLocation,
+    showInviteDialog: Boolean
 ) {
     // 임시: UI 전용 Participant 데이터로 변환
     val uiParticipants = remember(participants) {
@@ -184,7 +187,10 @@ private fun MapScreen(
                     Color(0xFFE53935) // 기본 빨강
                 }
             } catch (e: Exception) {
-                android.util.Log.w("A-degoLogTag", "[MapScreen] profileColor 파싱 실패: ${participant.profileColor}, 기본 색상 사용")
+                android.util.Log.w(
+                    "A-degoLogTag",
+                    "[MapScreen] profileColor 파싱 실패: ${participant.profileColor}, 기본 색상 사용"
+                )
                 Color(0xFFE53935) // 기본 빨강
             }
 
@@ -202,55 +208,63 @@ private fun MapScreen(
         initialPage = selectedParticipantIndex
     )
     val coroutineScope = rememberCoroutineScope()
-    var showInviteDialog by remember { mutableStateOf(false) }
 
     // 현재 사용자 찾기
     val currentUser = remember(participants, currentUserId) {
         participants.find { it.userId == currentUserId }
     }
 
-    // 초기 렌더링 여부 추적
-    var isInitialRender by remember { mutableStateOf(true) }
+    // 초기 카메라 설정 완료 여부
+    var isCameraInitialized by remember { mutableStateOf(false) }
 
-    // 지도 카메라 위치 설정 - 현재 사용자 위치가 반드시 있어야 함
+    // 지도 카메라 위치 설정 (전달받은 초기 위치로 고정)
     val cameraPositionState = rememberCameraPositionState {
-        currentUser?.location?.let { location ->
-            android.util.Log.d("A-degoLogTag", "[MapScreen] 카메라 초기화: 현재 사용자 위치 lat=${location.latitude}, lng=${location.longitude}")
-            position = CameraPosition.fromLatLngZoom(
-                LatLng(location.latitude, location.longitude),
-                15f
-            )
-        } ?: run {
-            // 이 경우는 발생하면 안 됨 (로딩 화면에서 위치를 받은 후에만 여기 도달)
-            android.util.Log.w("A-degoLogTag", "[MapScreen] 경고: 현재 사용자 위치가 없음")
-            position = CameraPosition.fromLatLngZoom(LatLng(37.5665, 126.9780), 15f)
+        android.util.Log.d(
+            "A-degoLogTag",
+            "[MapScreen] 카메라 초기 위치 설정: lat=${initialLocation.latitude}, lng=${initialLocation.longitude}"
+        )
+        position = CameraPosition.fromLatLngZoom(
+            LatLng(initialLocation.latitude, initialLocation.longitude),
+            15f
+        )
+    }
+
+    // pagerState 변경을 ViewModel과 동기화 (pagerState -> ViewModel)
+    LaunchedEffect(pagerState.currentPage) {
+        if (pagerState.currentPage != selectedParticipantIndex) {
+            onAction(MapIntent.SelectParticipant(pagerState.currentPage))
         }
     }
 
-    // 현재 사용자의 위치가 업데이트되면 카메라 이동 (초기 렌더링은 제외)
-    LaunchedEffect(currentUser?.location) {
-        currentUser?.location?.let { location ->
-            if (isInitialRender) {
-                // 초기 렌더링: 애니메이션 없이 바로 이동
-                android.util.Log.d("A-degoLogTag", "[MapScreen] 초기 카메라 위치 설정: lat=${location.latitude}, lng=${location.longitude}")
-                cameraPositionState.move(
-                    com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(
-                        LatLng(location.latitude, location.longitude),
-                        15f
-                    )
+    // ViewModel 상태를 pagerState와 동기화 (ViewModel -> pagerState)
+    LaunchedEffect(selectedParticipantIndex) {
+        if (pagerState.currentPage != selectedParticipantIndex) {
+            pagerState.animateScrollToPage(selectedParticipantIndex)
+        }
+    }
+
+    // 참가자 선택 시 해당 위치로 카메라 이동
+    LaunchedEffect(selectedParticipantIndex) {
+        // 초기화 완료 후에만 카메라 이동 (첫 렌더링 이후)
+        if (isCameraInitialized) {
+            val selectedParticipant = participants.getOrNull(selectedParticipantIndex)
+            selectedParticipant?.location?.let { location ->
+                android.util.Log.d(
+                    "A-degoLogTag",
+                    "[MapScreen] 참가자 선택됨 - ${selectedParticipant.name}, 카메라 이동: lat=${location.latitude}, lng=${location.longitude}"
                 )
-                isInitialRender = false
-            } else {
-                // 이후 업데이트: 부드럽게 애니메이션
-                android.util.Log.d("A-degoLogTag", "[MapScreen] 현재 사용자 위치 업데이트: lat=${location.latitude}, lng=${location.longitude}")
                 cameraPositionState.animate(
                     com.google.android.gms.maps.CameraUpdateFactory.newLatLngZoom(
                         LatLng(location.latitude, location.longitude),
                         15f
                     ),
-                    durationMs = 1000
+                    durationMs = 500
                 )
             }
+        } else {
+            // 첫 렌더링에서는 초기화만 하고 카메라 이동하지 않음
+            isCameraInitialized = true
+            android.util.Log.d("A-degoLogTag", "[MapScreen] 카메라 초기화 완료")
         }
     }
 
@@ -282,6 +296,30 @@ private fun MapScreen(
                     title = it.name,
                     snippet = "목적지"
                 )
+            }
+
+            // 참가자 마커들 (네이티브 Marker 사용)
+            participants.forEach { participant ->
+                androidx.compose.runtime.key(participant.userId) {
+                    participant.location?.let { location ->
+                        val uiParticipant = uiParticipants.find { it.name == participant.name }
+                        val isSelected =
+                            uiParticipants.getOrNull(pagerState.currentPage)?.name == participant.name
+
+                        uiParticipant?.let { uiPart ->
+                            val markerIcon = createParticipantMarkerIcon(uiPart.color, isSelected)
+
+                            com.google.maps.android.compose.Marker(
+                                state = com.google.maps.android.compose.rememberMarkerState(
+                                    position = LatLng(location.latitude, location.longitude)
+                                ),
+                                title = participant.name,
+                                icon = markerIcon,
+                                anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f)
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -329,7 +367,7 @@ private fun MapScreen(
                             .size(24.dp)
                             .clip(CircleShape)
                             .background(AdegoTheme.colors.highlight500)
-                            .clickable { showInviteDialog = true },
+                            .clickable { onAction(MapIntent.ShowInviteDialog) },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -343,197 +381,28 @@ private fun MapScreen(
             }
 
             // 참가자 트래킹 바 (거리 기반 배치)
-            BoxWithConstraints(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = Color(0xFFD6E9F5),
-                        shape = RoundedCornerShape(32.dp)
-                    )
-                    .padding(horizontal = 12.dp, vertical = 4.dp)
-                    .height(56.dp)
-            ) {
-                val barWidth = maxWidth - 24.dp // padding 제외한 실제 트래킹바 너비
-
-                // 약속장소 아이콘 (왼쪽 끝, 0%)
-                destination?.let {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(AdegoTheme.colors.main500),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = "약속장소",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
+            ParticipantTrackingBar(
+                participants = participants,
+                uiParticipants = uiParticipants,
+                destination = destination,
+                pagerState = pagerState,
+                onParticipantClick = { index ->
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(index)
                     }
                 }
-
-                // 거리 정보가 있는 참가자들로 필터링 및 정규화
-                val participantsWithDistance = participants.filter { it.distanceToDestination != null }
-                val maxDistance = participantsWithDistance.maxOfOrNull { it.distanceToDestination!! } ?: 1
-
-                // 참가자 아이콘들 (거리 기반 위치)
-                participantsWithDistance.forEach { participant ->
-                    val uiParticipant = uiParticipants.find { it.name == participant.name }
-
-                    uiParticipant?.let { uiPart ->
-                        val index = uiParticipants.indexOf(uiPart)
-                        val isSelected = pagerState.currentPage == index
-
-                        val iconSize by animateDpAsState(
-                            targetValue = if (isSelected) 40.dp else 32.dp,
-                            animationSpec = spring(
-                                dampingRatio = 0.7f,
-                                stiffness = 200f
-                            ),
-                            label = "iconSize"
-                        )
-
-                        // normalizedPosition: 0.0f (약속장소) ~ 1.0f (가장 먼 곳)
-                        val normalizedPosition = if (maxDistance > 0) {
-                            (participant.distanceToDestination!!.toFloat() / maxDistance.toFloat()).coerceIn(0f, 1f)
-                        } else {
-                            0f
-                        }
-
-                        // 실제 offset 계산: 약속장소 아이콘 너비(32dp) + 여백(8dp) + 비율에 따른 위치
-                        val offsetX = 40.dp + (barWidth - 80.dp) * normalizedPosition
-
-                        Box(
-                            modifier = Modifier
-                                .offset(x = offsetX, y = 0.dp)
-                                .size(iconSize)
-                                .align(Alignment.CenterStart),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            // 심장 박동 동심원 애니메이션 (선택된 경우만)
-                            if (isSelected) {
-                                val infiniteTransition = rememberInfiniteTransition(label = "pulse_${uiPart.name}")
-                                val pulseScale by infiniteTransition.animateFloat(
-                                    initialValue = 1f,
-                                    targetValue = 1.4f,
-                                    animationSpec = infiniteRepeatable(
-                                        animation = tween(1000)
-                                    ),
-                                    label = "pulseScale"
-                                )
-                                val pulseAlpha by infiniteTransition.animateFloat(
-                                    initialValue = 0.6f,
-                                    targetValue = 0f,
-                                    animationSpec = infiniteRepeatable(
-                                        animation = tween(1000)
-                                    ),
-                                    label = "pulseAlpha"
-                                )
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(iconSize * pulseScale)
-                                        .clip(CircleShape)
-                                        .background(uiPart.color.copy(alpha = pulseAlpha))
-                                )
-                            }
-
-                            // 메인 아이콘
-                            Box(
-                                modifier = Modifier
-                                    .size(iconSize)
-                                    .clip(CircleShape)
-                                    .background(uiPart.color),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = uiPart.name,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(if (isSelected) 24.dp else 20.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            )
         }
 
-        // 지도 위 참가자 위치 마커들
+        // 지도 위 참가자 위치 마커들 (화면 밖 처리)
         participants.forEach { participant ->
-            participant.location?.let { location ->
-                // 위도/경도를 화면 좌표로 변환
-                val projection = cameraPositionState.projection
-                val screenPosition = projection?.toScreenLocation(
-                    LatLng(location.latitude, location.longitude)
+            androidx.compose.runtime.key(participant.userId) {
+                ParticipantMapMarker(
+                    participant = participant,
+                    uiParticipants = uiParticipants,
+                    pagerState = pagerState,
+                    cameraPositionState = cameraPositionState
                 )
-
-                screenPosition?.let { screenPos ->
-                    val isSelected = uiParticipants.getOrNull(pagerState.currentPage)?.name == participant.name
-
-                    // 참가자 색상 찾기
-                    val participantColor = uiParticipants.find { it.name == participant.name }?.color
-                        ?: Color(0xFFE53935)
-
-                    // px를 dp로 변환
-                    val density = androidx.compose.ui.platform.LocalDensity.current
-                    val offsetX = with(density) { (screenPos.x - 28f).toDp() }
-                    val offsetY = with(density) { (screenPos.y - 28f).toDp() }
-
-                    Box(
-                        modifier = Modifier
-                            .offset(x = offsetX, y = offsetY)
-                            .size(56.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // 심장 박동 동심원 애니메이션 (선택된 경우만)
-                        if (isSelected) {
-                            val infiniteTransition = rememberInfiniteTransition(label = "mapPulse_${participant.userId}")
-                            val pulseScale by infiniteTransition.animateFloat(
-                                initialValue = 1f,
-                                targetValue = 1.5f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(1000)
-                                ),
-                                label = "mapPulseScale"
-                            )
-                            val pulseAlpha by infiniteTransition.animateFloat(
-                                initialValue = 0.6f,
-                                targetValue = 0f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(1000)
-                                ),
-                                label = "mapPulseAlpha"
-                            )
-
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp * pulseScale)
-                                    .clip(CircleShape)
-                                    .background(participantColor.copy(alpha = pulseAlpha))
-                            )
-                        }
-
-                        // 메인 마커
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(participantColor)
-                                .border(2.dp, Color.White, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = participant.name,
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
-                }
             }
         }
 
@@ -579,8 +448,290 @@ private fun MapScreen(
     if (showInviteDialog) {
         InviteDialog(
             inviteCode = roomId,
-            onDismiss = { showInviteDialog = false }
+            onDismiss = { onAction(MapIntent.DismissInviteDialog) }
         )
+    }
+}
+
+/**
+ * 참가자 트래킹바 컴포넌트
+ * 목적지를 기준으로 참가자들의 거리를 시각화
+ * 펄스 애니메이션이 바 영역을 넘어설 수 있도록 레이어 분리
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ParticipantTrackingBar(
+    participants: List<com.teammanduk.adego.core.model.Participant>,
+    uiParticipants: List<Participant>,
+    destination: com.teammanduk.adego.core.model.Place?,
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    onParticipantClick: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // 외부 Box: 클리핑 없이 펄스 효과가 넘칠 수 있도록
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp) // 펄스가 넘칠 공간 확보
+    ) {
+        // 배경 바 (클리핑됨)
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .align(Alignment.Center)
+                .background(
+                    color = Color(0xFFD6E9F5),
+                    shape = RoundedCornerShape(32.dp)
+                )
+                .padding(horizontal = 12.dp)
+        ) {
+            val barWidth = maxWidth - 24.dp // padding 제외한 실제 트래킹바 너비
+
+            // 약속장소 아이콘 (왼쪽 끝, 0%)
+            destination?.let {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(AdegoTheme.colors.main500),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "약속장소",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        // 참가자 아이콘들 (펄스 효과 포함, 클리핑되지 않도록 별도 레이어)
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp) // 전체 높이 사용
+                .align(Alignment.Center)
+                .padding(horizontal = 12.dp)
+        ) {
+            val barWidth = maxWidth - 24.dp
+
+            // 거리 정보가 있는 참가자들로 필터링
+            val participantsWithDistance =
+                participants.filter { it.distanceToDestination != null }
+            val currentMaxDistance =
+                participantsWithDistance.maxOfOrNull { it.distanceToDestination!! } ?: 1000
+
+            // 최대 거리 기록
+            var maxRecordedDistance by remember { mutableStateOf(1000) }
+            if (currentMaxDistance > maxRecordedDistance) {
+                maxRecordedDistance = currentMaxDistance
+            }
+
+            val trackerMaxDistance = maxRecordedDistance.coerceAtLeast(1000)
+
+            participantsWithDistance.forEach { participant ->
+                val uiParticipant = uiParticipants.find { it.name == participant.name }
+
+                uiParticipant?.let { uiPart ->
+                    val index = uiParticipants.indexOf(uiPart)
+                    val isSelected = pagerState.currentPage == index
+
+                    val iconSize by animateDpAsState(
+                        targetValue = if (isSelected) 32.dp else 28.dp,
+                        animationSpec = spring(
+                            dampingRatio = 0.7f,
+                            stiffness = 200f
+                        ),
+                        label = "iconSize"
+                    )
+
+                    // normalizedPosition: 실제 거리를 트래커 최대 거리로 나눔
+                    val normalizedPosition = if (trackerMaxDistance > 0) {
+                        (participant.distanceToDestination!!.toFloat() / trackerMaxDistance.toFloat()).coerceIn(
+                            0f,
+                            1f
+                        )
+                    } else {
+                        0f
+                    }
+
+                    // 실제 offset 계산
+                    val offsetX = 36.dp + (barWidth - 72.dp) * normalizedPosition
+
+                    Box(
+                        modifier = Modifier
+                            .offset(x = offsetX, y = 0.dp)
+                            .size(56.dp) // 펄스가 확장될 공간
+                            .align(Alignment.CenterStart)
+                            .zIndex(if (isSelected) 1f else 0f), // 선택된 아이콘을 최상단에 표시
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // 펄스 애니메이션 (선택된 경우만, 뒤에 배치)
+                        if (isSelected) {
+                            val infiniteTransition =
+                                rememberInfiniteTransition(label = "pulse_${uiPart.name}")
+                            val pulseScale by infiniteTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = 2.0f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1000)
+                                ),
+                                label = "pulseScale"
+                            )
+                            val pulseAlpha by infiniteTransition.animateFloat(
+                                initialValue = 0.5f,
+                                targetValue = 0f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(1000)
+                                ),
+                                label = "pulseAlpha"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(iconSize * pulseScale)
+                                    .background(
+                                        color = uiPart.color.copy(alpha = pulseAlpha),
+                                        shape = CircleShape
+                                    )
+                            )
+                        }
+
+                        // 메인 아이콘 (앞에 배치)
+                        Box(
+                            modifier = Modifier
+                                .size(iconSize)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .border(2.dp, Color.White, CircleShape)
+                                .padding(2.dp)
+                                .clip(CircleShape)
+                                .background(uiPart.color)
+                                .clickable { onParticipantClick(index) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = uiPart.name,
+                                tint = Color.White,
+                                modifier = Modifier.size(if (isSelected) 18.dp else 16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 화면 밖에 있는 참가자를 표시하는 마커 컴포넌트
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ParticipantMapMarker(
+    participant: com.teammanduk.adego.core.model.Participant,
+    uiParticipants: List<Participant>,
+    pagerState: androidx.compose.foundation.pager.PagerState,
+    cameraPositionState: com.google.maps.android.compose.CameraPositionState
+) {
+    participant.location?.let { location ->
+        // 카메라 position이 변경될 때마다 리컴포지션
+        val cameraPosition = cameraPositionState.position
+
+        // projection 계산을 derivedStateOf로 최적화
+        val screenPosition by androidx.compose.runtime.derivedStateOf {
+            cameraPositionState.projection?.toScreenLocation(
+                LatLng(location.latitude, location.longitude)
+            )
+        }
+
+        // 화면 크기 가져오기
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val screenWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+            configuration.screenWidthDp.dp.toPx()
+        }
+        val screenHeightPx = with(androidx.compose.ui.platform.LocalDensity.current) {
+            configuration.screenHeightDp.dp.toPx()
+        }
+
+        // 화면 안/밖 판단
+        val isOnScreen = screenPosition?.let { pos ->
+            pos.x >= 0f && pos.x <= screenWidthPx && pos.y >= 0f && pos.y <= screenHeightPx
+        } ?: false
+
+        // 화면 밖인 경우만 오버레이로 표시 (나중에 화살표로 변경 예정)
+        if (!isOnScreen) {
+            screenPosition?.let { screenPos ->
+                val isSelected =
+                    uiParticipants.getOrNull(pagerState.currentPage)?.name == participant.name
+
+                // 참가자 색상 찾기
+                val participantColor = uiParticipants.find { it.name == participant.name }?.color
+                    ?: Color(0xFFE53935)
+
+                // px를 dp로 변환
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val offsetX = with(density) { (screenPos.x - 28f).toDp() }
+                val offsetY = with(density) { (screenPos.y - 28f).toDp() }
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = offsetX, y = offsetY)
+                        .size(56.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // 심장 박동 동심원 애니메이션 (선택된 경우만)
+                    if (isSelected) {
+                        val infiniteTransition =
+                            rememberInfiniteTransition(label = "mapPulse_${participant.userId}")
+                        val pulseScale by infiniteTransition.animateFloat(
+                            initialValue = 1f,
+                            targetValue = 1.5f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000)
+                            ),
+                            label = "mapPulseScale"
+                        )
+                        val pulseAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.6f,
+                            targetValue = 0f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000)
+                            ),
+                            label = "mapPulseAlpha"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp * pulseScale)
+                                .clip(CircleShape)
+                                .background(participantColor.copy(alpha = pulseAlpha))
+                        )
+                    }
+
+                    // 메인 마커
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(participantColor)
+                            .border(2.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = participant.name,
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -826,15 +977,64 @@ private fun InviteDialog(
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun MapScreenPreview() {
+    // 더미 참가자 데이터 (테스트용)
+    val dummyParticipants = listOf(
+        com.teammanduk.adego.core.model.Participant(
+            userId = "user1",
+            name = "김철수",
+            profileColor = "#E53935",
+            location = com.teammanduk.adego.core.model.ParticipantLocation(
+                latitude = 37.5665,
+                longitude = 126.9780,
+                updatedAt = System.currentTimeMillis()
+            ),
+            distanceToDestination = 1500,
+            route = null
+        ),
+        com.teammanduk.adego.core.model.Participant(
+            userId = "user2",
+            name = "이영희",
+            profileColor = "#43A047",
+            location = com.teammanduk.adego.core.model.ParticipantLocation(
+                latitude = 37.5675,
+                longitude = 126.9790,
+                updatedAt = System.currentTimeMillis()
+            ),
+            distanceToDestination = 800,
+            route = null
+        ),
+        com.teammanduk.adego.core.model.Participant(
+            userId = "user3",
+            name = "박민수",
+            profileColor = "#1E88E5",
+            location = com.teammanduk.adego.core.model.ParticipantLocation(
+                latitude = 37.5655,
+                longitude = 126.9770,
+                updatedAt = System.currentTimeMillis()
+            ),
+            distanceToDestination = 2000,
+            route = null
+        )
+    )
+
+    val dummyDestination = com.teammanduk.adego.core.model.Place(
+        name = "스타벅스 명동점",
+        address = "서울시 중구 명동",
+        latitude = 37.5665,
+        longitude = 126.9780
+    )
+
     AdegoTheme {
         MapScreen(
             roomId = "preview123",
             meetingTime = "14시 30분",
-            participants = emptyList(),
+            participants = dummyParticipants,
             selectedParticipantIndex = 0,
-            onParticipantSelected = {},
-            destination = null,
-            currentUserId = "preview_user"
+            onAction = {},
+            destination = dummyDestination,
+            currentUserId = "user1",
+            initialLocation = dummyParticipants[0].location!!,
+            showInviteDialog = false
         )
     }
 }
