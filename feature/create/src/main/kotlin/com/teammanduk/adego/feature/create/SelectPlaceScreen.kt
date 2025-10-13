@@ -9,13 +9,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,19 +34,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.model.Place
@@ -84,9 +88,9 @@ internal fun SelectPlaceRoute(
     ) { paddingValues ->
         SelectPlaceScreen(
             searchResult = searchResult,
-            onMapClick = { latLng ->
+            onCameraIdle = { latLng ->
                 viewModel.searchByCoordinates(latLng.latitude, latLng.longitude)
-                Log.d("SelectPlaceRoute", "onMapClick: $latLng");
+                Log.d("SelectPlaceRoute", "onCameraIdle: $latLng")
             },
             onPlaceSelected = {
                 viewModel.confirmSelection()
@@ -101,7 +105,7 @@ internal fun SelectPlaceRoute(
 @Composable
 private fun SelectPlaceScreen(
     searchResult: Place?,
-    onMapClick: (LatLng) -> Unit,
+    onCameraIdle: (LatLng) -> Unit,
     onPlaceSelected: () -> Unit,
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -115,6 +119,8 @@ private fun SelectPlaceScreen(
         }
     }
 
+    var isLoading by remember { mutableStateOf(false) }
+
     Box(
         modifier = modifier.fillMaxSize()
     ) {
@@ -122,8 +128,35 @@ private fun SelectPlaceScreen(
         MapPlaceholder(
             modifier = Modifier.fillMaxSize(),
             selectedPosition = selectedPosition,
-            onMapClick = onMapClick
+            onCameraIdle = onCameraIdle,
+            onCameraMove = {
+                isLoading = true
+            },
+            onCameraIdleComplete = {
+                isLoading = false
+            }
         )
+
+        // 화면 중앙에 고정된 마커
+        Icon(
+            imageVector = Icons.Default.LocationOn,
+            contentDescription = "선택 위치",
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(48.dp)
+                .offset(y = (-24).dp), // 마커의 하단이 중심점이 되도록 오프셋
+            tint = AdegoTheme.colors.main500
+        )
+
+        // 로딩 인디케이터
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .offset(y = 60.dp),
+                color = AdegoTheme.colors.main500
+            )
+        }
 
         // 상단 검색창
         OutlinedTextField(
@@ -197,14 +230,53 @@ private fun SelectPlaceScreen(
 private fun MapPlaceholder(
     modifier: Modifier = Modifier,
     selectedPosition: LatLng,
-    onMapClick: (LatLng) -> Unit
+    onCameraIdle: (LatLng) -> Unit,
+    onCameraMove: () -> Unit,
+    onCameraIdleComplete: () -> Unit
 ) {
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(selectedPosition, 15f)
     }
 
+    // 이전 selectedPosition을 기억하여 실제로 변경되었을 때만 카메라 이동
+    var previousPosition by remember { mutableStateOf(selectedPosition) }
+
+    // searchResult가 변경될 때만 카메라 이동 (검색 결과가 있을 때)
     LaunchedEffect(selectedPosition) {
-        cameraPositionState.position = CameraPosition.fromLatLngZoom(selectedPosition, 15f)
+        // 위치가 실제로 변경되었을 때만 카메라 이동
+        if (selectedPosition != previousPosition) {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition(
+                        selectedPosition, // 타겟 위치
+                        cameraPositionState.position.zoom, // 현재 줌 유지
+                        cameraPositionState.position.tilt, // 현재 기울기 유지
+                        cameraPositionState.position.bearing // 현재 회전 유지
+                    )
+                )
+            )
+            previousPosition = selectedPosition
+        }
+    }
+
+    // 카메라 이동 감지
+    LaunchedEffect(cameraPositionState.isMoving) {
+        if (cameraPositionState.isMoving) {
+            onCameraMove()
+        }
+    }
+
+    // 카메라 이동 완료 감지 및 역지오코딩
+    LaunchedEffect(cameraPositionState) {
+        snapshotFlow { cameraPositionState.isMoving }
+            .collect { isMoving ->
+                if (!isMoving) {
+                    // 지도 이동이 완료되면 중심 좌표로 역지오코딩
+                    val centerLatLng = cameraPositionState.position.target
+                    onCameraIdle(centerLatLng)
+                    onCameraIdleComplete()
+                }
+            }
     }
 
     GoogleMap(
@@ -216,13 +288,9 @@ private fun MapPlaceholder(
         uiSettings = MapUiSettings(
             zoomControlsEnabled = true,
             myLocationButtonEnabled = false
-        ),
-        onMapClick = onMapClick
-    ) {
-        Marker(
-            state = MarkerState(position = selectedPosition),
-            title = "선택한 위치"
         )
+    ) {
+        // 마커 제거 - 화면 중앙에 고정된 아이콘 사용
     }
 }
 
