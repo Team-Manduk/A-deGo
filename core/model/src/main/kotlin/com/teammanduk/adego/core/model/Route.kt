@@ -27,7 +27,25 @@ data class SubPath(
     val lane: Lane? = null, // 노선 정보
 
     // 도보 정보 (trafficType이 WALK일 때)
-    val walkDistance: Double? = null // 도보 거리 (미터)
+    val walkDistance: Double? = null, // 도보 거리 (미터)
+
+    // 좌표 정보
+    val startLatitude: Double? = null, // 출발지 위도
+    val startLongitude: Double? = null, // 출발지 경도
+    val endLatitude: Double? = null, // 도착지 위도
+    val endLongitude: Double? = null, // 도착지 경도
+
+    // 경유 정류장 목록 (좌표 포함)
+    val passStations: List<Station>? = null
+)
+
+/**
+ * 정류장/역 정보
+ */
+data class Station(
+    val name: String, // 정류장/역 이름
+    val latitude: Double, // 위도
+    val longitude: Double // 경도
 )
 
 /**
