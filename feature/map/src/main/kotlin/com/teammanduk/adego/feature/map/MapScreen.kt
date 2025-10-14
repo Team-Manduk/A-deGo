@@ -91,9 +91,12 @@ private fun MapRouteContent(
             )
         }
 
-        uiState.participants.isEmpty() ||
-        uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location == null -> {
+        uiState.myLocation == null -> {
             LoadingScreen(text = "현재 위치를 가져오는 중...")
+        }
+
+        uiState.participants.isEmpty() -> {
+            LoadingScreen(text = "방 정보를 불러오는 중...")
         }
 
         else -> {
@@ -128,8 +131,8 @@ private fun MapScreen(
     var isCameraInitialized by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState {
-        val initialLocation =
-            uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location
+        val initialLocation = uiState.myLocation
+            ?: uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location
         if (initialLocation != null) {
             position = CameraPosition.fromLatLngZoom(
                 LatLng(initialLocation.latitude, initialLocation.longitude),

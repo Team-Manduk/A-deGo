@@ -49,9 +49,10 @@ class MapViewModel @Inject constructor(
                             )
                         }
                     }
-                    .collect {
+                    .collect { location ->
                         _uiState.update { currentState ->
                             currentState.copy(
+                                myLocation = location,
                                 isLocationTrackingActive = true,
                                 isInitialLocationLoaded = if (!currentState.isInitialLocationLoaded) {
                                     true
