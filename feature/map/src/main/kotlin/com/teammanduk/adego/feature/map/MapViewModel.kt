@@ -1,9 +1,11 @@
 package com.teammanduk.adego.feature.map
 
+import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
+import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapUiState
@@ -17,33 +19,24 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * 지도 화면의 UI 상태
- */
-data class MapUiState(
-    val room: Room? = null,
-    val participants: List<Participant> = emptyList(),
-    val selectedParticipantIndex: Int = 0,
-    val isLocationTrackingActive: Boolean = false,
-    val isInitialLocationLoaded: Boolean = false,
-    val error: String? = null,
-    val showInviteDialog: Boolean = false,
-    val showRouteDialog: Boolean = false
-)
+private const val TAG = "MapViewModel"
 
-@HiltViewModel(assistedFactory = MapViewModel.Factory::class)
-class MapViewModel @AssistedInject constructor(
-    @Assisted("roomId") private val roomId: String,
-    @Assisted("userId") val userId: String,  // public으로 변경
-    private val roomRepository: RoomRepository,
-    private val locationRepository: LocationRepository
+@HiltViewModel
+class MapViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
+    private val joinRoom: JoinRoomUseCase,
+    private val trackAndUpdateLocation: TrackAndUpdateLocationUseCase,
+    private val searchRouteUseCase: SearchRouteUseCase,
+    private val userRepository: com.teammanduk.adego.core.domain.repository.UserRepository,
+    private val roomRepository: com.teammanduk.adego.core.domain.repository.RoomRepository,
+    private val locationRepository: com.teammanduk.adego.core.domain.repository.LocationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState
 
     private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
-    private val userId: String = savedStateHandle.get<String>("userId") ?: ""
+    val userId: String = savedStateHandle.get<String>("userId") ?: ""
 
     init {
         userRepository.setCurrentUser(userId)
@@ -109,6 +102,18 @@ class MapViewModel @AssistedInject constructor(
             MapIntent.DismissRouteDialog -> {
                 _uiState.update { reduce(it, intent) }
             }
+            MapIntent.ShowSelectStartPlace -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.DismissSelectStartPlace -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            is MapIntent.StartPlaceSelected -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.SearchRoute -> {
+                searchRoute()
+            }
         }
     }
 
@@ -121,7 +126,64 @@ class MapViewModel @AssistedInject constructor(
             MapIntent.ShowInviteDialog -> state.copy(showInviteDialog = true)
             MapIntent.DismissInviteDialog -> state.copy(showInviteDialog = false)
             MapIntent.ShowRouteDialog -> state.copy(showRouteDialog = true)
-            MapIntent.DismissRouteDialog -> state.copy(showRouteDialog = false)
+            MapIntent.DismissRouteDialog -> state.copy(showRouteDialog = false, searchedRoutes = emptyList(), startPlace = null)
+            MapIntent.ShowSelectStartPlace -> state.copy(
+                showSelectStartPlace = true,
+                showRouteDialog = false // 출발지 선택 화면으로 전환 시 다이얼로그 닫기
+            )
+            MapIntent.DismissSelectStartPlace -> state.copy(
+                showSelectStartPlace = false,
+                showRouteDialog = true // 출발지 선택 완료 후 다시 다이얼로그 열기
+            )
+            is MapIntent.StartPlaceSelected -> state.copy(
+                startPlace = intent.place,
+                showSelectStartPlace = false,
+                showRouteDialog = true // 출발지 선택 후 다시 다이얼로그 열기
+            )
+            MapIntent.SearchRoute -> state // searchRoute()에서 처리
+        }
+    }
+
+    // 경로 검색
+    private fun searchRoute() {
+        val currentState = _uiState.value
+        val startPlace = currentState.startPlace
+        val destination = currentState.room?.destination
+
+        if (startPlace == null || destination == null) {
+            _uiState.update { it.copy(error = "출발지와 목적지를 모두 선택해주세요.") }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isSearchingRoute = true, error = null) }
+
+                val routes = searchRouteUseCase(
+                    startLat = startPlace.latitude,
+                    startLng = startPlace.longitude,
+                    endLat = destination.latitude,
+                    endLng = destination.longitude
+                )
+
+                Log.d(TAG, "[MapViewModel] 경로 검색 완료: ${routes.size}개 경로 발견")
+
+                _uiState.update {
+                    it.copy(
+                        searchedRoutes = routes,
+                        isSearchingRoute = false,
+                        showRouteDialog = false
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[MapViewModel] 경로 검색 실패", e)
+                _uiState.update {
+                    it.copy(
+                        error = "경로 검색에 실패했습니다: ${e.message}",
+                        isSearchingRoute = false
+                    )
+                }
+            }
         }
     }
 

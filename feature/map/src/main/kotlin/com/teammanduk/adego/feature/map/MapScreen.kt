@@ -133,6 +133,41 @@ internal fun MapRoute(
                     onDismiss = { showInviteDialog = false }
                 )
             }
+
+            // 경로 설정 다이얼로그
+            if (uiState.showRouteDialog) {
+                RouteSetupDialog(
+                    destination = uiState.room?.destination,
+                    startPlace = uiState.startPlace,
+                    isSearchingRoute = uiState.isSearchingRoute,
+                    onDismiss = { viewModel.onAction(MapIntent.DismissRouteDialog) },
+                    onSelectStartPlace = { viewModel.onAction(MapIntent.ShowSelectStartPlace) },
+                    onSearchRoute = { viewModel.onAction(MapIntent.SearchRoute) }
+                )
+            }
+
+            // 출발지 선택 화면
+            if (uiState.showSelectStartPlace) {
+                val selectPlaceViewModel: com.teammanduk.adego.feature.place.SelectPlaceViewModel =
+                    androidx.hilt.navigation.compose.hiltViewModel()
+                val selectedPlace by selectPlaceViewModel.currentSearchResult.collectAsState()
+
+                com.teammanduk.adego.feature.place.SelectPlaceRoute(
+                    title = "출발지 선택",
+                    buttonText = "이 위치에서 출발",
+                    showTopBar = true,
+                    onBackClick = { viewModel.onAction(MapIntent.DismissSelectStartPlace) },
+                    onPlaceSelected = {
+                        // 장소 선택 확정 시에만 MapViewModel에 전달하고 화면 닫기
+                        selectedPlace?.let {
+                            viewModel.onAction(MapIntent.StartPlaceSelected(it))
+                        }
+                        viewModel.onAction(MapIntent.DismissSelectStartPlace)
+                    },
+                    onSearchClick = { /* TODO: 검색 화면 연동 */ },
+                    viewModel = selectPlaceViewModel
+                )
+            }
         } else {
             LoadingScreen(text = "사용자 위치를 확인 중...")
         }
@@ -732,10 +767,12 @@ private fun ParticipantCard(
 @Composable
 private fun RouteSetupDialog(
     destination: com.teammanduk.adego.core.model.Place?,
-    onDismiss: () -> Unit
+    startPlace: com.teammanduk.adego.core.model.Place?,
+    isSearchingRoute: Boolean,
+    onDismiss: () -> Unit,
+    onSelectStartPlace: () -> Unit,
+    onSearchRoute: () -> Unit
 ) {
-    var startLocation by remember { mutableStateOf("") }
-
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -765,7 +802,7 @@ private fun RouteSetupDialog(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 출발지 입력
+            // 출발지 선택
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -776,20 +813,53 @@ private fun RouteSetupDialog(
                     color = AdegoTheme.colors.onBackground
                 )
 
-                OutlinedTextField(
-                    value = startLocation,
-                    onValueChange = { startLocation = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = if (startPlace != null) AdegoTheme.colors.main500 else Color(0xFFE0E0E0),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .background(
+                            color = if (startPlace != null) AdegoTheme.colors.main500.copy(alpha = 0.05f) else Color.White,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .clickable { onSelectStartPlace() }
+                        .padding(16.dp)
+                ) {
+                    if (startPlace != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "출발지",
+                                tint = AdegoTheme.colors.main500,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = startPlace.name,
+                                    style = AdegoTheme.typography.bodyLarge,
+                                    color = AdegoTheme.colors.onBackground
+                                )
+                                Text(
+                                    text = startPlace.address,
+                                    style = AdegoTheme.typography.bodySmall,
+                                    color = Color(0xFF9E9E9E)
+                                )
+                            }
+                        }
+                    } else {
                         Text(
-                            text = "출발지를 입력하세요 (입력 기능 미구현)",
+                            text = "출발지를 선택하세요",
                             style = AdegoTheme.typography.bodyLarge,
                             color = Color(0xFF9E9E9E)
                         )
-                    },
-                    shape = RoundedCornerShape(8.dp),
-                    enabled = false // 입력 기능 미구현
-                )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -849,9 +919,9 @@ private fun RouteSetupDialog(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 경로 검색 버튼 (비활성화)
+            // 경로 검색 버튼
             Button(
-                onClick = { /* TODO: 경로 검색 기능 구현 */ },
+                onClick = onSearchRoute,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -860,19 +930,33 @@ private fun RouteSetupDialog(
                     disabledContainerColor = Color(0xFFE0E0E0)
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = false // 입력 기능이 구현되면 활성화
+                enabled = startPlace != null && !isSearchingRoute
             ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowForward,
-                    contentDescription = null,
-                    tint = Color.White
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "경로 검색 (준비중)",
-                    style = AdegoTheme.typography.titleLarge,
-                    color = Color.White
-                )
+                if (isSearchingRoute) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "경로 검색 중...",
+                        style = AdegoTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "경로 검색",
+                        style = AdegoTheme.typography.titleLarge,
+                        color = Color.White
+                    )
+                }
             }
         }
     }
