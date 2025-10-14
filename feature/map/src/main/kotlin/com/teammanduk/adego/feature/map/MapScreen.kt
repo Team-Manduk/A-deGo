@@ -3,10 +3,23 @@ package com.teammanduk.adego.feature.map
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -18,6 +31,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -28,6 +45,7 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
+import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.ui.component.LoadingScreen
 import com.teammanduk.adego.feature.map.component.InviteDialog
 import com.teammanduk.adego.feature.map.component.ParticipantCardPager
@@ -63,21 +81,35 @@ internal fun MapRoute(
         )
     }
 
-    if (!uiState.isInitialLocationLoaded || uiState.participants.isEmpty()) {
-        LoadingScreen(text = "현재 위치를 가져오는 중...")
-    } else {
-        MapScreen(
-            uiState = uiState,
-            onAction = viewModel::onAction,
-            onInviteClick = { showInviteDialog = true }
-        )
-    }
+    when {
+        uiState.showUserNameInput -> {
+            UserNameInputDialog(
+                userName = uiState.userName,
+                onUserNameChange = { viewModel.onAction(MapIntent.UpdateUserName(it)) },
+                onConfirm = { viewModel.onAction(MapIntent.ConfirmUserName) },
+                error = uiState.error
+            )
+        }
 
-    if (showInviteDialog) {
-        InviteDialog(
-            inviteCode = uiState.room?.roomId ?: "",
-            onDismiss = { showInviteDialog = false }
-        )
+        uiState.participants.isEmpty() ||
+        uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location == null -> {
+            LoadingScreen(text = "현재 위치를 가져오는 중...")
+        }
+
+        else -> {
+            MapScreen(
+                uiState = uiState,
+                onAction = viewModel::onAction,
+                onInviteClick = { showInviteDialog = true }
+            )
+
+            if (showInviteDialog) {
+                InviteDialog(
+                    inviteCode = uiState.room?.roomId ?: "",
+                    onDismiss = { showInviteDialog = false }
+                )
+            }
+        }
     }
 }
 
@@ -180,7 +212,7 @@ private fun MapScreen(
                             ),
                             title = participant.name,
                             icon = markerIcon,
-                            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+                            anchor = Offset(0.5f, 0.5f),
                             zIndex = if (isSelected) 1f else 0f
                         )
                     }
@@ -242,5 +274,84 @@ private fun MapScreen(
             pagerState = pagerState,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+    }
+}
+
+@Composable
+private fun UserNameInputDialog(
+    userName: String,
+    onUserNameChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    error: String?
+) {
+    Dialog(onDismissRequest = { }) {
+        Column(
+            modifier = Modifier
+                .background(Color.White, RoundedCornerShape(16.dp))
+                .padding(24.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "사용자 이름 입력",
+                    style = AdegoTheme.typography.titleLarge,
+                    color = AdegoTheme.colors.onBackground
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 이름 입력 필드
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = userName,
+                    onValueChange = onUserNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            text = "이름을 입력해주세요",
+                            style = AdegoTheme.typography.bodyLarge,
+                            color = AdegoTheme.colors.line500
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                error?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = it,
+                        color = Color.Red,
+                        style = AdegoTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 확인 버튼
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AdegoTheme.colors.main500
+                ),
+                shape = RoundedCornerShape(12.dp),
+                enabled = userName.isNotBlank()
+            ) {
+                Text(
+                    text = "확인",
+                    style = AdegoTheme.typography.titleLarge,
+                    color = Color.White
+                )
+            }
+        }
     }
 }

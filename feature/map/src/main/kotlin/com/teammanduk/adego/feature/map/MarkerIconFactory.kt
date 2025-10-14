@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
@@ -22,7 +23,7 @@ fun createParticipantMarkerIcon(
     color: Color,
     isSelected: Boolean = false
 ): BitmapDescriptor {
-    val density = androidx.compose.ui.platform.LocalDensity.current
+    val density = LocalDensity.current
 
     val sizeDp = if (isSelected) 56 else 48 // 크기
     val sizePx = with(density) { sizeDp.dp.roundToPx() }

@@ -30,24 +30,11 @@ class MapViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState
 
+    private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
+    private val userId: String = savedStateHandle.get<String>("userId") ?: ""
+
     init {
-        val roomId = savedStateHandle.get<String>("roomId") ?: ""
-        val userId = savedStateHandle.get<String>("userId") ?: ""
-
         userRepository.setCurrentUser(userId)
-
-        viewModelScope.launch {
-            joinRoom(roomId)
-                .catch { emit(null to emptyList()) }
-                .collect { (room, participants) ->
-                    _uiState.update { currentState ->
-                        currentState.copy(
-                            room = room?.toUiModel(),
-                            participants = participants.toUiModels()
-                        )
-                    }
-                }
-        }
     }
 
     fun startLocationTracking() {
@@ -86,6 +73,14 @@ class MapViewModel @Inject constructor(
                 _uiState.update { reduce(it, intent) }
             }
 
+            is MapIntent.UpdateUserName -> {
+                _uiState.update { reduce(it, intent) }
+            }
+
+            MapIntent.ConfirmUserName -> {
+                confirmUserName()
+            }
+
             MapIntent.ClearError -> {
                 _uiState.update { reduce(it, intent) }
             }
@@ -95,7 +90,36 @@ class MapViewModel @Inject constructor(
     private fun reduce(state: MapUiState, intent: MapIntent): MapUiState {
         return when (intent) {
             is MapIntent.SelectParticipant -> state.copy(selectedParticipantIndex = intent.index)
+            is MapIntent.UpdateUserName -> state.copy(userName = intent.userName)
+            MapIntent.ConfirmUserName -> state
             MapIntent.ClearError -> state.copy(error = null)
+        }
+    }
+
+    private fun confirmUserName() {
+        val userName = _uiState.value.userName
+        if (userName.isBlank()) {
+            _uiState.update { it.copy(error = "이름을 입력해주세요") }
+            return
+        }
+
+        _uiState.update { it.copy(showUserNameInput = false) }
+
+        // 이름 입력 완료 후 방 참가 처리
+        viewModelScope.launch {
+            joinRoom(roomId, userId, userName)
+                .catch { e ->
+                    _uiState.update { it.copy(error = "방 참가 실패: ${e.message}") }
+                    emit(null to emptyList())
+                }
+                .collect { (room, participants) ->
+                    _uiState.update { currentState ->
+                        currentState.copy(
+                            room = room?.toUiModel(),
+                            participants = participants.toUiModels()
+                        )
+                    }
+                }
         }
     }
 
