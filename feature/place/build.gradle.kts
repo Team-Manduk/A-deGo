@@ -4,10 +4,9 @@ plugins {
     alias(libs.plugins.adego.android.feature)
 }
 
-setNamespace("feature.create")
+setNamespace("feature.place")
 
 dependencies {
-    implementation(projects.feature.place)
     implementation(libs.google.maps.compose)
     implementation(libs.play.services.maps)
 }

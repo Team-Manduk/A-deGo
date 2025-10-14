@@ -27,6 +27,7 @@ include(
     ":feature:home",
     ":feature:create",
     ":feature:map",
+    ":feature:place",
 )
 include(
     ":core:common",

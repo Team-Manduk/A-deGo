@@ -1,4 +1,4 @@
-package com.teammanduk.adego.feature.create
+package com.teammanduk.adego.feature.place
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

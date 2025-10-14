@@ -7,8 +7,8 @@ import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import com.teammanduk.adego.core.navigation.Route
 import com.teammanduk.adego.feature.create.CreateRoute
-import com.teammanduk.adego.feature.create.SearchPlaceRoute
-import com.teammanduk.adego.feature.create.SelectPlaceRoute
+import com.teammanduk.adego.feature.place.SearchPlaceRoute
+import com.teammanduk.adego.feature.place.SelectPlaceRoute
 
 fun NavController.navigateToCreate(
     navOptions: NavOptions? = null
@@ -52,6 +52,9 @@ fun NavGraphBuilder.createNavGraph(
 
     composable<Route.SelectPlace> {
         SelectPlaceRoute(
+            title = "모임 장소 선택",
+            buttonText = "모임 장소 선택하기",
+            showTopBar = true,
             onBackClick = onNavigateBack,
             onPlaceSelected = onNavigateBack,
             onSearchClick = {

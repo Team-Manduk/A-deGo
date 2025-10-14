@@ -10,6 +10,7 @@ dependencies {
     implementation(projects.feature.home)
     implementation(projects.feature.create)
     implementation(projects.feature.map)
+    implementation(projects.feature.place)
     implementation(projects.core.data)
     implementation(projects.core.remote)
 }

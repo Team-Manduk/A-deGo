@@ -1,4 +1,4 @@
-package com.teammanduk.adego.feature.create
+package com.teammanduk.adego.feature.place
 
 import android.util.Log
 import androidx.compose.foundation.background
@@ -53,7 +53,10 @@ import com.teammanduk.adego.core.model.Place
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SelectPlaceRoute(
+fun SelectPlaceRoute(
+    title: String = "장소 선택",
+    buttonText: String = "장소 선택하기",
+    showTopBar: Boolean = true,
     onBackClick: () -> Unit = {},
     onPlaceSelected: () -> Unit = {},
     onSearchClick: () -> Unit = {},
@@ -66,28 +69,47 @@ internal fun SelectPlaceRoute(
         // ViewModel이 생성될 때 이미 selectedPlace의 변경을 감지하고 있음
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "모임 장소 선택",
-                        style = AdegoTheme.typography.titleLarge
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로가기"
+    if (showTopBar) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = title,
+                            style = AdegoTheme.typography.titleLarge
                         )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "뒤로가기"
+                            )
+                        }
                     }
-                }
+                )
+            }
+        ) { paddingValues ->
+            SelectPlaceScreen(
+                searchResult = searchResult,
+                buttonText = buttonText,
+                onCameraIdle = { latLng ->
+                    viewModel.searchByCoordinates(latLng.latitude, latLng.longitude)
+                    Log.d("SelectPlaceRoute", "onCameraIdle: $latLng")
+                },
+                onPlaceSelected = {
+                    viewModel.confirmSelection()
+                    onPlaceSelected()
+                },
+                onSearchClick = onSearchClick,
+                modifier = Modifier.padding(paddingValues)
             )
         }
-    ) { paddingValues ->
+    } else {
+        // TopBar 없이 사용 (다이얼로그 등에서)
         SelectPlaceScreen(
             searchResult = searchResult,
+            buttonText = buttonText,
             onCameraIdle = { latLng ->
                 viewModel.searchByCoordinates(latLng.latitude, latLng.longitude)
                 Log.d("SelectPlaceRoute", "onCameraIdle: $latLng")
@@ -96,8 +118,7 @@ internal fun SelectPlaceRoute(
                 viewModel.confirmSelection()
                 onPlaceSelected()
             },
-            onSearchClick = onSearchClick,
-            modifier = Modifier.padding(paddingValues)
+            onSearchClick = onSearchClick
         )
     }
 }
@@ -105,6 +126,7 @@ internal fun SelectPlaceRoute(
 @Composable
 private fun SelectPlaceScreen(
     searchResult: Place?,
+    buttonText: String = "장소 선택하기",
     onCameraIdle: (LatLng) -> Unit,
     onPlaceSelected: () -> Unit,
     onSearchClick: () -> Unit,
@@ -217,7 +239,7 @@ private fun SelectPlaceScreen(
                 enabled = searchResult != null
             ) {
                 Text(
-                    text = "모임 장소 선택하기",
+                    text = buttonText,
                     style = AdegoTheme.typography.titleLarge,
                     color = AdegoTheme.colors.onMain500
                 )
