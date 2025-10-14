@@ -21,6 +21,63 @@ class RoomRepositoryImpl @Inject constructor(
     private val roomDataSource: RoomDataSource
 ) : RoomRepository {
 
+    // 현재 참여 중인 방 ID (세션 정보)
+    private var currentRoomId: String? = null
+
+    // ===== 세션 관리 =====
+    override fun setCurrentRoom(roomId: String) {
+        currentRoomId = roomId
+        Log.d(TAG, "[Repository] 현재 방 세션 설정: $roomId")
+    }
+
+    override fun getCurrentRoomId(): String? = currentRoomId
+
+    override fun clearCurrentRoom() {
+        Log.d(TAG, "[Repository] 현재 방 세션 종료: $currentRoomId")
+        currentRoomId = null
+    }
+
+    // ===== 현재 방 기준 작업 (세션 기반) =====
+    override fun observeCurrentRoom(): Flow<Room?> {
+        val roomId = currentRoomId
+            ?: throw IllegalStateException("현재 방이 설정되지 않았습니다. setCurrentRoom()을 먼저 호출하세요.")
+        return observeRoom(roomId)
+    }
+
+    override fun observeCurrentParticipants(): Flow<List<Participant>> {
+        val roomId = currentRoomId
+            ?: throw IllegalStateException("현재 방이 설정되지 않았습니다. setCurrentRoom()을 먼저 호출하세요.")
+        return observeParticipants(roomId)
+    }
+
+    override suspend fun updateMyLocation(
+        userId: String,
+        location: ParticipantLocation
+    ): Result<Unit> {
+        val roomId = currentRoomId
+            ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
+        return updateMyLocation(roomId, userId, location)
+    }
+
+    override suspend fun updateMyRoute(
+        userId: String,
+        route: ParticipantRoute
+    ): Result<Unit> {
+        val roomId = currentRoomId
+            ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
+        return updateMyRoute(roomId, userId, route)
+    }
+
+    override suspend fun leaveCurrentRoom(userId: String): Result<Unit> {
+        val roomId = currentRoomId
+            ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
+        val result = leaveRoom(roomId, userId)
+        if (result.isSuccess) {
+            clearCurrentRoom()
+        }
+        return result
+    }
+
     /**
      * userId를 기반으로 고유한 색상을 생성
      * 같은 userId는 항상 같은 색상을 반환

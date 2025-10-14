@@ -40,8 +40,8 @@ internal class MainNavigator(
         navController.navigateToSelectPlace()
     }
 
-    fun navigateToMap(roomId: String, userId: String, hour: Int, minute: Int) {
-        navController.navigateToMap(roomId, userId, hour, minute, navOptions)
+    fun navigateToMap(roomId: String, userId: String) {
+        navController.navigateToMap(roomId, userId, navOptions)
     }
 
     fun navigateBack() {

@@ -16,7 +16,7 @@ fun NavController.navigateToHome(
 fun NavGraphBuilder.homeNavGraph(
     onNavigateToCreate: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToMap: (String, String, Int, Int) -> Unit,
+    onNavigateToMap: (String, String) -> Unit,
 ) {
     composable<Route.Home> {
         HomeRoute(

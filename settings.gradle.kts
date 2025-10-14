@@ -29,7 +29,9 @@ include(
     ":feature:map",
 )
 include(
+    ":core:common",
     ":core:designsystem",
+    ":core:ui",
     ":core:navigation",
     ":core:data-api",
     ":core:remote",

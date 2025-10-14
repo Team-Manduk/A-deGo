@@ -32,7 +32,7 @@ fun NavGraphBuilder.createNavGraph(
     navController: NavController,
     onNavigateBack: () -> Unit,
     onNavigateToSelectPlace: () -> Unit,
-    onCreateMeeting: (String, String, Int, Int) -> Unit,
+    onCreateMeeting: (String, String) -> Unit,
 ) {
     composable<Route.Create> { backStackEntry ->
         val selectedPlace = navController.currentBackStackEntry
@@ -43,8 +43,8 @@ fun NavGraphBuilder.createNavGraph(
         CreateRoute(
             onNavigateBack = onNavigateBack,
             onNavigateToSelectPlace = onNavigateToSelectPlace,
-            onNavigateToMap = { roomId, userId, hour, minute ->
-                onCreateMeeting(roomId, userId, hour, minute)
+            onNavigateToMap = { roomId, userId ->
+                onCreateMeeting(roomId, userId)
             },
             selectedPlaceFromNav = selectedPlace?.value,
         )

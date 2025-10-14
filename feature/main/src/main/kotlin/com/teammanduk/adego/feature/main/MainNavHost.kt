@@ -34,8 +34,8 @@ internal fun MainNavHost(
                 navController = navigator.navController,
                 onNavigateBack = navigator::navigateBack,
                 onNavigateToSelectPlace = navigator::navigateToSelectPlace,
-                onCreateMeeting = { roomId, userId, hour, minute ->
-                    navigator.navigateToMap(roomId, userId, hour, minute)
+                onCreateMeeting = { roomId, userId ->
+                    navigator.navigateToMap(roomId, userId)
                 }
             )
             mapNavGraph()
