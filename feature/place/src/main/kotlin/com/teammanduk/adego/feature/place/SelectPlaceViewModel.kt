@@ -46,6 +46,12 @@ class SelectPlaceViewModel @Inject constructor(
     private val _isUserDragging = MutableStateFlow(false)
     val isUserDragging: StateFlow<Boolean> = _isUserDragging
 
+    // 검색으로 선택된 장소인지 여부 (역지오코딩 결과 무시용)
+    private val _isFromSearch = MutableStateFlow(false)
+
+    // 역지오코딩 요청 ID (최신 요청만 처리하기 위함)
+    private var geocodingRequestId = 0L
+
     // 카메라 위치 변경을 위한 SharedFlow
     private val cameraPositionFlow = MutableSharedFlow<LatLng>(replay = 0)
 
@@ -55,21 +61,29 @@ class SelectPlaceViewModel @Inject constructor(
             cameraPositionFlow
                 .debounce(500L) // 500ms 대기
                 .collect { requestedLatLng ->
+                    // 요청 ID를 캡처 (API 호출 전에)
+                    val currentRequestId = geocodingRequestId
+
                     // API 응답을 받을 때 현재 카메라 위치와 비교
                     val place = searchPlaceByCoordinatesUseCase(
                         requestedLatLng.latitude,
                         requestedLatLng.longitude
                     )
 
-                    // 응답이 왔을 때 현재 카메라 위치와 요청했던 위치가 같은지 확인
-                    // 그리고 사용자가 드래그 중이 아닌지 확인
+                    // 응답이 왔을 때:
+                    // 1. 요청 ID가 여전히 유효한지 확인 (새로운 액션이 시작되지 않았는지)
+                    // 2. 현재 카메라 위치와 요청했던 위치가 같은지 확인
+                    // 3. 사용자가 드래그 중이 아닌지 확인
+                    // 4. 검색으로 선택된 장소가 아닌지 확인
                     val currentPosition = _currentCameraPosition.value
-                    val shouldApplyResult = currentPosition != null &&
+                    val shouldApplyResult = currentRequestId == geocodingRequestId &&
+                        currentPosition != null &&
                         isSameLocation(requestedLatLng, currentPosition) &&
-                        !_isUserDragging.value
+                        !_isUserDragging.value &&
+                        !_isFromSearch.value
 
                     if (shouldApplyResult) {
-                        // 위치가 같고 드래그 중이 아니면 결과 적용
+                        // 위치가 같고 드래그 중이 아니며 검색 결과가 아니면 결과 적용
                         place?.let { setSelectedPlaceUseCase(it) }
                         // 결과를 적용했으므로 로딩 종료
                         _isLoading.value = false
@@ -77,6 +91,20 @@ class SelectPlaceViewModel @Inject constructor(
                     // 조건 불만족으로 결과를 무시하면 로딩 상태 유지
                     // (다음 드래그가 끝나고 새로운 응답이 올 때까지)
                 }
+        }
+
+        // 검색으로 선택된 장소가 변경되면 로딩 상태 해제 및 플래그 설정
+        viewModelScope.launch {
+            currentSearchResult.collect { place ->
+                if (place != null) {
+                    // 검색으로 선택된 장소는 이미 확정된 정보이므로 로딩 해제
+                    _isLoading.value = false
+                    // 검색으로부터 선택됨 플래그 설정 (역지오코딩 결과 무시용)
+                    _isFromSearch.value = true
+                    // 모든 진행 중인 역지오코딩 요청 무효화
+                    geocodingRequestId++
+                }
+            }
         }
     }
 
@@ -91,6 +119,10 @@ class SelectPlaceViewModel @Inject constructor(
     fun onCameraMove() {
         _isUserDragging.value = true
         _isLoading.value = true
+        // 사용자가 직접 드래그하기 시작하면 검색 플래그 해제
+        _isFromSearch.value = false
+        // 새로운 드래그 세션 시작: 이전 역지오코딩 요청 무효화
+        geocodingRequestId++
     }
 
     // 카메라 위치가 변경될 때 호출 (debouncing 적용)
