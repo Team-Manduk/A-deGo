@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -238,7 +239,7 @@ private fun ScrollableTimePickerColumn(
             state = listState,
             flingBehavior = rememberSnapFlingBehavior(lazyListState = listState),
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 60.dp)
+            contentPadding = PaddingValues(vertical = 60.dp)
         ) {
             items(totalItems) { index ->
                 val itemValue = index % itemCount

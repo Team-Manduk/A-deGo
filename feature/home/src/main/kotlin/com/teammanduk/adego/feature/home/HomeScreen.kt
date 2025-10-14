@@ -16,14 +16,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +55,7 @@ internal fun HomeRoute(
     val joinedRoomInfo by viewModel.joinedRoomInfo.collectAsStateWithLifecycle()
 
     // 방 참여 성공 시 Map 화면으로 이동
-    androidx.compose.runtime.LaunchedEffect(joinedRoomInfo) {
+    LaunchedEffect(joinedRoomInfo) {
         joinedRoomInfo?.let { info ->
             onNavigateToMap(info.roomId, info.userId)
             viewModel.clearJoinedRoomInfo()
@@ -60,12 +64,12 @@ internal fun HomeRoute(
 
     // 에러 표시
     error?.let { errorMessage ->
-        androidx.compose.material3.AlertDialog(
+        AlertDialog(
             onDismissRequest = { viewModel.clearError() },
             title = { Text("방 참여 실패") },
             text = { Text(errorMessage) },
             confirmButton = {
-                androidx.compose.material3.TextButton(onClick = { viewModel.clearError() }) {
+                TextButton(onClick = { viewModel.clearError() }) {
                     Text("확인")
                 }
             }
@@ -211,7 +215,7 @@ private fun HomeScreen(
                     enabled = inviteCode.isNotEmpty() && !isJoining
                 ) {
                     if (isJoining) {
-                        androidx.compose.material3.CircularProgressIndicator(
+                        CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
                             color = AdegoTheme.colors.onMain500
                         )

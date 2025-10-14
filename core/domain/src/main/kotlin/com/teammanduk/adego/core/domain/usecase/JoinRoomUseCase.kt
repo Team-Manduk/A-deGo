@@ -10,14 +10,29 @@ import javax.inject.Inject
 class JoinRoomUseCase @Inject constructor(
     private val roomRepository: RoomRepository
 ) {
-    operator fun invoke(roomId: String): Flow<Pair<Room?, List<Participant>>> {
+    operator fun invoke(
+        roomId: String,
+        userId: String,
+        userName: String
+    ): Flow<Pair<Room?, List<Participant>>> {
         roomRepository.setCurrentRoom(roomId)
 
-        return combine(
-            roomRepository.observeCurrentRoom(),
-            roomRepository.observeCurrentParticipants()
-        ) { room, participants ->
-            room to participants
+        return kotlinx.coroutines.flow.flow {
+            // 먼저 방에 참가 (참가자 생성)
+            roomRepository.joinRoom(roomId, userId, userName)
+                .onFailure { error ->
+                    throw error
+                }
+
+            // 그 다음 실시간 구독 시작
+            combine(
+                roomRepository.observeCurrentRoom(),
+                roomRepository.observeCurrentParticipants()
+            ) { room, participants ->
+                room to participants
+            }.collect { data ->
+                emit(data)
+            }
         }
     }
 }

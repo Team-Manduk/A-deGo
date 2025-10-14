@@ -6,5 +6,7 @@ data class MapUiState(
     val selectedParticipantIndex: Int = 0,
     val isLocationTrackingActive: Boolean = false,
     val isInitialLocationLoaded: Boolean = false,
+    val showUserNameInput: Boolean = true,
+    val userName: String = "",
     val error: String? = null
 )
