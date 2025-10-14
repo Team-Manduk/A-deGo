@@ -2,22 +2,26 @@ package com.teammanduk.adego.feature.place
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.teammanduk.adego.core.domain.usecase.GetCurrentSearchResultUseCase
+import com.google.android.gms.maps.model.LatLng
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchPlaceByCoordinatesUseCase
 import com.teammanduk.adego.core.domain.usecase.SetSelectedPlaceUseCase
 import com.teammanduk.adego.core.model.Place
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(FlowPreview::class)
 @HiltViewModel
 class SelectPlaceViewModel @Inject constructor(
     private val searchPlaceByCoordinatesUseCase: SearchPlaceByCoordinatesUseCase,
-    private val getCurrentSearchResultUseCase: GetCurrentSearchResultUseCase,
     private val getSelectedPlaceUseCase: GetSelectedPlaceUseCase,
     private val setSelectedPlaceUseCase: SetSelectedPlaceUseCase
 ) : ViewModel() {
@@ -31,11 +35,81 @@ class SelectPlaceViewModel @Inject constructor(
             initialValue = null
         )
 
-    // 위경도로 장소 검색 (지도 클릭 시)
+    // 로딩 상태 관리
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    // 현재 카메라 위치 추적
+    private val _currentCameraPosition = MutableStateFlow<LatLng?>(null)
+
+    // 사용자가 드래그 중인지 여부 추적
+    private val _isUserDragging = MutableStateFlow(false)
+    val isUserDragging: StateFlow<Boolean> = _isUserDragging
+
+    // 카메라 위치 변경을 위한 SharedFlow
+    private val cameraPositionFlow = MutableSharedFlow<LatLng>(replay = 0)
+
+    init {
+        // Debouncing: 카메라가 멈춘 후 500ms 대기 후 지오코딩 실행
+        viewModelScope.launch {
+            cameraPositionFlow
+                .debounce(500L) // 500ms 대기
+                .collect { requestedLatLng ->
+                    // API 응답을 받을 때 현재 카메라 위치와 비교
+                    val place = searchPlaceByCoordinatesUseCase(
+                        requestedLatLng.latitude,
+                        requestedLatLng.longitude
+                    )
+
+                    // 응답이 왔을 때 현재 카메라 위치와 요청했던 위치가 같은지 확인
+                    // 그리고 사용자가 드래그 중이 아닌지 확인
+                    val currentPosition = _currentCameraPosition.value
+                    val shouldApplyResult = currentPosition != null &&
+                        isSameLocation(requestedLatLng, currentPosition) &&
+                        !_isUserDragging.value
+
+                    if (shouldApplyResult) {
+                        // 위치가 같고 드래그 중이 아니면 결과 적용
+                        place?.let { setSelectedPlaceUseCase(it) }
+                        // 결과를 적용했으므로 로딩 종료
+                        _isLoading.value = false
+                    }
+                    // 조건 불만족으로 결과를 무시하면 로딩 상태 유지
+                    // (다음 드래그가 끝나고 새로운 응답이 올 때까지)
+                }
+        }
+    }
+
+    // 두 위치가 실질적으로 같은지 확인 (소수점 6자리까지 비교, 약 0.1m 오차)
+    private fun isSameLocation(pos1: LatLng, pos2: LatLng): Boolean {
+        val latDiff = kotlin.math.abs(pos1.latitude - pos2.latitude)
+        val lngDiff = kotlin.math.abs(pos1.longitude - pos2.longitude)
+        return latDiff < 0.000001 && lngDiff < 0.000001
+    }
+
+    // 카메라 이동 시작 (로딩 상태 활성화, 드래그 상태 추적)
+    fun onCameraMove() {
+        _isUserDragging.value = true
+        _isLoading.value = true
+    }
+
+    // 카메라 위치가 변경될 때 호출 (debouncing 적용)
+    fun onCameraPositionChanged(latLng: LatLng) {
+        _currentCameraPosition.value = latLng
+        viewModelScope.launch {
+            cameraPositionFlow.emit(latLng)
+        }
+    }
+
+    // 카메라 이동 완료 (드래그 종료)
+    fun onCameraIdle() {
+        _isUserDragging.value = false
+    }
+
+    // 위경도로 장소 검색 (검색 화면에서 장소 선택 시) - 즉시 실행
     fun searchByCoordinates(latitude: Double, longitude: Double) {
         viewModelScope.launch {
             val place = searchPlaceByCoordinatesUseCase(latitude, longitude)
-            // 검색 결과를 바로 선택된 장소로 설정
             place?.let { setSelectedPlaceUseCase(it) }
         }
     }

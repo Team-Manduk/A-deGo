@@ -11,6 +11,7 @@ import com.teammanduk.adego.feature.create.navigation.createNavGraph
 import com.teammanduk.adego.feature.home.navigation.homeNavGraph
 import com.teammanduk.adego.feature.main.navigation.MainNavigator
 import com.teammanduk.adego.feature.map.navigation.mapNavGraph
+import com.teammanduk.adego.feature.place.navigation.placeNavGraph
 
 @Composable
 internal fun MainNavHost(
@@ -37,6 +38,10 @@ internal fun MainNavHost(
                 onCreateMeeting = { roomId, userId ->
                     navigator.navigateToMap(roomId, userId)
                 }
+            )
+            placeNavGraph(
+                navController = navigator.navController,
+                onNavigateBack = navigator::navigateBack
             )
             mapNavGraph()
         }

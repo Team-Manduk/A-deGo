@@ -1,6 +1,9 @@
 package com.teammanduk.adego.feature.place
 
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -63,11 +66,8 @@ fun SelectPlaceRoute(
     viewModel: SelectPlaceViewModel = hiltViewModel()
 ) {
     val searchResult by viewModel.currentSearchResult.collectAsStateWithLifecycle()
-
-    // LaunchedEffect를 사용하여 선택된 장소가 있을 때 searchResult 업데이트
-    LaunchedEffect(Unit) {
-        // ViewModel이 생성될 때 이미 selectedPlace의 변경을 감지하고 있음
-    }
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isUserDragging by viewModel.isUserDragging.collectAsStateWithLifecycle()
 
     if (showTopBar) {
         Scaffold(
@@ -92,9 +92,15 @@ fun SelectPlaceRoute(
         ) { paddingValues ->
             SelectPlaceScreen(
                 searchResult = searchResult,
+                isLoading = isLoading,
+                isUserDragging = isUserDragging,
                 buttonText = buttonText,
+                onCameraMove = {
+                    viewModel.onCameraMove()
+                },
                 onCameraIdle = { latLng ->
-                    viewModel.searchByCoordinates(latLng.latitude, latLng.longitude)
+                    viewModel.onCameraIdle()
+                    viewModel.onCameraPositionChanged(latLng)
                     Log.d("SelectPlaceRoute", "onCameraIdle: $latLng")
                 },
                 onPlaceSelected = {
@@ -109,9 +115,15 @@ fun SelectPlaceRoute(
         // TopBar 없이 사용 (다이얼로그 등에서)
         SelectPlaceScreen(
             searchResult = searchResult,
+            isLoading = isLoading,
+            isUserDragging = isUserDragging,
             buttonText = buttonText,
+            onCameraMove = {
+                viewModel.onCameraMove()
+            },
             onCameraIdle = { latLng ->
-                viewModel.searchByCoordinates(latLng.latitude, latLng.longitude)
+                viewModel.onCameraIdle()
+                viewModel.onCameraPositionChanged(latLng)
                 Log.d("SelectPlaceRoute", "onCameraIdle: $latLng")
             },
             onPlaceSelected = {
@@ -126,7 +138,10 @@ fun SelectPlaceRoute(
 @Composable
 private fun SelectPlaceScreen(
     searchResult: Place?,
+    isLoading: Boolean,
+    isUserDragging: Boolean,
     buttonText: String = "장소 선택하기",
+    onCameraMove: () -> Unit,
     onCameraIdle: (LatLng) -> Unit,
     onPlaceSelected: () -> Unit,
     onSearchClick: () -> Unit,
@@ -141,8 +156,6 @@ private fun SelectPlaceScreen(
         }
     }
 
-    var isLoading by remember { mutableStateOf(false) }
-
     Box(
         modifier = modifier.fillMaxSize()
     ) {
@@ -150,13 +163,9 @@ private fun SelectPlaceScreen(
         MapPlaceholder(
             modifier = Modifier.fillMaxSize(),
             selectedPosition = selectedPosition,
-            onCameraIdle = onCameraIdle,
-            onCameraMove = {
-                isLoading = true
-            },
-            onCameraIdleComplete = {
-                isLoading = false
-            }
+            isUserDragging = isUserDragging,
+            onCameraMove = onCameraMove,
+            onCameraIdle = onCameraIdle
         )
 
         // 화면 중앙에 고정된 마커
@@ -220,11 +229,18 @@ private fun SelectPlaceScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            searchResult?.let { place ->
-                PlaceInfoCard(
-                    placeName = place.name,
-                    placeAddress = place.address
-                )
+            // 검색 결과가 있고 로딩 중이 아닐 때 정보 카드 표시
+            AnimatedVisibility(
+                visible = searchResult != null && !isLoading,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                searchResult?.let {
+                    PlaceInfoCard(
+                        placeName = it.name,
+                        placeAddress = it.address
+                    )
+                }
             }
 
             Button(
@@ -236,7 +252,7 @@ private fun SelectPlaceScreen(
                     containerColor = AdegoTheme.colors.main500
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = searchResult != null
+                enabled = !isLoading && searchResult != null
             ) {
                 Text(
                     text = buttonText,
@@ -252,9 +268,9 @@ private fun SelectPlaceScreen(
 private fun MapPlaceholder(
     modifier: Modifier = Modifier,
     selectedPosition: LatLng,
-    onCameraIdle: (LatLng) -> Unit,
+    isUserDragging: Boolean,
     onCameraMove: () -> Unit,
-    onCameraIdleComplete: () -> Unit
+    onCameraIdle: (LatLng) -> Unit
 ) {
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(selectedPosition, 15f)
@@ -263,10 +279,15 @@ private fun MapPlaceholder(
     // 이전 selectedPosition을 기억하여 실제로 변경되었을 때만 카메라 이동
     var previousPosition by remember { mutableStateOf(selectedPosition) }
 
+    // 자동 애니메이션 진행 중인지 추적 (사용자 드래그와 구분하기 위함)
+    var isAutoAnimating by remember { mutableStateOf(false) }
+
     // searchResult가 변경될 때만 카메라 이동 (검색 결과가 있을 때)
-    LaunchedEffect(selectedPosition) {
-        // 위치가 실제로 변경되었을 때만 카메라 이동
-        if (selectedPosition != previousPosition) {
+    // 단, 사용자가 드래그 중일 때는 자동 카메라 이동을 하지 않음
+    LaunchedEffect(selectedPosition, isUserDragging) {
+        // 위치가 실제로 변경되었고, 사용자가 드래그 중이 아닐 때만 카메라 이동
+        if (selectedPosition != previousPosition && !isUserDragging) {
+            isAutoAnimating = true
             cameraPositionState.animate(
                 CameraUpdateFactory.newCameraPosition(
                     CameraPosition(
@@ -278,12 +299,13 @@ private fun MapPlaceholder(
                 )
             )
             previousPosition = selectedPosition
+            isAutoAnimating = false
         }
     }
 
-    // 카메라 이동 감지
+    // 카메라 이동 감지 (사용자 드래그만 감지, 자동 애니메이션 제외)
     LaunchedEffect(cameraPositionState.isMoving) {
-        if (cameraPositionState.isMoving) {
+        if (cameraPositionState.isMoving && !isAutoAnimating) {
             onCameraMove()
         }
     }
@@ -296,7 +318,6 @@ private fun MapPlaceholder(
                     // 지도 이동이 완료되면 중심 좌표로 역지오코딩
                     val centerLatLng = cameraPositionState.position.target
                     onCameraIdle(centerLatLng)
-                    onCameraIdleComplete()
                 }
             }
     }

@@ -10,9 +10,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
 import com.teammanduk.adego.core.navigation.Route
 import com.teammanduk.adego.feature.create.navigation.navigateToCreate
-import com.teammanduk.adego.feature.create.navigation.navigateToSelectPlace
 import com.teammanduk.adego.feature.home.navigation.navigateToHome
 import com.teammanduk.adego.feature.map.navigation.navigateToMap
+import com.teammanduk.adego.feature.place.navigation.navigateToSelectPlace
 
 internal class MainNavigator(
     val navController: NavHostController,
