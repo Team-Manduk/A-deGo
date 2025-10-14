@@ -17,14 +17,26 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-@HiltViewModel
-class MapViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
-    private val joinRoom: JoinRoomUseCase,
-    private val trackAndUpdateLocation: TrackAndUpdateLocationUseCase,
-    private val userRepository: com.teammanduk.adego.core.domain.repository.UserRepository,
-    private val roomRepository: com.teammanduk.adego.core.domain.repository.RoomRepository,
-    private val locationRepository: com.teammanduk.adego.core.domain.repository.LocationRepository
+/**
+ * 지도 화면의 UI 상태
+ */
+data class MapUiState(
+    val room: Room? = null,
+    val participants: List<Participant> = emptyList(),
+    val selectedParticipantIndex: Int = 0,
+    val isLocationTrackingActive: Boolean = false,
+    val isInitialLocationLoaded: Boolean = false,
+    val error: String? = null,
+    val showInviteDialog: Boolean = false,
+    val showRouteDialog: Boolean = false
+)
+
+@HiltViewModel(assistedFactory = MapViewModel.Factory::class)
+class MapViewModel @AssistedInject constructor(
+    @Assisted("roomId") private val roomId: String,
+    @Assisted("userId") val userId: String,  // public으로 변경
+    private val roomRepository: RoomRepository,
+    private val locationRepository: LocationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -85,6 +97,18 @@ class MapViewModel @Inject constructor(
             MapIntent.ClearError -> {
                 _uiState.update { reduce(it, intent) }
             }
+            MapIntent.ShowInviteDialog -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.DismissInviteDialog -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.ShowRouteDialog -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.DismissRouteDialog -> {
+                _uiState.update { reduce(it, intent) }
+            }
         }
     }
 
@@ -94,6 +118,10 @@ class MapViewModel @Inject constructor(
             is MapIntent.UpdateUserName -> state.copy(userName = intent.userName)
             MapIntent.ConfirmUserName -> state
             MapIntent.ClearError -> state.copy(error = null)
+            MapIntent.ShowInviteDialog -> state.copy(showInviteDialog = true)
+            MapIntent.DismissInviteDialog -> state.copy(showInviteDialog = false)
+            MapIntent.ShowRouteDialog -> state.copy(showRouteDialog = true)
+            MapIntent.DismissRouteDialog -> state.copy(showRouteDialog = false)
         }
     }
 
