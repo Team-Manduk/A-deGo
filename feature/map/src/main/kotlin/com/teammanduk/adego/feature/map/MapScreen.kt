@@ -1,8 +1,5 @@
 package com.teammanduk.adego.feature.map
 
-import android.Manifest
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,6 +44,8 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.ui.component.LoadingScreen
+import com.teammanduk.adego.core.ui.permission.PermissionRequester
+import com.teammanduk.adego.core.ui.permission.PermissionType
 import com.teammanduk.adego.feature.map.component.InviteDialog
 import com.teammanduk.adego.feature.map.component.ParticipantCardPager
 import com.teammanduk.adego.feature.map.component.ParticipantMapMarker
@@ -62,25 +61,26 @@ internal fun MapRoute(
     val uiState by viewModel.uiState.collectAsState()
     var showInviteDialog by remember { mutableStateOf(false) }
 
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
-            viewModel.startLocationTracking()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        locationPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
+    PermissionRequester(
+        permissionTypes = listOf(PermissionType.Location),
+        onGranted = { viewModel.startLocationTracking() }
+    ) {
+        MapRouteContent(
+            uiState = uiState,
+            viewModel = viewModel,
+            showInviteDialog = showInviteDialog,
+            onShowInviteDialogChange = { showInviteDialog = it }
         )
     }
+}
 
+@Composable
+private fun MapRouteContent(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    showInviteDialog: Boolean,
+    onShowInviteDialogChange: (Boolean) -> Unit
+) {
     when {
         uiState.showUserNameInput -> {
             UserNameInputDialog(
@@ -100,13 +100,13 @@ internal fun MapRoute(
             MapScreen(
                 uiState = uiState,
                 onAction = viewModel::onAction,
-                onInviteClick = { showInviteDialog = true }
+                onInviteClick = { onShowInviteDialogChange(true) }
             )
 
             if (showInviteDialog) {
                 InviteDialog(
                     inviteCode = uiState.room?.roomId ?: "",
-                    onDismiss = { showInviteDialog = false }
+                    onDismiss = { onShowInviteDialogChange(false) }
                 )
             }
         }
