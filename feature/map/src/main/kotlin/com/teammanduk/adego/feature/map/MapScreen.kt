@@ -136,14 +136,24 @@ internal fun MapRoute(
 
             // 경로 설정 다이얼로그
             if (uiState.showRouteDialog) {
-                RouteSetupDialog(
-                    destination = uiState.room?.destination,
-                    startPlace = uiState.startPlace,
-                    isSearchingRoute = uiState.isSearchingRoute,
-                    onDismiss = { viewModel.onAction(MapIntent.DismissRouteDialog) },
-                    onSelectStartPlace = { viewModel.onAction(MapIntent.ShowSelectStartPlace) },
-                    onSearchRoute = { viewModel.onAction(MapIntent.SearchRoute) }
-                )
+                // 경로 검색 결과가 있으면 경로 목록 표시, 없으면 경로 설정 다이얼로그 표시
+                if (uiState.searchedRoutes.isNotEmpty()) {
+                    RouteListDialog(
+                        routes = uiState.searchedRoutes,
+                        selectedRouteIndex = uiState.selectedRouteIndex,
+                        onRouteSelect = { index -> viewModel.onAction(MapIntent.SelectRoute(index)) },
+                        onDismiss = { viewModel.onAction(MapIntent.DismissRouteDialog) }
+                    )
+                } else {
+                    RouteSetupDialog(
+                        destination = uiState.room?.destination,
+                        startPlace = uiState.startPlace,
+                        isSearchingRoute = uiState.isSearchingRoute,
+                        onDismiss = { viewModel.onAction(MapIntent.DismissRouteDialog) },
+                        onSelectStartPlace = { viewModel.onAction(MapIntent.ShowSelectStartPlace) },
+                        onSearchRoute = { viewModel.onAction(MapIntent.SearchRoute) }
+                    )
+                }
             }
 
             // 출발지 선택 화면
@@ -257,10 +267,32 @@ private fun MapScreen(
                 mapToolbarEnabled = false
             )
         ) {
-            // 목적지 마커
+            // 선택된 경로를 폴리라인으로 표시
+            if (uiState.selectedRouteIndex != null && uiState.searchedRoutes.isNotEmpty()) {
+                val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
+                selectedRoute?.let { route ->
+                    // 출발지와 목적지 좌표로 간단한 폴리라인 그리기
+                    uiState.startPlace?.let { start ->
+                        uiState.room?.destination?.let { dest ->
+                            com.google.maps.android.compose.Polyline(
+                                points = listOf(
+                                    LatLng(start.latitude, start.longitude),
+                                    LatLng(dest.latitude, dest.longitude)
+                                ),
+                                color = AdegoTheme.colors.main500,
+                                width = 10f
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 목적지 마커 추가
             uiState.room?.destination?.let {
-                Marker(
-                    state = rememberMarkerState(position = LatLng(it.latitude, it.longitude)),
+                com.google.maps.android.compose.Marker(
+                    state = com.google.maps.android.compose.rememberMarkerState(
+                        position = LatLng(it.latitude, it.longitude)
+                    ),
                     title = it.name,
                     snippet = "목적지"
                 )
@@ -1096,9 +1128,234 @@ private fun InviteDialog(
     }
 }
 
+<<<<<<< HEAD
 // Preview 주석 처리 - MapScreen의 signature 변경으로 인해 일시적으로 비활성화
 // @Preview(showBackground = true, showSystemUi = true)
 // @Composable
 // private fun MapScreenPreview() {
 //     ...
 // }
+=======
+@Composable
+private fun RouteListDialog(
+    routes: List<com.teammanduk.adego.core.model.Route>,
+    selectedRouteIndex: Int?,
+    onRouteSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .background(Color.White, RoundedCornerShape(16.dp))
+                .padding(24.dp)
+                .fillMaxWidth()
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "경로 선택",
+                    style = AdegoTheme.typography.titleLarge,
+                    color = AdegoTheme.colors.onBackground
+                )
+
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "닫기",
+                        tint = AdegoTheme.colors.onBackground
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 경로 목록
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                routes.forEachIndexed { index, route ->
+                    RouteCard(
+                        route = route,
+                        isSelected = selectedRouteIndex == index,
+                        onClick = { onRouteSelect(index) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteCard(
+    route: com.teammanduk.adego.core.model.Route,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val pathTypeText = when (route.pathType) {
+        1 -> "지하철"
+        2 -> "버스"
+        3 -> "지하철+버스"
+        else -> "도보"
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) AdegoTheme.colors.main500 else Color(0xFFE0E0E0),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .background(
+                color = if (isSelected) AdegoTheme.colors.main500.copy(alpha = 0.05f) else Color.White,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(16.dp)
+    ) {
+        // 경로 타입 배지
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(
+                        color = AdegoTheme.colors.main500,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = pathTypeText,
+                    style = AdegoTheme.typography.bodySmall,
+                    color = Color.White
+                )
+            }
+
+            if (route.transferCount > 0) {
+                Text(
+                    text = "환승 ${route.transferCount}회",
+                    style = AdegoTheme.typography.bodySmall,
+                    color = Color(0xFF757575)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 경로 정보
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 시간 및 거리
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${route.totalTime}분",
+                        style = AdegoTheme.typography.titleLarge,
+                        color = AdegoTheme.colors.onBackground
+                    )
+                    Text(
+                        text = "• ${(route.totalDistance / 1000.0).format(1)}km",
+                        style = AdegoTheme.typography.bodyLarge,
+                        color = Color(0xFF757575)
+                    )
+                }
+            }
+
+            // 요금
+            Text(
+                text = "${route.totalFare}원",
+                style = AdegoTheme.typography.titleLarge,
+                color = AdegoTheme.colors.main500
+            )
+        }
+    }
+}
+
+// 소수점 포맷 헬퍼 함수
+private fun Double.format(digits: Int) = "%.${digits}f".format(this)
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun MapScreenPreview() {
+    // 더미 참가자 데이터 (테스트용)
+    val dummyParticipants = listOf(
+        com.teammanduk.adego.core.model.Participant(
+            userId = "user1",
+            name = "김철수",
+            profileColor = "#E53935",
+            location = com.teammanduk.adego.core.model.ParticipantLocation(
+                latitude = 37.5665,
+                longitude = 126.9780,
+                updatedAt = System.currentTimeMillis()
+            ),
+            distanceToDestination = 1500,
+            route = null
+        ),
+        com.teammanduk.adego.core.model.Participant(
+            userId = "user2",
+            name = "이영희",
+            profileColor = "#43A047",
+            location = com.teammanduk.adego.core.model.ParticipantLocation(
+                latitude = 37.5675,
+                longitude = 126.9790,
+                updatedAt = System.currentTimeMillis()
+            ),
+            distanceToDestination = 800,
+            route = null
+        ),
+        com.teammanduk.adego.core.model.Participant(
+            userId = "user3",
+            name = "박민수",
+            profileColor = "#1E88E5",
+            location = com.teammanduk.adego.core.model.ParticipantLocation(
+                latitude = 37.5655,
+                longitude = 126.9770,
+                updatedAt = System.currentTimeMillis()
+            ),
+            distanceToDestination = 2000,
+            route = null
+        )
+    )
+
+    val dummyDestination = com.teammanduk.adego.core.model.Place(
+        name = "스타벅스 명동점",
+        address = "서울시 중구 명동",
+        latitude = 37.5665,
+        longitude = 126.9780
+    )
+
+    AdegoTheme {
+        MapScreen(
+            roomId = "preview123",
+            meetingTime = "14시 30분",
+            participants = dummyParticipants,
+            selectedParticipantIndex = 0,
+            onAction = {},
+            destination = dummyDestination,
+            currentUserId = "user1",
+            initialLocation = dummyParticipants[0].location!!,
+            showInviteDialog = false,
+            showRouteDialog = false,
+            showSelectStartPlace = false,
+            showSearchPlace = false,
+            startPlace = null,
+            searchedRoutes = emptyList(),
+            selectedRouteIndex = null,
+            isSearchingRoute = false
+        )
+    }
+}
+>>>>>>> 2980fb1 (fix: ODsay API 경로 검색 JSON 파싱 오류 수정)

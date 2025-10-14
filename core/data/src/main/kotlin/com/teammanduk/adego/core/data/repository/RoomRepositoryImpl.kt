@@ -199,8 +199,14 @@ class RoomRepositoryImpl @Inject constructor(
     }
 
     override fun observeRoom(roomId: String): Flow<Room?> {
+        Log.d(TAG, "[Repository] observeRoom() 호출됨 - roomId: $roomId")
         return roomDataSource.observeRoom(roomId)
-            .map { it?.toModel() }
+            .map { roomDto ->
+                Log.d(TAG, "[Repository] observeRoom - RoomDto 수신: ${roomDto?.roomId}")
+                val room = roomDto?.toModel()
+                Log.d(TAG, "[Repository] observeRoom - Room 변환 완료: roomId=${room?.roomId}, destination=${room?.destination?.name}")
+                room
+            }
     }
 
     override fun observeParticipants(roomId: String): Flow<List<Participant>> {

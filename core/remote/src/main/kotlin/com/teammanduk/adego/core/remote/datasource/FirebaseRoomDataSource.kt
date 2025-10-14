@@ -69,22 +69,36 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
     }
 
     override fun observeRoom(roomId: String): Flow<RoomDto?> = callbackFlow {
+        Log.d(TAG, "[Firebase] observeRoom() 호출됨 - roomId: $roomId")
+
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d(TAG, "[Firebase] observeRoom - onDataChange 콜백 호출됨")
+                Log.d(TAG, "[Firebase] observeRoom - snapshot.exists(): ${snapshot.exists()}")
+                Log.d(TAG, "[Firebase] observeRoom - snapshot.key: ${snapshot.key}")
+
+                if (snapshot.exists()) {
+                    Log.d(TAG, "[Firebase] observeRoom - snapshot value: ${snapshot.value}")
+                }
+
                 val room = snapshot.getValue(RoomDto::class.java)
+                Log.d(TAG, "[Firebase] observeRoom - parsed room: roomId=${room?.roomId}, roomName=${room?.roomName}, destination=${room?.destination?.name}")
                 trySend(room)
             }
 
             override fun onCancelled(error: DatabaseError) {
-                Log.e(TAG, "Room observation cancelled", error.toException())
+                Log.e(TAG, "[Firebase] observeRoom - cancelled: ${error.message}", error.toException())
                 close(error.toException())
             }
         }
 
         val ref = database.child("rooms").child(roomId)
+        Log.d(TAG, "[Firebase] observeRoom - 리스너 등록 시작: ${ref.path}")
         ref.addValueEventListener(listener)
+        Log.d(TAG, "[Firebase] observeRoom - 리스너 등록 완료")
 
         awaitClose {
+            Log.d(TAG, "[Firebase] observeRoom - 리스너 제거됨")
             ref.removeEventListener(listener)
         }
     }

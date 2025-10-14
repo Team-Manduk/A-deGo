@@ -38,6 +38,7 @@ private data class OdsayResult(
 
 @Serializable
 private data class OdsayPath(
+    val pathType: Int, // 경로 타입 (1: 지하철, 2: 버스, 3: 지하철+버스) - path 레벨에 있음!
     val info: OdsayPathInfo,
     val subPath: List<OdsaySubPath> = emptyList()
 )
@@ -48,8 +49,21 @@ private data class OdsayPathInfo(
     val payment: Int, // 총 요금 (원)
     val busTransitCount: Int, // 버스 환승 횟수
     val subwayTransitCount: Int, // 지하철 환승 횟수
-    val totalDistance: Int, // 총 거리 (미터)
-    val pathType: Int // 경로 타입 (1: 지하철, 2: 버스, 3: 지하철+버스)
+    val trafficDistance: Double? = null, // 대중교통 이동 거리 (미터)
+    val totalDistance: Double, // 총 거리 (미터) - API에서 Double로 반환
+
+    // API 응답에 포함된 추가 필드들 (파싱 오류 방지를 위해 추가)
+    val totalWalk: Int? = null, // 총 도보 거리 (미터)
+    val totalWalkTime: Int? = null, // 총 도보 시간 (분)
+    val firstStartStation: String? = null, // 첫 출발역/정류장
+    val lastEndStation: String? = null, // 마지막 도착역/정류장
+    val totalStationCount: Int? = null, // 총 정거장 수
+    val busStationCount: Int? = null, // 버스 정거장 수
+    val subwayStationCount: Int? = null, // 지하철 역 수
+    val checkIntervalTime: Int? = null, // 배차 간격 시간
+    val checkIntervalTimeOverYn: String? = null, // 배차 간격 초과 여부
+    val totalIntervalTime: Int? = null, // 총 환승 대기 시간
+    val mapObj: String? = null // 지도 객체 정보
 )
 
 @Serializable
@@ -187,10 +201,10 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
 
         return Route(
             totalTime = path.info.totalTime,
-            totalDistance = path.info.totalDistance,
+            totalDistance = path.info.totalDistance.toInt(), // Double을 Int로 변환
             totalFare = path.info.payment,
             transferCount = path.info.busTransitCount + path.info.subwayTransitCount,
-            pathType = path.info.pathType,
+            pathType = path.pathType, // path.info.pathType이 아니라 path.pathType!
             subPaths = subPaths
         )
     }

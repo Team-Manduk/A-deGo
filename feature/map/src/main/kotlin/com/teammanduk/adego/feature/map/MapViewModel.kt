@@ -120,6 +120,9 @@ class MapViewModel @Inject constructor(
             MapIntent.SearchRoute -> {
                 searchRoute()
             }
+            is MapIntent.SelectRoute -> {
+                _uiState.update { reduce(it, intent) }
+            }
         }
     }
 
@@ -132,7 +135,12 @@ class MapViewModel @Inject constructor(
             MapIntent.ShowInviteDialog -> state.copy(showInviteDialog = true)
             MapIntent.DismissInviteDialog -> state.copy(showInviteDialog = false)
             MapIntent.ShowRouteDialog -> state.copy(showRouteDialog = true)
-            MapIntent.DismissRouteDialog -> state.copy(showRouteDialog = false, searchedRoutes = emptyList(), startPlace = null)
+            MapIntent.DismissRouteDialog -> state.copy(
+                showRouteDialog = false,
+                searchedRoutes = emptyList(),
+                selectedRouteIndex = null
+                // startPlace는 유지 - 사용자가 다시 경로 검색할 수 있도록
+            )
             MapIntent.ShowSelectStartPlace -> state.copy(
                 showSelectStartPlace = true,
                 showRouteDialog = false // 출발지 선택 화면으로 전환 시 다이얼로그 닫기
@@ -149,22 +157,30 @@ class MapViewModel @Inject constructor(
             MapIntent.ShowSearchPlace -> state.copy(showSearchPlace = true)
             MapIntent.DismissSearchPlace -> state.copy(showSearchPlace = false)
             MapIntent.SearchRoute -> state // searchRoute()에서 처리
+            is MapIntent.SelectRoute -> state.copy(selectedRouteIndex = intent.routeIndex)
         }
     }
 
     // 경로 검색
     private fun searchRoute() {
-        val currentState = _uiState.value
+        Log.d(TAG, "[MapViewModel] searchRoute() 호출됨")
+        val currentState = uiState.value  // _uiState 대신 uiState 사용
         val startPlace = currentState.startPlace
-        val destination = currentState.room?.destination
+        val room = currentState.room
+        val destination = room?.destination
+
+        Log.d(TAG, "[MapViewModel] room 상태: ${if (room == null) "null" else "존재함 (roomId=${room.roomId})"}")
+        Log.d(TAG, "[MapViewModel] 출발지: ${startPlace?.name}, 목적지: ${destination?.name}")
 
         if (startPlace == null || destination == null) {
+            Log.w(TAG, "[MapViewModel] 출발지 또는 목적지가 null입니다")
             _uiState.update { it.copy(error = "출발지와 목적지를 모두 선택해주세요.") }
             return
         }
 
         viewModelScope.launch {
             try {
+                Log.d(TAG, "[MapViewModel] 경로 검색 시작 중...")
                 _uiState.update { it.copy(isSearchingRoute = true, error = null) }
 
                 val routes = searchRouteUseCase(
@@ -179,8 +195,8 @@ class MapViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         searchedRoutes = routes,
-                        isSearchingRoute = false,
-                        showRouteDialog = false
+                        isSearchingRoute = false
+                        // showRouteDialog는 유지 - 사용자가 직접 닫도록
                     )
                 }
             } catch (e: Exception) {
