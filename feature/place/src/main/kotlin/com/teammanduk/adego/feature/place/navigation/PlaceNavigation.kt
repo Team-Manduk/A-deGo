@@ -20,6 +20,22 @@ fun NavController.navigateToSearchPlace(
     navigate(Route.SearchPlace, navOptions)
 }
 
+fun NavGraphBuilder.placeNavGraph(
+    navController: NavController,
+    onNavigateBack: () -> Unit
+) {
+    selectPlaceScreen(
+        onBackClick = onNavigateBack,
+        onSearchClick = { navController.navigateToSearchPlace() },
+        onPlaceSelected = onNavigateBack
+    )
+
+    searchPlaceScreen(
+        onBackClick = { navController.popBackStack() },
+        onPlaceClick = { navController.popBackStack() }
+    )
+}
+
 fun NavGraphBuilder.selectPlaceScreen(
     onBackClick: () -> Unit,
     onSearchClick: () -> Unit,
