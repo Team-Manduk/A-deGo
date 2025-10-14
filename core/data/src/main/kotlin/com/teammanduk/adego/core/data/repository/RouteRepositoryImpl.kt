@@ -76,7 +76,16 @@ private data class OdsaySubPath(
     val startName: String? = null, // 승차 정류장/역 이름
     val endName: String? = null, // 하차 정류장/역 이름
     val stationCount: Int? = null, // 정거장 개수
-    val lane: List<OdsayLane>? = null // 노선 정보
+    val lane: List<OdsayLane>? = null, // 노선 정보
+
+    // 좌표 정보
+    val startX: Double? = null, // 출발지 경도
+    val startY: Double? = null, // 출발지 위도
+    val endX: Double? = null, // 도착지 경도
+    val endY: Double? = null, // 도착지 위도
+
+    // 경유 정류장 목록
+    val passStopList: OdsayPassStopList? = null
 )
 
 @Serializable
@@ -85,6 +94,19 @@ private data class OdsayLane(
     val busNo: String? = null, // 버스 번호
     val type: Int? = null, // 버스 타입
     val subwayCode: Int? = null // 지하철 노선 번호
+)
+
+@Serializable
+private data class OdsayPassStopList(
+    val stations: List<OdsayStation>? = null
+)
+
+@Serializable
+private data class OdsayStation(
+    val stationName: String? = null, // 정류장/역 이름
+    val x: Double? = null, // 경도
+    val y: Double? = null, // 위도
+    val stationID: String? = null // 정류장/역 ID
 )
 
 @Serializable
@@ -195,7 +217,24 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                         subwayCode = lane.subwayCode
                     )
                 },
-                walkDistance = if (subPath.trafficType == 3) subPath.distance else null
+                walkDistance = if (subPath.trafficType == 3) subPath.distance else null,
+                // 좌표 정보 매핑
+                startLatitude = subPath.startY,
+                startLongitude = subPath.startX,
+                endLatitude = subPath.endY,
+                endLongitude = subPath.endX,
+                // 경유 정류장 목록 매핑
+                passStations = subPath.passStopList?.stations?.mapNotNull { station ->
+                    if (station.stationName != null && station.y != null && station.x != null) {
+                        com.teammanduk.adego.core.model.Station(
+                            name = station.stationName,
+                            latitude = station.y,
+                            longitude = station.x
+                        )
+                    } else {
+                        null
+                    }
+                }
             )
         }
 
