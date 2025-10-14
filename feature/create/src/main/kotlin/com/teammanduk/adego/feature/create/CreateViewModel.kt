@@ -20,9 +20,7 @@ import javax.inject.Inject
 
 data class CreatedRoomInfo(
     val roomId: String,
-    val userId: String,
-    val hour: Int,
-    val minute: Int
+    val userId: String
 )
 
 @HiltViewModel
@@ -87,9 +85,7 @@ class CreateViewModel @Inject constructor(
                     Log.d(TAG, "[ViewModel] 방 생성 성공! roomId=$roomId")
                     _createdRoomInfo.value = CreatedRoomInfo(
                         roomId = roomId,
-                        userId = userId,
-                        hour = hour,
-                        minute = minute
+                        userId = userId
                     )
                 }.onFailure { exception ->
                     Log.e(TAG, "[ViewModel] 방 생성 실패", exception)

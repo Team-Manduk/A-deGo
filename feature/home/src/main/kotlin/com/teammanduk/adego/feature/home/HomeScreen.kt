@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -30,6 +31,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,7 +43,7 @@ import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 internal fun HomeRoute(
     onNavigateToCreate: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    onNavigateToMap: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },
+    onNavigateToMap: (String, String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val isJoining by viewModel.isJoining.collectAsStateWithLifecycle()
@@ -50,7 +53,7 @@ internal fun HomeRoute(
     // 방 참여 성공 시 Map 화면으로 이동
     androidx.compose.runtime.LaunchedEffect(joinedRoomInfo) {
         joinedRoomInfo?.let { info ->
-            onNavigateToMap(info.roomId, info.userId, info.hour, info.minute)
+            onNavigateToMap(info.roomId, info.userId)
             viewModel.clearJoinedRoomInfo()
         }
     }
@@ -168,8 +171,25 @@ private fun HomeScreen(
             ) {
                 OutlinedTextField(
                     value = inviteCode,
-                    onValueChange = { inviteCode = it },
+                    onValueChange = { newValue ->
+                        // 영어 대문자와 숫자만 허용
+                        inviteCode = newValue
+                            .uppercase()
+                            .filter { it.isLetterOrDigit() }
+                    },
                     modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(
+                            text = "초대 코드 입력",
+                            style = AdegoTheme.typography.bodyLarge,
+                            color = AdegoTheme.colors.line500
+                        )
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Ascii,
+                        capitalization = KeyboardCapitalization.Characters
+                    ),
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = AdegoTheme.colors.main500,
                         unfocusedBorderColor = AdegoTheme.colors.main500,

@@ -15,9 +15,7 @@ private const val TAG = "A-degoLogTag"
 
 data class RoomJoinInfo(
     val roomId: String,
-    val userId: String,
-    val hour: Int,
-    val minute: Int
+    val userId: String
 )
 
 @HiltViewModel
@@ -71,24 +69,9 @@ class HomeViewModel @Inject constructor(
                             onSuccess = {
                                 Log.d(TAG, "[HomeViewModel] 방 참여 성공")
 
-                                // 시간 정보 추출 (예: "2025-01-13 14:30" -> hour=14, minute=30)
-                                val timeParts = room.dateTime.split(" ")
-                                val hourMinute = if (timeParts.size >= 2) {
-                                    val time = timeParts[1].split(":")
-                                    if (time.size >= 2) {
-                                        Pair(time[0].toIntOrNull() ?: 0, time[1].toIntOrNull() ?: 0)
-                                    } else {
-                                        Pair(0, 0)
-                                    }
-                                } else {
-                                    Pair(0, 0)
-                                }
-
                                 _joinedRoomInfo.value = RoomJoinInfo(
                                     roomId = inviteCode,
-                                    userId = tempUserId,
-                                    hour = hourMinute.first,
-                                    minute = hourMinute.second
+                                    userId = tempUserId
                                 )
                             },
                             onFailure = { exception ->

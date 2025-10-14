@@ -50,7 +50,7 @@ import java.util.Locale
 internal fun CreateRoute(
     onNavigateBack: () -> Unit = {},
     onNavigateToSelectPlace: () -> Unit = {},
-    onNavigateToMap: (String, String, Int, Int) -> Unit = { _, _, _, _ -> },  // roomId, userId, hour, minute으로 Map 화면 이동
+    onNavigateToMap: (String, String) -> Unit = { _, _ -> },  // roomId, userId로 Map 화면 이동
     selectedPlaceFromNav: String? = null,
     viewModel: CreateViewModel = hiltViewModel()
 ) {
@@ -62,7 +62,7 @@ internal fun CreateRoute(
     // 방 생성 성공 시 Map 화면으로 이동
     androidx.compose.runtime.LaunchedEffect(createdRoomInfo) {
         createdRoomInfo?.let { info ->
-            onNavigateToMap(info.roomId, info.userId, info.hour, info.minute)
+            onNavigateToMap(info.roomId, info.userId)
             viewModel.clearCreatedRoomInfo()
         }
     }
