@@ -9,8 +9,6 @@ data class MapUiState(
     val myLocation: ParticipantLocation? = null,
     val isLocationTrackingActive: Boolean = false,
     val isInitialLocationLoaded: Boolean = false,
-    val showUserNameInput: Boolean = true,
-    val userName: String = "",
     val error: String? = null,
     val showInviteDialog: Boolean = false,
     val showRouteDialog: Boolean = false,

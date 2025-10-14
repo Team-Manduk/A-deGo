@@ -19,17 +19,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val TAG = "MapViewModel"
-
 @HiltViewModel
 class MapViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val joinRoom: JoinRoomUseCase,
     private val trackAndUpdateLocation: TrackAndUpdateLocationUseCase,
-    private val searchRouteUseCase: SearchRouteUseCase,
     private val userRepository: com.teammanduk.adego.core.domain.repository.UserRepository,
     private val roomRepository: com.teammanduk.adego.core.domain.repository.RoomRepository,
-    private val locationRepository: com.teammanduk.adego.core.domain.repository.LocationRepository
+    private val locationRepository: com.teammanduk.adego.core.domain.repository.LocationRepository,
+    private val searchRouteUseCase: com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -79,14 +77,6 @@ class MapViewModel @Inject constructor(
                 _uiState.update { reduce(it, intent) }
             }
 
-            is MapIntent.UpdateUserName -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.ConfirmUserName -> {
-                confirmUserName()
-            }
-
             MapIntent.ClearError -> {
                 _uiState.update { reduce(it, intent) }
             }
@@ -129,8 +119,6 @@ class MapViewModel @Inject constructor(
     private fun reduce(state: MapUiState, intent: MapIntent): MapUiState {
         return when (intent) {
             is MapIntent.SelectParticipant -> state.copy(selectedParticipantIndex = intent.index)
-            is MapIntent.UpdateUserName -> state.copy(userName = intent.userName)
-            MapIntent.ConfirmUserName -> state
             MapIntent.ClearError -> state.copy(error = null)
             MapIntent.ShowInviteDialog -> state.copy(showInviteDialog = true)
             MapIntent.DismissInviteDialog -> state.copy(showInviteDialog = false)
@@ -139,48 +127,39 @@ class MapViewModel @Inject constructor(
                 showRouteDialog = false,
                 searchedRoutes = emptyList(),
                 selectedRouteIndex = null
-                // startPlace는 유지 - 사용자가 다시 경로 검색할 수 있도록
             )
             MapIntent.ShowSelectStartPlace -> state.copy(
                 showSelectStartPlace = true,
-                showRouteDialog = false // 출발지 선택 화면으로 전환 시 다이얼로그 닫기
+                showRouteDialog = false
             )
             MapIntent.DismissSelectStartPlace -> state.copy(
                 showSelectStartPlace = false,
-                showRouteDialog = true // 출발지 선택 완료 후 다시 다이얼로그 열기
+                showRouteDialog = true
             )
             is MapIntent.StartPlaceSelected -> state.copy(
                 startPlace = intent.place,
                 showSelectStartPlace = false,
-                showRouteDialog = true // 출발지 선택 후 다시 다이얼로그 열기
+                showRouteDialog = true
             )
             MapIntent.ShowSearchPlace -> state.copy(showSearchPlace = true)
             MapIntent.DismissSearchPlace -> state.copy(showSearchPlace = false)
-            MapIntent.SearchRoute -> state // searchRoute()에서 처리
+            MapIntent.SearchRoute -> state
             is MapIntent.SelectRoute -> state.copy(selectedRouteIndex = intent.routeIndex)
         }
     }
 
-    // 경로 검색
     private fun searchRoute() {
-        Log.d(TAG, "[MapViewModel] searchRoute() 호출됨")
-        val currentState = uiState.value  // _uiState 대신 uiState 사용
+        val currentState = _uiState.value
         val startPlace = currentState.startPlace
-        val room = currentState.room
-        val destination = room?.destination
-
-        Log.d(TAG, "[MapViewModel] room 상태: ${if (room == null) "null" else "존재함 (roomId=${room.roomId})"}")
-        Log.d(TAG, "[MapViewModel] 출발지: ${startPlace?.name}, 목적지: ${destination?.name}")
+        val destination = currentState.room?.destination
 
         if (startPlace == null || destination == null) {
-            Log.w(TAG, "[MapViewModel] 출발지 또는 목적지가 null입니다")
             _uiState.update { it.copy(error = "출발지와 목적지를 모두 선택해주세요.") }
             return
         }
 
         viewModelScope.launch {
             try {
-                Log.d(TAG, "[MapViewModel] 경로 검색 시작 중...")
                 _uiState.update { it.copy(isSearchingRoute = true, error = null) }
 
                 val routes = searchRouteUseCase(
@@ -190,17 +169,13 @@ class MapViewModel @Inject constructor(
                     endLng = destination.longitude
                 )
 
-                Log.d(TAG, "[MapViewModel] 경로 검색 완료: ${routes.size}개 경로 발견")
-
                 _uiState.update {
                     it.copy(
                         searchedRoutes = routes,
                         isSearchingRoute = false
-                        // showRouteDialog는 유지 - 사용자가 직접 닫도록
                     )
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "[MapViewModel] 경로 검색 실패", e)
                 _uiState.update {
                     it.copy(
                         error = "경로 검색에 실패했습니다: ${e.message}",
@@ -208,33 +183,6 @@ class MapViewModel @Inject constructor(
                     )
                 }
             }
-        }
-    }
-
-    private fun confirmUserName() {
-        val userName = _uiState.value.userName
-        if (userName.isBlank()) {
-            _uiState.update { it.copy(error = "이름을 입력해주세요") }
-            return
-        }
-
-        _uiState.update { it.copy(showUserNameInput = false) }
-
-        // 이름 입력 완료 후 방 참가 처리
-        viewModelScope.launch {
-            joinRoom(roomId, userId, userName)
-                .catch { e ->
-                    _uiState.update { it.copy(error = "방 참가 실패: ${e.message}") }
-                    emit(null to emptyList())
-                }
-                .collect { (room, participants) ->
-                    _uiState.update { currentState ->
-                        currentState.copy(
-                            room = room?.toUiModel(),
-                            participants = participants.toUiModels()
-                        )
-                    }
-                }
         }
     }
 

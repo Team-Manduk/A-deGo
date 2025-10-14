@@ -24,21 +24,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowForward
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,11 +35,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -106,76 +86,18 @@ internal fun MapRoute(
     if (!uiState.isInitialLocationLoaded || uiState.participants.isEmpty()) {
         LoadingScreen(text = "현재 위치를 가져오는 중...")
     } else {
-        val currentUser = uiState.participants.find { it.userId == viewModel.userId }
-        if (currentUser?.location != null) {
-            MapScreen(
-                uiState = uiState,
-                onAction = viewModel::onAction,
-                onInviteClick = { showInviteDialog = true }
-            )
+        MapScreen(
+            uiState = uiState,
+            onAction = viewModel::onAction,
+            onInviteClick = { showInviteDialog = true }
+        )
+    }
 
-            if (showInviteDialog) {
-                InviteDialog(
-                    inviteCode = uiState.room?.roomId ?: "",
-                    onDismiss = { showInviteDialog = false }
-                )
-            }
-
-            // 경로 설정 다이얼로그
-            if (uiState.showRouteDialog) {
-                // 경로 검색 결과가 있으면 경로 목록 표시, 없으면 경로 설정 다이얼로그 표시
-                if (uiState.searchedRoutes.isNotEmpty()) {
-                    RouteListDialog(
-                        routes = uiState.searchedRoutes,
-                        selectedRouteIndex = uiState.selectedRouteIndex,
-                        onRouteSelect = { index -> viewModel.onAction(MapIntent.SelectRoute(index)) },
-                        onDismiss = { viewModel.onAction(MapIntent.DismissRouteDialog) }
-                    )
-                } else {
-                    RouteSetupDialog(
-                        destination = uiState.room?.destination,
-                        startPlace = uiState.startPlace,
-                        isSearchingRoute = uiState.isSearchingRoute,
-                        onDismiss = { viewModel.onAction(MapIntent.DismissRouteDialog) },
-                        onSelectStartPlace = { viewModel.onAction(MapIntent.ShowSelectStartPlace) },
-                        onSearchRoute = { viewModel.onAction(MapIntent.SearchRoute) }
-                    )
-                }
-            }
-
-            // 출발지 선택 화면
-            if (uiState.showSelectStartPlace) {
-                val selectPlaceViewModel: com.teammanduk.adego.feature.place.SelectPlaceViewModel =
-                    androidx.hilt.navigation.compose.hiltViewModel()
-                val selectedPlace by selectPlaceViewModel.currentSearchResult.collectAsState()
-
-                com.teammanduk.adego.feature.place.SelectPlaceRoute(
-                    title = "출발지 선택",
-                    buttonText = "이 위치에서 출발",
-                    showTopBar = true,
-                    onBackClick = { viewModel.onAction(MapIntent.DismissSelectStartPlace) },
-                    onPlaceSelected = {
-                        // 장소 선택 확정 시에만 MapViewModel에 전달하고 화면 닫기
-                        selectedPlace?.let {
-                            viewModel.onAction(MapIntent.StartPlaceSelected(it))
-                        }
-                        viewModel.onAction(MapIntent.DismissSelectStartPlace)
-                    },
-                    onSearchClick = { viewModel.onAction(MapIntent.ShowSearchPlace) },
-                    viewModel = selectPlaceViewModel
-                )
-            }
-
-            // 장소 검색 화면
-            if (uiState.showSearchPlace) {
-                com.teammanduk.adego.feature.place.SearchPlaceRoute(
-                    onBackClick = { viewModel.onAction(MapIntent.DismissSearchPlace) },
-                    onPlaceClick = { viewModel.onAction(MapIntent.DismissSearchPlace) }
-                )
-            }
-        } else {
-            LoadingScreen(text = "사용자 위치를 확인 중...")
-        }
+    if (showInviteDialog) {
+        InviteDialog(
+            inviteCode = uiState.room?.roomId ?: "",
+            onDismiss = { showInviteDialog = false }
+        )
     }
 }
 
@@ -254,32 +176,10 @@ private fun MapScreen(
                 mapToolbarEnabled = false
             )
         ) {
-            // 선택된 경로를 폴리라인으로 표시
-            if (uiState.selectedRouteIndex != null && uiState.searchedRoutes.isNotEmpty()) {
-                val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
-                selectedRoute?.let { route ->
-                    // 출발지와 목적지 좌표로 간단한 폴리라인 그리기
-                    uiState.startPlace?.let { start ->
-                        uiState.room?.destination?.let { dest ->
-                            com.google.maps.android.compose.Polyline(
-                                points = listOf(
-                                    LatLng(start.latitude, start.longitude),
-                                    LatLng(dest.latitude, dest.longitude)
-                                ),
-                                color = AdegoTheme.colors.main500,
-                                width = 10f
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 목적지 마커 추가
+            // 목적지 마커
             uiState.room?.destination?.let {
-                com.google.maps.android.compose.Marker(
-                    state = com.google.maps.android.compose.rememberMarkerState(
-                        position = LatLng(it.latitude, it.longitude)
-                    ),
+                Marker(
+                    state = rememberMarkerState(position = LatLng(it.latitude, it.longitude)),
                     title = it.name,
                     snippet = "목적지"
                 )
@@ -357,46 +257,10 @@ private fun MapScreen(
             }
         }
 
-        // 하단 영역: 경로 설정 버튼 + 참가자 카드
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // 경로 설정 버튼
-            Button(
-                onClick = { onAction(MapIntent.ShowRouteDialog) },
-                modifier = Modifier
-                    .padding(horizontal = 32.dp)
-                    .height(48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = AdegoTheme.colors.highlight500
-                ),
-                shape = RoundedCornerShape(24.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowForward,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "목적지까지 경로 설정",
-                    style = AdegoTheme.typography.bodyLarge,
-                    color = Color.White
-                )
-            }
-
-            // 참가자 카드 (스와이프)
-            ParticipantCardPager(
-                participants = uiState.participants,
-                pagerState = pagerState,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        ParticipantCardPager(
+            participants = uiState.participants,
+            pagerState = pagerState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
