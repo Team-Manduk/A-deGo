@@ -111,6 +111,12 @@ class MapViewModel @Inject constructor(
             is MapIntent.StartPlaceSelected -> {
                 _uiState.update { reduce(it, intent) }
             }
+            MapIntent.ShowSearchPlace -> {
+                _uiState.update { reduce(it, intent) }
+            }
+            MapIntent.DismissSearchPlace -> {
+                _uiState.update { reduce(it, intent) }
+            }
             MapIntent.SearchRoute -> {
                 searchRoute()
             }
@@ -140,6 +146,8 @@ class MapViewModel @Inject constructor(
                 showSelectStartPlace = false,
                 showRouteDialog = true // 출발지 선택 후 다시 다이얼로그 열기
             )
+            MapIntent.ShowSearchPlace -> state.copy(showSearchPlace = true)
+            MapIntent.DismissSearchPlace -> state.copy(showSearchPlace = false)
             MapIntent.SearchRoute -> state // searchRoute()에서 처리
         }
     }

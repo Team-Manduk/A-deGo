@@ -164,8 +164,16 @@ internal fun MapRoute(
                         }
                         viewModel.onAction(MapIntent.DismissSelectStartPlace)
                     },
-                    onSearchClick = { /* TODO: 검색 화면 연동 */ },
+                    onSearchClick = { viewModel.onAction(MapIntent.ShowSearchPlace) },
                     viewModel = selectPlaceViewModel
+                )
+            }
+
+            // 장소 검색 화면
+            if (uiState.showSearchPlace) {
+                com.teammanduk.adego.feature.place.SearchPlaceRoute(
+                    onBackClick = { viewModel.onAction(MapIntent.DismissSearchPlace) },
+                    onPlaceClick = { viewModel.onAction(MapIntent.DismissSearchPlace) }
                 )
             }
         } else {

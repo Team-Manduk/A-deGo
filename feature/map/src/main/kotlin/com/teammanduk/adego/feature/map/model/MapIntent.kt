@@ -11,6 +11,8 @@ sealed interface MapIntent {
     data object DismissRouteDialog : MapIntent
     data object ShowSelectStartPlace : MapIntent
     data object DismissSelectStartPlace : MapIntent
+    data object ShowSearchPlace : MapIntent
+    data object DismissSearchPlace : MapIntent
     data class StartPlaceSelected(val place: com.teammanduk.adego.core.model.Place) : MapIntent
     data object SearchRoute : MapIntent
 }
