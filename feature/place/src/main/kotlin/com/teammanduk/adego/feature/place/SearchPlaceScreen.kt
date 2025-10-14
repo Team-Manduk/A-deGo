@@ -1,4 +1,4 @@
-package com.teammanduk.adego.feature.create
+package com.teammanduk.adego.feature.place
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,7 +45,7 @@ import com.teammanduk.adego.core.model.Place
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SearchPlaceRoute(
+fun SearchPlaceRoute(
     onBackClick: () -> Unit = {},
     onPlaceClick: () -> Unit = {},
     viewModel: SearchPlaceViewModel = hiltViewModel()

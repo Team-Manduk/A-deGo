@@ -7,6 +7,7 @@ plugins {
 setNamespace("feature.map")
 
 dependencies {
+    implementation(projects.feature.place)
     implementation(libs.google.maps.compose)
     implementation(libs.play.services.maps)
 }
