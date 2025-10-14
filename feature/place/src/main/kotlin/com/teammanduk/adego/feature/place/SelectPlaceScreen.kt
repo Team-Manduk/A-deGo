@@ -1,6 +1,5 @@
 package com.teammanduk.adego.feature.place
 
-import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -101,7 +100,6 @@ fun SelectPlaceRoute(
                 onCameraIdle = { latLng ->
                     viewModel.onCameraIdle()
                     viewModel.onCameraPositionChanged(latLng)
-                    Log.d("SelectPlaceRoute", "onCameraIdle: $latLng")
                 },
                 onPlaceSelected = {
                     viewModel.confirmSelection()
@@ -124,7 +122,6 @@ fun SelectPlaceRoute(
             onCameraIdle = { latLng ->
                 viewModel.onCameraIdle()
                 viewModel.onCameraPositionChanged(latLng)
-                Log.d("SelectPlaceRoute", "onCameraIdle: $latLng")
             },
             onPlaceSelected = {
                 viewModel.confirmSelection()
@@ -277,16 +274,15 @@ private fun MapPlaceholder(
     }
 
     // 이전 selectedPosition을 기억하여 실제로 변경되었을 때만 카메라 이동
-    var previousPosition by remember { mutableStateOf(selectedPosition) }
+    var previousPosition by remember { mutableStateOf<LatLng?>(null) }
 
     // 자동 애니메이션 진행 중인지 추적 (사용자 드래그와 구분하기 위함)
     var isAutoAnimating by remember { mutableStateOf(false) }
 
     // searchResult가 변경될 때만 카메라 이동 (검색 결과가 있을 때)
-    // 단, 사용자가 드래그 중일 때는 자동 카메라 이동을 하지 않음
-    LaunchedEffect(selectedPosition, isUserDragging) {
-        // 위치가 실제로 변경되었고, 사용자가 드래그 중이 아닐 때만 카메라 이동
-        if (selectedPosition != previousPosition && !isUserDragging) {
+    LaunchedEffect(selectedPosition) {
+        // 위치가 실제로 변경되었을 때 카메라 이동 (previousPosition이 null이거나 다를 때)
+        if (previousPosition == null || selectedPosition != previousPosition) {
             isAutoAnimating = true
             cameraPositionState.animate(
                 CameraUpdateFactory.newCameraPosition(
@@ -314,8 +310,9 @@ private fun MapPlaceholder(
     LaunchedEffect(cameraPositionState) {
         snapshotFlow { cameraPositionState.isMoving }
             .collect { isMoving ->
-                if (!isMoving) {
-                    // 지도 이동이 완료되면 중심 좌표로 역지오코딩
+                if (!isMoving && !isAutoAnimating) {
+                    // 지도 이동이 완료되고, 자동 애니메이션이 아닐 때만 역지오코딩
+                    // (사용자가 직접 드래그한 경우에만 역지오코딩 실행)
                     val centerLatLng = cameraPositionState.position.target
                     onCameraIdle(centerLatLng)
                 }
