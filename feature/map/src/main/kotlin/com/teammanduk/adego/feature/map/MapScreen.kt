@@ -1,6 +1,7 @@
 package com.teammanduk.adego.feature.map
 
 import android.Manifest
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -223,24 +224,54 @@ private fun MapScreen(
             // 선택한 경로 그리기
             if (uiState.selectedRouteIndex != null) {
                 val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
-                selectedRoute?.subPaths?.forEach { subPath ->
-                    // 각 SubPath의 시작점과 끝점을 연결
-                    val startLat = subPath.startLatitude
-                    val startLng = subPath.startLongitude
-                    val endLat = subPath.endLatitude
-                    val endLng = subPath.endLongitude
+                selectedRoute?.subPaths?.forEachIndexed { index, subPath ->
+                    val points = mutableListOf<LatLng>()
+                    val graphicData = subPath.graphicData
 
-                    if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                        val points = mutableListOf<LatLng>()
-                        points.add(LatLng(startLat, startLng))
+                    Log.d("MapScreen", "SubPath[$index] - trafficType: ${subPath.trafficType}, graphicData size: ${graphicData?.size ?: 0}")
 
-                        // 경유 정류장이 있으면 추가
-                        subPath.passStations?.forEach { station ->
-                            points.add(LatLng(station.latitude, station.longitude))
+                    // 그래픽 데이터가 있으면 사용 (실제 경로)
+                    if (!graphicData.isNullOrEmpty()) {
+                        Log.d("MapScreen", "SubPath[$index] - 그래픽 데이터 사용 (${graphicData.size}개 좌표)")
+                        graphicData.forEach { coord ->
+                            points.add(LatLng(coord.latitude, coord.longitude))
+                        }
+                    } else {
+                        Log.d("MapScreen", "SubPath[$index] - 기존 방식 사용 (정류장 간 직선)")
+                        // 그래픽 데이터가 없으면 기존 방식 사용
+                        var startLat = subPath.startLatitude
+                        var startLng = subPath.startLongitude
+                        var endLat = subPath.endLatitude
+                        var endLng = subPath.endLongitude
+
+                        // 좌표가 null인 경우 (주로 도보 구간) 이전/다음 구간의 좌표 사용
+                        if (startLat == null || startLng == null) {
+                            // 이전 구간의 끝점을 시작점으로
+                            val prevSubPath = selectedRoute.subPaths.getOrNull(index - 1)
+                            startLat = prevSubPath?.endLatitude
+                            startLng = prevSubPath?.endLongitude
+                        }
+                        if (endLat == null || endLng == null) {
+                            // 다음 구간의 시작점을 끝점으로
+                            val nextSubPath = selectedRoute.subPaths.getOrNull(index + 1)
+                            endLat = nextSubPath?.startLatitude
+                            endLng = nextSubPath?.startLongitude
                         }
 
-                        points.add(LatLng(endLat, endLng))
+                        if (startLat != null && startLng != null && endLat != null && endLng != null) {
+                            points.add(LatLng(startLat, startLng))
 
+                            // 경유 정류장이 있으면 추가
+                            subPath.passStations?.forEach { station ->
+                                points.add(LatLng(station.latitude, station.longitude))
+                            }
+
+                            points.add(LatLng(endLat, endLng))
+                        }
+                    }
+
+                    // 포인트가 있으면 Polyline 그리기
+                    if (points.isNotEmpty()) {
                         // 교통수단에 따라 다른 색상 사용
                         val lineColor = when (subPath.trafficType) {
                             com.teammanduk.adego.core.model.TrafficType.SUBWAY -> androidx.compose.ui.graphics.Color(0xFF0052A4)
