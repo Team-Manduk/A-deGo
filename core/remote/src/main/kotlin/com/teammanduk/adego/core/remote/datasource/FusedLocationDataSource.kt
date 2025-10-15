@@ -62,6 +62,17 @@ class FusedLocationDataSource @Inject constructor(
 
     @SuppressLint("MissingPermission")
     override fun getLocationUpdates(): Flow<ParticipantLocationDto> = callbackFlow {
+        // 1. 먼저 lastLocation을 즉시 emit (있다면)
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location: Location? ->
+                location?.let {
+                    val locationDto = it.toDto()
+                    Log.d(TAG, "Initial last known location: $locationDto")
+                    trySend(locationDto)
+                }
+            }
+
+        // 2. 그 다음 실시간 업데이트 시작
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
             LOCATION_UPDATE_INTERVAL
