@@ -14,13 +14,19 @@ import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.doubleOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -154,6 +160,89 @@ private data class OdsayError(
     val message: String
 )
 
+// TMAP Pedestrian Route API Request Model
+@Serializable
+private data class TmapPedestrianRequest(
+    val startX: Double, // 출발지 경도
+    val startY: Double, // 출발지 위도
+    val endX: Double,   // 도착지 경도
+    val endY: Double,   // 도착지 위도
+    val reqCoordType: String = "WGS84GEO",
+    val resCoordType: String = "WGS84GEO",
+    val startName: String = "출발지",
+    val endName: String = "도착지"
+)
+
+// TMAP Pedestrian Route API Response Models
+@Serializable
+private data class TmapPedestrianResponse(
+    val type: String? = null, // "FeatureCollection"
+    val features: List<TmapFeature> = emptyList()
+)
+
+@Serializable
+private data class TmapFeature(
+    val type: String? = null, // "Feature"
+    val geometry: TmapGeometry? = null,
+    val properties: TmapProperties? = null
+)
+
+@Serializable
+private data class TmapGeometry(
+    val type: String? = null, // "Point" or "LineString"
+    val coordinates: kotlinx.serialization.json.JsonElement? = null // Can be array of numbers or array of arrays
+)
+
+@Serializable
+private data class TmapProperties(
+    val totalDistance: Int? = null,
+    val totalTime: Int? = null,
+    val index: Int? = null,
+    val pointIndex: Int? = null,
+    val name: String? = null,
+    val description: String? = null,
+    val direction: String? = null,
+    val nearPoiName: String? = null,
+    val nearPoiX: String? = null,
+    val nearPoiY: String? = null,
+    val intersectionName: String? = null,
+    val facilityType: String? = null,
+    val facilityName: String? = null,
+    val turnType: Int? = null,
+    val pointType: String? = null,
+    val lineIndex: Int? = null,
+    val distance: Int? = null,
+    val time: Int? = null,
+    val roadType: Int? = null,
+    val categoryRoadType: Int? = null
+)
+
+// TMAP Reverse Geocoding API Response Models
+@Serializable
+private data class TmapReverseGeocodingResponse(
+    val addressInfo: TmapAddressInfo? = null
+)
+
+@Serializable
+private data class TmapAddressInfo(
+    val fullAddress: String? = null,
+    val addressType: String? = null,
+    val city_do: String? = null, // 시/도
+    val gu_gun: String? = null, // 구/군
+    val eup_myun: String? = null, // 읍/면
+    val adminDong: String? = null, // 행정동
+    val adminDongCode: String? = null,
+    val legalDong: String? = null, // 법정동
+    val legalDongCode: String? = null,
+    val ri: String? = null, // 리
+    val bunji: String? = null, // 번지
+    val roadName: String? = null, // 도로명
+    val buildingIndex: String? = null, // 건물번호
+    val buildingName: String? = null, // 건물명
+    val mappingDistance: String? = null,
+    val roadCode: String? = null
+)
+
 @Singleton
 class RouteRepositoryImpl @Inject constructor() : RouteRepository {
 
@@ -219,9 +308,9 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                 return@withContext emptyList()
             }
 
-            // 경로 변환 (그래픽 데이터 포함)
+            // 경로 변환 (기본 정보만, graphicData 없이)
             val routes = odsayResponse.result?.path?.map { path ->
-                mapOdsayPathToRouteWithGraphics(path)
+                mapOdsayPathToRoute(path)
             } ?: emptyList()
 
             Log.d("RouteRepository", "ODsay API: ${routes.size}개 경로 발견")
@@ -232,10 +321,187 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
         }
     }
 
+    override suspend fun getRouteDetails(
+        route: Route,
+        startLat: Double,
+        startLng: Double,
+        endLat: Double,
+        endLng: Double
+    ): Route = withContext(Dispatchers.IO) {
+        Log.d("RouteRepository", "경로 세부 정보 로드 시작")
+
+        // mapObj를 @로 split하여 각 대중교통 구간에 매핑
+        val mapObjs = route.mapObj?.split("@") ?: emptyList()
+        var mapObjIndex = 0
+
+        Log.d("RouteRepository", "Route mapObj: ${route.mapObj}")
+        Log.d("RouteRepository", "Split된 mapObj 개수: ${mapObjs.size}")
+
+        // 각 SubPath에 대해 graphicData 로드
+        val updatedSubPaths = route.subPaths.mapIndexed { index, subPath ->
+            // 이미 graphicData가 있으면 그대로 반환
+            if (subPath.graphicData != null) {
+                Log.d("RouteRepository", "SubPath[$index] - 이미 graphicData 존재")
+                return@mapIndexed subPath
+            }
+
+            val graphicData = when (subPath.trafficType) {
+                TrafficType.SUBWAY, TrafficType.BUS -> {
+                    // 대중교통 구간 (지하철/버스)
+                    val mapObj = mapObjs.getOrNull(mapObjIndex)
+                    mapObjIndex++
+
+                    Log.d("RouteRepository", "대중교통 구간 - trafficType: ${subPath.trafficType}, mapObj: $mapObj")
+
+                    if (!mapObj.isNullOrEmpty()) {
+                        Log.d("RouteRepository", "loadLane API 호출")
+                        loadLaneGraphicData(mapObj)
+                    } else {
+                        Log.d("RouteRepository", "mapObj 없음")
+                        null
+                    }
+                }
+                TrafficType.WALK -> {
+                    // 도보 구간
+                    Log.d("RouteRepository", "도보 구간 - distance: ${subPath.distance}m, index: $index/${route.subPaths.lastIndex}")
+
+                    // 도보 구간의 시작/끝 좌표 결정
+                    val walkStartLat: Double?
+                    val walkStartLng: Double?
+                    val walkEndLat: Double?
+                    val walkEndLng: Double?
+
+                    when {
+                        // 첫 번째 도보 구간: 출발지 -> 첫 정류장
+                        index == 0 -> {
+                            walkStartLat = startLat
+                            walkStartLng = startLng
+                            // 다음 대중교통 구간의 시작점
+                            val nextTransitSubPath = route.subPaths.getOrNull(index + 1)
+                            walkEndLat = nextTransitSubPath?.startLatitude
+                            walkEndLng = nextTransitSubPath?.startLongitude
+                            Log.d("RouteRepository", "첫 번째 도보 구간 - 출발지 -> 첫 정류장")
+                        }
+                        // 마지막 도보 구간: 마지막 정류장 -> 도착지
+                        index == route.subPaths.lastIndex -> {
+                            // 이전 대중교통 구간의 끝점
+                            val prevTransitSubPath = route.subPaths.getOrNull(index - 1)
+                            walkStartLat = prevTransitSubPath?.endLatitude
+                            walkStartLng = prevTransitSubPath?.endLongitude
+                            walkEndLat = endLat
+                            walkEndLng = endLng
+                            Log.d("RouteRepository", "마지막 도보 구간 - 마지막 정류장 -> 도착지")
+                        }
+                        // 중간 도보 구간 (환승)
+                        else -> {
+                            if (subPath.startLatitude != null && subPath.startLongitude != null &&
+                                subPath.endLatitude != null && subPath.endLongitude != null) {
+                                // 기존 좌표 사용
+                                walkStartLat = subPath.startLatitude
+                                walkStartLng = subPath.startLongitude
+                                walkEndLat = subPath.endLatitude
+                                walkEndLng = subPath.endLongitude
+                                Log.d("RouteRepository", "중간 도보 구간 - 기존 좌표 사용")
+                            } else {
+                                // 좌표가 없으면 이전/다음 구간에서 추출
+                                val prevSubPath = route.subPaths.getOrNull(index - 1)
+                                val nextSubPath = route.subPaths.getOrNull(index + 1)
+                                walkStartLat = prevSubPath?.endLatitude
+                                walkStartLng = prevSubPath?.endLongitude
+                                walkEndLat = nextSubPath?.startLatitude
+                                walkEndLng = nextSubPath?.startLongitude
+                                Log.d("RouteRepository", "중간 도보 구간 - 이전/다음 구간 좌표 사용")
+                            }
+                        }
+                    }
+
+                    // TMAP API 호출
+                    if (walkStartLat != null && walkStartLng != null &&
+                        walkEndLat != null && walkEndLng != null) {
+                        Log.d("RouteRepository", "TMAP API 호출 - 출발: ($walkStartLat, $walkStartLng), 도착: ($walkEndLat, $walkEndLng)")
+                        getPedestrianRoute(walkStartLat, walkStartLng, walkEndLat, walkEndLng)
+                    } else {
+                        Log.d("RouteRepository", "도보 좌표 없음 - 스킵")
+                        null
+                    }
+                }
+            }
+
+            Log.d("RouteRepository", "GraphicData 개수: ${graphicData?.size ?: 0}")
+
+            // graphicData가 업데이트된 새로운 SubPath 반환
+            subPath.copy(graphicData = graphicData)
+        }
+
+        Log.d("RouteRepository", "경로 세부 정보 로드 완료")
+        route.copy(subPaths = updatedSubPaths)
+    }
+
+    /**
+     * ODsay API 응답을 도메인 모델로 변환합니다 (기본 정보만).
+     */
+    private fun mapOdsayPathToRoute(path: OdsayPath): Route {
+        val subPaths = path.subPath.map { subPath ->
+            SubPath(
+                trafficType = when (subPath.trafficType) {
+                    1 -> TrafficType.SUBWAY
+                    2 -> TrafficType.BUS
+                    else -> TrafficType.WALK
+                },
+                distance = subPath.distance,
+                sectionTime = subPath.sectionTime,
+                startName = subPath.startName,
+                endName = subPath.endName,
+                stationCount = subPath.stationCount,
+                lane = subPath.lane?.firstOrNull()?.let { lane ->
+                    Lane(
+                        name = lane.name ?: "",
+                        busNo = lane.busNo,
+                        type = lane.type,
+                        subwayCode = lane.subwayCode
+                    )
+                },
+                walkDistance = if (subPath.trafficType == 3) subPath.distance else null,
+                startLatitude = subPath.startY,
+                startLongitude = subPath.startX,
+                endLatitude = subPath.endY,
+                endLongitude = subPath.endX,
+                passStations = subPath.passStopList?.stations?.mapNotNull { station ->
+                    if (station.stationName != null && station.y != null && station.x != null) {
+                        com.teammanduk.adego.core.model.Station(
+                            name = station.stationName,
+                            latitude = station.y,
+                            longitude = station.x
+                        )
+                    } else {
+                        null
+                    }
+                },
+                graphicData = null // 기본 정보만 반환, graphicData는 나중에 로드
+            )
+        }
+
+        return Route(
+            totalTime = path.info.totalTime,
+            totalDistance = path.info.totalDistance.toInt(),
+            totalFare = path.info.payment,
+            transferCount = path.info.busTransitCount + path.info.subwayTransitCount,
+            pathType = path.pathType,
+            subPaths = subPaths,
+            mapObj = path.info.mapObj // 나중에 세부 경로 로드하기 위해 mapObj 저장
+        )
+    }
+
     /**
      * ODsay API 응답을 도메인 모델로 변환합니다 (그래픽 데이터 포함).
      */
-    private suspend fun mapOdsayPathToRouteWithGraphics(path: OdsayPath): Route {
+    private suspend fun mapOdsayPathToRouteWithGraphics(
+        path: OdsayPath,
+        startLat: Double,
+        startLng: Double,
+        endLat: Double,
+        endLng: Double
+    ): Route {
         // path.info.mapObj를 @로 split하여 각 대중교통 구간에 매핑
         val mapObjs = path.info.mapObj?.split("@") ?: emptyList()
         var mapObjIndex = 0
@@ -243,24 +509,90 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
         Log.d("RouteRepository", "Path mapObj: ${path.info.mapObj}")
         Log.d("RouteRepository", "Split된 mapObj 개수: ${mapObjs.size}")
 
-        val subPaths = path.subPath.map { subPath ->
-            // 대중교통 구간인 경우 그래픽 데이터 로드
-            val graphicData = if (subPath.trafficType in listOf(1, 2)) {
-                val mapObj = mapObjs.getOrNull(mapObjIndex)
-                mapObjIndex++
+        val subPaths = path.subPath.mapIndexed { index, subPath ->
+            // 대중교통 구간인 경우 loadLane API로 그래픽 데이터 로드
+            // 도보 구간인 경우 TMAP API로 보행자 경로 데이터 로드
+            val graphicData = when (subPath.trafficType) {
+                1, 2 -> {
+                    // 대중교통 구간 (지하철/버스)
+                    val mapObj = mapObjs.getOrNull(mapObjIndex)
+                    mapObjIndex++
 
-                Log.d("RouteRepository", "대중교통 구간 - trafficType: ${subPath.trafficType}, mapObj: $mapObj")
+                    Log.d("RouteRepository", "대중교통 구간 - trafficType: ${subPath.trafficType}, mapObj: $mapObj")
 
-                if (!mapObj.isNullOrEmpty()) {
-                    Log.d("RouteRepository", "loadLane API 호출")
-                    loadLaneGraphicData(mapObj)
-                } else {
-                    Log.d("RouteRepository", "mapObj 없음")
-                    null
+                    if (!mapObj.isNullOrEmpty()) {
+                        Log.d("RouteRepository", "loadLane API 호출")
+                        loadLaneGraphicData(mapObj)
+                    } else {
+                        Log.d("RouteRepository", "mapObj 없음")
+                        null
+                    }
                 }
-            } else {
-                Log.d("RouteRepository", "도보 구간 - trafficType: ${subPath.trafficType}")
-                null
+                3 -> {
+                    // 도보 구간
+                    Log.d("RouteRepository", "도보 구간 - distance: ${subPath.distance}m, index: $index/${path.subPath.lastIndex}")
+
+                    // 도보 구간의 시작/끝 좌표 결정
+                    val walkStartLat: Double?
+                    val walkStartLng: Double?
+                    val walkEndLat: Double?
+                    val walkEndLng: Double?
+
+                    when {
+                        // 첫 번째 도보 구간: 출발지 -> 첫 정류장
+                        index == 0 -> {
+                            walkStartLat = startLat
+                            walkStartLng = startLng
+                            // 다음 대중교통 구간의 시작점
+                            val nextTransitSubPath = path.subPath.getOrNull(index + 1)
+                            walkEndLat = nextTransitSubPath?.startY
+                            walkEndLng = nextTransitSubPath?.startX
+                            Log.d("RouteRepository", "첫 번째 도보 구간 - 출발지 -> 첫 정류장")
+                        }
+                        // 마지막 도보 구간: 마지막 정류장 -> 도착지
+                        index == path.subPath.lastIndex -> {
+                            // 이전 대중교통 구간의 끝점
+                            val prevTransitSubPath = path.subPath.getOrNull(index - 1)
+                            walkStartLat = prevTransitSubPath?.endY
+                            walkStartLng = prevTransitSubPath?.endX
+                            walkEndLat = endLat
+                            walkEndLng = endLng
+                            Log.d("RouteRepository", "마지막 도보 구간 - 마지막 정류장 -> 도착지")
+                        }
+                        // 중간 도보 구간 (환승): 이전 정류장 -> 다음 정류장
+                        else -> {
+                            if (subPath.startX != null && subPath.startY != null &&
+                                subPath.endX != null && subPath.endY != null) {
+                                // ODsay API에서 좌표를 제공한 경우
+                                walkStartLat = subPath.startY
+                                walkStartLng = subPath.startX
+                                walkEndLat = subPath.endY
+                                walkEndLng = subPath.endX
+                                Log.d("RouteRepository", "중간 도보 구간 - ODsay 좌표 사용")
+                            } else {
+                                // 좌표가 없으면 이전/다음 구간에서 추출
+                                val prevSubPath = path.subPath.getOrNull(index - 1)
+                                val nextSubPath = path.subPath.getOrNull(index + 1)
+                                walkStartLat = prevSubPath?.endY
+                                walkStartLng = prevSubPath?.endX
+                                walkEndLat = nextSubPath?.startY
+                                walkEndLng = nextSubPath?.startX
+                                Log.d("RouteRepository", "중간 도보 구간 - 이전/다음 구간 좌표 사용")
+                            }
+                        }
+                    }
+
+                    // TMAP API 호출
+                    if (walkStartLat != null && walkStartLng != null &&
+                        walkEndLat != null && walkEndLng != null) {
+                        Log.d("RouteRepository", "TMAP API 호출 - 출발: ($walkStartLat, $walkStartLng), 도착: ($walkEndLat, $walkEndLng)")
+                        getPedestrianRoute(walkStartLat, walkStartLng, walkEndLat, walkEndLng)
+                    } else {
+                        Log.d("RouteRepository", "도보 좌표 없음 - 스킵")
+                        null
+                    }
+                }
+                else -> null
             }
 
             Log.d("RouteRepository", "GraphicData 개수: ${graphicData?.size ?: 0}")
@@ -376,6 +708,155 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
     }
 
     /**
+     * TMAP 역지오코딩 API를 호출하여 좌표로부터 장소 이름을 가져옵니다.
+     */
+    private suspend fun reverseGeocode(lat: Double, lng: Double): String {
+        return try {
+            val apiKey = getTmapApiKey()
+            if (apiKey.isEmpty() || apiKey == "YOUR_TMAP_API_KEY_HERE") {
+                return "위치"
+            }
+
+            Log.d("RouteRepository", "TMAP 역지오코딩 API 호출: ($lat, $lng)")
+
+            val response = httpClient.get("https://apis.openapi.sk.com/tmap/geo/reversegeocoding") {
+                header("appKey", apiKey)
+                parameter("version", "1")
+                parameter("lat", lat)
+                parameter("lon", lng)
+                parameter("coordType", "WGS84GEO")
+                parameter("addressType", "A02") // A02: 도로명 주소
+            }
+
+            if (response.status.value !in 200..299) {
+                Log.e("RouteRepository", "TMAP 역지오코딩 API 요청 실패: ${response.status.value}")
+                return "위치"
+            }
+
+            val tmapResponse = response.body<TmapReverseGeocodingResponse>()
+            val addressInfo = tmapResponse.addressInfo
+
+            // 건물명이 있으면 건물명 사용, 없으면 도로명 + 건물번호, 그것도 없으면 fullAddress 사용
+            val locationName = when {
+                !addressInfo?.buildingName.isNullOrEmpty() -> addressInfo?.buildingName!!
+                !addressInfo?.roadName.isNullOrEmpty() && !addressInfo?.buildingIndex.isNullOrEmpty() ->
+                    "${addressInfo?.roadName} ${addressInfo?.buildingIndex}"
+                !addressInfo?.fullAddress.isNullOrEmpty() -> addressInfo?.fullAddress!!
+                else -> "위치"
+            }
+
+            Log.d("RouteRepository", "역지오코딩 결과: $locationName")
+            locationName
+        } catch (e: Exception) {
+            Log.e("RouteRepository", "TMAP 역지오코딩 API 호출 실패", e)
+            "위치"
+        }
+    }
+
+    /**
+     * TMAP API를 호출하여 보행자 경로 데이터를 가져옵니다.
+     */
+    private suspend fun getPedestrianRoute(
+        startLat: Double,
+        startLng: Double,
+        endLat: Double,
+        endLng: Double
+    ): List<com.teammanduk.adego.core.model.GraphicCoordinate> {
+        return try {
+            val apiKey = getTmapApiKey()
+            if (apiKey.isEmpty() || apiKey == "YOUR_TMAP_API_KEY_HERE") {
+                Log.w("RouteRepository", "TMAP API 키가 설정되지 않았습니다")
+                return emptyList()
+            }
+
+            Log.d("RouteRepository", "TMAP 보행자 경로 API 호출 시작")
+            Log.d("RouteRepository", "출발: ($startLat, $startLng), 도착: ($endLat, $endLng)")
+
+            // 역지오코딩으로 출발지와 도착지 이름 가져오기
+            val startName = reverseGeocode(startLat, startLng)
+            val endName = reverseGeocode(endLat, endLng)
+
+            Log.d("RouteRepository", "역지오코딩 - 출발: $startName, 도착: $endName")
+
+            val requestBody = TmapPedestrianRequest(
+                startX = startLng,
+                startY = startLat,
+                endX = endLng,
+                endY = endLat,
+                startName = startName,
+                endName = endName
+            )
+
+            val response = httpClient.post("https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1") {
+                header("appKey", apiKey)
+                header("Accept", "application/json")
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }
+
+            if (response.status.value !in 200..299) {
+                Log.e("RouteRepository", "TMAP API 요청 실패: ${response.status.value}")
+                return emptyList()
+            }
+
+            val responseBody = response.bodyAsText()
+            Log.d("RouteRepository", "TMAP API 응답 수신 (길이: ${responseBody.length})")
+
+            val tmapResponse = response.body<TmapPedestrianResponse>()
+
+            // LineString geometry만 추출하여 좌표 리스트 생성
+            val coordinates = mutableListOf<com.teammanduk.adego.core.model.GraphicCoordinate>()
+
+            Log.d("RouteRepository", "TMAP features 개수: ${tmapResponse.features.size}")
+
+            tmapResponse.features.forEachIndexed { featureIndex, feature ->
+                Log.d("RouteRepository", "Feature[$featureIndex] type: ${feature.geometry?.type}")
+
+                if (feature.geometry?.type == "LineString") {
+                    val coordsArray = feature.geometry.coordinates
+                    Log.d("RouteRepository", "LineString coordinates type: ${coordsArray?.javaClass?.simpleName}")
+
+                    if (coordsArray is kotlinx.serialization.json.JsonArray) {
+                        Log.d("RouteRepository", "LineString coordinates 개수: ${coordsArray.size}")
+
+                        coordsArray.forEachIndexed { coordIndex, coord ->
+                            if (coord is kotlinx.serialization.json.JsonArray && coord.size >= 2) {
+                                try {
+                                    // JsonPrimitive에서 double 값 추출
+                                    val lngPrimitive = coord[0] as? kotlinx.serialization.json.JsonPrimitive
+                                    val latPrimitive = coord[1] as? kotlinx.serialization.json.JsonPrimitive
+
+                                    val lng = lngPrimitive?.doubleOrNull
+                                    val lat = latPrimitive?.doubleOrNull
+
+                                    if (lng != null && lat != null) {
+                                        coordinates.add(
+                                            com.teammanduk.adego.core.model.GraphicCoordinate(
+                                                latitude = lat,
+                                                longitude = lng
+                                            )
+                                        )
+                                    } else {
+                                        Log.w("RouteRepository", "좌표[$coordIndex] 파싱 실패: lng=$lng, lat=$lat")
+                                    }
+                                } catch (e: Exception) {
+                                    Log.e("RouteRepository", "좌표[$coordIndex] 변환 실패", e)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Log.d("RouteRepository", "TMAP API: ${coordinates.size}개 보행자 경로 좌표 획득")
+            coordinates
+        } catch (e: Exception) {
+            Log.e("RouteRepository", "TMAP API 호출 실패", e)
+            emptyList()
+        }
+    }
+
+    /**
      * BuildConfig에서 ODsay API 키를 가져옵니다.
      */
     private fun getApiKey(): String {
@@ -385,6 +866,20 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
             field.get(null) as? String ?: ""
         } catch (e: Exception) {
             Log.e("RouteRepository", "ODsay API 키를 가져올 수 없습니다", e)
+            ""
+        }
+    }
+
+    /**
+     * BuildConfig에서 TMAP API 키를 가져옵니다.
+     */
+    private fun getTmapApiKey(): String {
+        return try {
+            val buildConfigClass = Class.forName("com.teammanduk.adego.BuildConfig")
+            val field = buildConfigClass.getDeclaredField("TMAP_API_KEY")
+            field.get(null) as? String ?: ""
+        } catch (e: Exception) {
+            Log.e("RouteRepository", "TMAP API 키를 가져올 수 없습니다", e)
             ""
         }
     }
