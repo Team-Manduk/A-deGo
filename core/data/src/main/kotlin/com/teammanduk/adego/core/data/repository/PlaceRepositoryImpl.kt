@@ -9,6 +9,8 @@ import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.Place as GooglePlace
 import com.google.android.libraries.places.api.net.FindCurrentPlaceRequest
 import com.google.android.libraries.places.api.net.PlacesClient
+import com.teammanduk.adego.core.data.model.TmapAddressInfo
+import com.teammanduk.adego.core.data.model.TmapReverseGeocodingResponse
 import com.teammanduk.adego.core.domain.repository.PlaceRepository
 import com.teammanduk.adego.core.model.Place
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,7 +21,9 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.logging.LogLevel
 import io.ktor.client.plugins.logging.Logger
 import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -149,18 +153,31 @@ class PlaceRepositoryImpl @Inject constructor(
 
     override suspend fun searchPlaceByCoordinates(latitude: Double, longitude: Double): Place? {
         return try {
-            // 1단계: Places API로 주변 장소 검색
-            val nearbyPlace = findNearbyPlaceUsingPlacesApi(latitude, longitude)
+            Log.d("PlaceRepository", "역지오코딩 시작: ($latitude, $longitude)")
 
-            if (nearbyPlace != null) {
-                _currentSearchResult.emit(nearbyPlace)
-                nearbyPlace
-            } else {
-                // 2단계: Places API 실패 시 Geocoder로 폴백
-                val geocodedPlace = searchUsingGeocoder(latitude, longitude)
-                _currentSearchResult.emit(geocodedPlace)
-                geocodedPlace
+            // 1단계: TMAP 역지오코딩 시도
+            val tmapPlace = searchUsingTmapReverseGeocoding(latitude, longitude)
+            if (tmapPlace != null && !tmapPlace.name.contains("알 수 없는") && !tmapPlace.name.contains("위도:")) {
+                Log.d("PlaceRepository", "TMAP 역지오코딩 성공: ${tmapPlace.name}")
+                _currentSearchResult.emit(tmapPlace)
+                return tmapPlace
             }
+
+            // 2단계: Google Places API로 주변 장소 검색
+            Log.d("PlaceRepository", "TMAP 실패 또는 결과 불충분, Google Places API 시도")
+            val nearbyPlace = findNearbyPlaceUsingPlacesApi(latitude, longitude)
+            if (nearbyPlace != null) {
+                Log.d("PlaceRepository", "Google Places API 성공: ${nearbyPlace.name}")
+                _currentSearchResult.emit(nearbyPlace)
+                return nearbyPlace
+            }
+
+            // 3단계: Android Geocoder로 폴백
+            Log.d("PlaceRepository", "Google Places API 실패, Android Geocoder 시도")
+            val geocodedPlace = searchUsingGeocoder(latitude, longitude)
+            Log.d("PlaceRepository", "Android Geocoder 결과: ${geocodedPlace.name}")
+            _currentSearchResult.emit(geocodedPlace)
+            geocodedPlace
         } catch (e: Exception) {
             Log.e("PlaceRepository", "Place search failed", e)
             val fallbackPlace = createFallbackPlace(latitude, longitude)
@@ -276,6 +293,90 @@ class PlaceRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Log.e("PlaceRepository", "API 키를 가져올 수 없습니다", e)
             ""
+        }
+    }
+
+    private fun getTmapApiKey(): String {
+        return try {
+            val buildConfigClass = Class.forName("com.teammanduk.adego.BuildConfig")
+            val field = buildConfigClass.getDeclaredField("TMAP_API_KEY")
+            field.get(null) as? String ?: ""
+        } catch (e: Exception) {
+            Log.e("PlaceRepository", "TMAP API 키를 가져올 수 없습니다", e)
+            ""
+        }
+    }
+
+    /**
+     * TMAP 역지오코딩 API를 사용하여 주소 정보를 가져옵니다.
+     * 실패 시 null 반환 (다음 단계로 폴백)
+     */
+    private suspend fun searchUsingTmapReverseGeocoding(latitude: Double, longitude: Double): Place? = withContext(Dispatchers.IO) {
+        return@withContext try {
+            val apiKey = getTmapApiKey()
+            if (apiKey.isEmpty() || apiKey == "YOUR_TMAP_API_KEY_HERE") {
+                Log.w("PlaceRepository", "TMAP API 키가 설정되지 않았습니다")
+                return@withContext null
+            }
+
+            Log.d("PlaceRepository", "TMAP 역지오코딩 API 호출: ($latitude, $longitude)")
+
+            val response = httpClient.get("https://apis.openapi.sk.com/tmap/geo/reversegeocoding") {
+                header("appKey", apiKey)
+                parameter("version", "1")
+                parameter("lat", latitude)
+                parameter("lon", longitude)
+                parameter("coordType", "WGS84GEO")
+                parameter("addressType", "A02") // A02: 도로명 주소
+            }
+
+            if (response.status.value !in 200..299) {
+                Log.e("PlaceRepository", "TMAP 역지오코딩 API 요청 실패: ${response.status.value}")
+                return@withContext null
+            }
+
+            val tmapResponse = response.body<TmapReverseGeocodingResponse>()
+            val addressInfo = tmapResponse.addressInfo
+
+            Log.d("PlaceRepository", "TMAP 역지오코딩 응답:")
+            Log.d("PlaceRepository", "  - 건물명: ${addressInfo?.buildingName}")
+            Log.d("PlaceRepository", "  - 도로명: ${addressInfo?.roadName}")
+            Log.d("PlaceRepository", "  - 건물번호: ${addressInfo?.buildingIndex}")
+            Log.d("PlaceRepository", "  - 행정동: ${addressInfo?.adminDong}")
+            Log.d("PlaceRepository", "  - 법정동: ${addressInfo?.legalDong}")
+            Log.d("PlaceRepository", "  - fullAddress: ${addressInfo?.fullAddress}")
+
+            // 장소 이름 결정 (건물명 > 도로명+건물번호 > 행정동 > 법정동)
+            val placeName = when {
+                !addressInfo?.buildingName.isNullOrEmpty() -> addressInfo?.buildingName!!
+                !addressInfo?.roadName.isNullOrEmpty() && !addressInfo?.buildingIndex.isNullOrEmpty() ->
+                    "${addressInfo?.roadName} ${addressInfo?.buildingIndex}"
+                !addressInfo?.adminDong.isNullOrEmpty() -> addressInfo?.adminDong!!
+                !addressInfo?.legalDong.isNullOrEmpty() -> addressInfo?.legalDong!!
+                else -> null // 유효한 정보가 없으면 null 반환하여 다음 단계로 폴백
+            }
+
+            // 장소 이름이 없으면 null 반환
+            if (placeName == null) {
+                Log.w("PlaceRepository", "TMAP 역지오코딩 결과에 유효한 장소 정보가 없습니다")
+                return@withContext null
+            }
+
+            // 주소 (fullAddress 사용)
+            val address = addressInfo?.fullAddress ?: "주소 정보 없음"
+
+            Log.d("PlaceRepository", "생성된 장소명: $placeName")
+            Log.d("PlaceRepository", "주소: $address")
+
+            Place(
+                name = placeName,
+                address = address,
+                latitude = latitude,
+                longitude = longitude
+            )
+        } catch (e: Exception) {
+            Log.e("PlaceRepository", "TMAP 역지오코딩 실패", e)
+            null // 예외 발생 시 null 반환하여 다음 단계로 폴백
         }
     }
 
