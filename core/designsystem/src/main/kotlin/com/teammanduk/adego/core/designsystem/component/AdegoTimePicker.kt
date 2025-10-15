@@ -3,6 +3,7 @@ package com.teammanduk.adego.core.designsystem.component
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,11 +21,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,16 +34,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+
+enum class TimePickerType {
+    HOUR,
+    MINUTE
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -57,11 +63,9 @@ fun AdegoTimePicker(
 ) {
     if (!show) return
 
-    // initialHour (0-23) -> selectedHour (0-11, 0=12시)
-    val initialHour12 = initialHour % 12
-    var selectedHour by remember { mutableIntStateOf(initialHour12) }
-    var selectedMinute by remember { mutableIntStateOf(initialMinute) }
-    var isPM by remember { mutableStateOf(initialHour >= 12) }
+    // 5분 단위로 시간을 관리하기 때문에 시간에는 12를 곱하고 분은 5로 나눔
+    // 하루를 228 단위로 관리하고 1은 5분으로 함
+    var timeValue by remember { mutableIntStateOf((initialHour * 12) + (initialMinute / 5)) }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -69,83 +73,47 @@ fun AdegoTimePicker(
                 .background(Color.White, RoundedCornerShape(16.dp))
                 .padding(24.dp)
         ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "시간 선택",
-                    style = AdegoTheme.typography.titleLarge,
-                    color = AdegoTheme.colors.onBackground,
-                    modifier = Modifier.weight(1f)
-                )
-
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "닫기",
-                        tint = AdegoTheme.colors.onBackground
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
             // Time Picker
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // AM/PM Picker
+                // 오전/오후 Picker
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp, 40.dp)
-                            .background(
-                                color = if (!isPM) AdegoTheme.colors.main500 else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .clickable { isPM = false },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "AM",
-                            style = AdegoTheme.typography.bodyLarge,
-                            color = if (!isPM) Color.White else AdegoTheme.colors.onBackground
-                        )
-                    }
+                    SelectableButton(
+                        text = "오전",
+                        isSelected = !timeValue.isAfternoon,
+                        onClick = {
+                            if (timeValue.isAfternoon) {
+                                timeValue -= 144  // 오후 -> 오전
+                            }
+                        }
+                    )
 
-                    Box(
-                        modifier = Modifier
-                            .size(60.dp, 40.dp)
-                            .background(
-                                color = if (isPM) AdegoTheme.colors.main500 else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .clickable { isPM = true },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "PM",
-                            style = AdegoTheme.typography.bodyLarge,
-                            color = if (isPM) Color.White else AdegoTheme.colors.onBackground
-                        )
-                    }
+                    SelectableButton(
+                        text = "오후",
+                        isSelected = timeValue.isAfternoon,
+                        onClick = {
+                            if (!timeValue.isAfternoon) {
+                                timeValue += 144  // 오전 -> 오후
+                            }
+                        }
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(16.dp))
 
-                // Hour Picker
+                // Hour Picker (0-11, 12시간 형식)
                 ScrollableTimePickerColumn(
-                    value = selectedHour,
-                    onValueChange = { selectedHour = it },
-                    range = 0..11,
-                    displayRange = 1..12
+                    timeValue = timeValue,
+                    type = TimePickerType.HOUR,
+                    onValueChange = { diff ->
+                        timeValue += diff * 12  // 1시간 = 12칸(60분)
+                    }
                 )
 
                 Text(
@@ -155,12 +123,13 @@ fun AdegoTimePicker(
                     modifier = Modifier.padding(horizontal = 8.dp)
                 )
 
-                // Minute Picker
+                // Minute Picker (0-11, 5분 단위)
                 ScrollableTimePickerColumn(
-                    value = selectedMinute,
-                    onValueChange = { selectedMinute = it },
-                    range = 0..59,
-                    displayRange = 0..59
+                    timeValue = timeValue,
+                    type = TimePickerType.MINUTE,
+                    onValueChange = { diff ->
+                        timeValue += diff  // 1칸 = 5분
+                    }
                 )
             }
 
@@ -169,14 +138,7 @@ fun AdegoTimePicker(
             // Confirm Button
             Button(
                 onClick = {
-                    // selectedHour: 0=12시, 1=1시, 2=2시, ..., 11=11시
-                    val hour12 = if (selectedHour == 0) 12 else selectedHour
-                    val hour24 = if (isPM) {
-                        if (hour12 == 12) 12 else hour12 + 12
-                    } else {
-                        if (hour12 == 12) 0 else hour12
-                    }
-                    onConfirm(hour24, selectedMinute)
+                    onConfirm(timeValue.hour24, timeValue.minute)
                     onDismiss()
                 },
                 modifier = Modifier
@@ -206,27 +168,94 @@ fun AdegoTimePicker(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ScrollableTimePickerColumn(
-    value: Int,
-    onValueChange: (Int) -> Unit,
-    range: IntRange,
-    displayRange: IntRange
+    timeValue: Int,
+    type: TimePickerType,
+    onValueChange: (diff: Int) -> Unit
 ) {
-    val itemCount = range.count()
+    // type에 따라 현재 인덱스, 범위, 표시 정보 결정
+    val currentIndex = when (type) {
+        TimePickerType.HOUR -> timeValue.hour12
+        TimePickerType.MINUTE -> timeValue.minuteIndex
+    }
+
+    val displayRange = when (type) {
+        TimePickerType.HOUR -> 1..12
+        TimePickerType.MINUTE -> 0..11
+    }
+
+    val displayMultiplier = when (type) {
+        TimePickerType.HOUR -> 1
+        TimePickerType.MINUTE -> 5
+    }
+
+    val itemCount = 12
     val repeatCount = 1000
     val totalItems = itemCount * repeatCount
     val middleStart = totalItems / 2 - (totalItems / 2) % itemCount
 
     val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = middleStart + value
+        initialFirstVisibleItemIndex = middleStart + currentIndex
     )
     val coroutineScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
+    // 프로그래밍 방식 업데이트 플래그
+    var isUpdatingProgrammatically by remember { mutableStateOf(false) }
+
+    // 이전 값 추적
+    var previousValue by remember { mutableIntStateOf(currentIndex) }
+
+    // 애니메이션 Job 추적
+    var animationJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    // currentIndex가 외부에서 변경되면 스크롤 위치 자동 업데이트
+    // 단, 사용자가 스크롤 중일 때는 업데이트하지 않음
+    LaunchedEffect(currentIndex, listState.isScrollInProgress) {
+        // 스크롤 중이면 업데이트 안 함
+        if (listState.isScrollInProgress) return@LaunchedEffect
+
+        val currentScrollIndex = ((listState.firstVisibleItemIndex % itemCount) + itemCount) % itemCount
+        if (currentScrollIndex != currentIndex) {
+            // 이전 애니메이션 취소
+            animationJob?.cancel()
+
+            // 새 애니메이션 시작
+            animationJob = coroutineScope.launch {
+                try {
+                    isUpdatingProgrammatically = true
+                    listState.animateScrollToItem(middleStart + currentIndex)  // 애니메이션으로 이동
+                    previousValue = currentIndex
+                } finally {
+                    // 취소되어도 플래그는 반드시 리셋
+                    isUpdatingProgrammatically = false
+                }
+            }
+        }
+    }
+
+    // 사용자 스크롤 감지
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }
-            .map { index -> index % itemCount }
+            .map { index -> ((index % itemCount) + itemCount) % itemCount }
             .distinctUntilChanged()
-            .collect { normalizedIndex ->
-                onValueChange(normalizedIndex)
+            .collect { newValue ->
+                if (!isUpdatingProgrammatically) {  // 사용자 스크롤만 처리
+                    // 차이 계산
+                    var diff = newValue - previousValue
+                    // 순환 처리: 최단 거리
+                    if (diff > itemCount / 2) diff -= itemCount
+                    if (diff < -itemCount / 2) diff += itemCount
+
+                    previousValue = newValue
+
+                    // 햅틱 피드백
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+
+                    onValueChange(diff)
+                } else {
+                    // 프로그래밍 업데이트 중에도 previousValue는 동기화
+                    previousValue = newValue
+                }
             }
     }
 
@@ -244,12 +273,14 @@ private fun ScrollableTimePickerColumn(
             items(totalItems) { index ->
                 val itemValue = index % itemCount
                 // displayRange가 1..12면 itemValue 0 -> 12, 1 -> 1, ..., 11 -> 11
-                val displayValue = if (displayRange.first == 1) {
+                // displayMultiplier로 실제 표시값 계산 (예: 5분 단위)
+                val baseValue = if (displayRange.first == 1) {
                     if (itemValue == 0) 12 else itemValue
                 } else {
                     itemValue
                 }
-                val isSelected = itemValue == value
+                val displayValue = baseValue * displayMultiplier
+                val isSelected = itemValue == currentIndex
 
                 Box(
                     modifier = Modifier
@@ -265,7 +296,9 @@ private fun ScrollableTimePickerColumn(
                     Text(
                         text = String.format("%02d", displayValue),
                         style = AdegoTheme.typography.headlineLarge,
-                        color = if (isSelected) AdegoTheme.colors.main500 else AdegoTheme.colors.onBackground.copy(alpha = 0.3f),
+                        color = if (isSelected) AdegoTheme.colors.main500 else AdegoTheme.colors.onBackground.copy(
+                            alpha = 0.3f
+                        ),
                         textAlign = TextAlign.Center
                     )
                 }
