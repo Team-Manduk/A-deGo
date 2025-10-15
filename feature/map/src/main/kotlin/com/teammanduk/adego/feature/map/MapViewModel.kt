@@ -5,7 +5,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
-import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapUiState
@@ -34,7 +33,7 @@ class MapViewModel @Inject constructor(
     val uiState: StateFlow<MapUiState> = _uiState
 
     private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
-    val userId: String = savedStateHandle.get<String>("userId") ?: ""
+    private val userId: String = savedStateHandle.get<String>("userId") ?: ""
     private val userName: String = savedStateHandle.get<String>("userName") ?: ""
 
     init {
@@ -60,9 +59,15 @@ class MapViewModel @Inject constructor(
     }
 
     fun setSelectedRoute(route: com.teammanduk.adego.core.model.Route) {
-        Log.d("MapViewModel", "setSelectedRoute 호출 - route: totalTime=${route.totalTime}분, subPaths=${route.subPaths.size}개")
+        Log.d(
+            "MapViewModel",
+            "setSelectedRoute 호출 - route: totalTime=${route.totalTime}분, subPaths=${route.subPaths.size}개"
+        )
         route.subPaths.forEachIndexed { index, subPath ->
-            Log.d("MapViewModel", "  SubPath[$index]: ${subPath.trafficType}, graphicData size=${subPath.graphicData?.size ?: 0}")
+            Log.d(
+                "MapViewModel",
+                "  SubPath[$index]: ${subPath.trafficType}, graphicData size=${subPath.graphicData?.size ?: 0}"
+            )
         }
         _uiState.update {
             it.copy(
@@ -70,7 +75,10 @@ class MapViewModel @Inject constructor(
                 selectedRouteIndex = 0
             )
         }
-        Log.d("MapViewModel", "setSelectedRoute 완료 - searchedRoutes size=${_uiState.value.searchedRoutes.size}, selectedRouteIndex=${_uiState.value.selectedRouteIndex}")
+        Log.d(
+            "MapViewModel",
+            "setSelectedRoute 완료 - searchedRoutes size=${_uiState.value.searchedRoutes.size}, selectedRouteIndex=${_uiState.value.selectedRouteIndex}"
+        )
     }
 
     fun startLocationTracking() {
@@ -113,39 +121,55 @@ class MapViewModel @Inject constructor(
             MapIntent.ClearError -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.ShowInviteDialog -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.DismissInviteDialog -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.ShowRouteDialog -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.DismissRouteDialog -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.ShowSelectStartPlace -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.DismissSelectStartPlace -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             is MapIntent.StartPlaceSelected -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.ShowSearchPlace -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.DismissSearchPlace -> {
                 _uiState.update { reduce(it, intent) }
             }
+
             MapIntent.SearchRoute -> {
                 searchRoute()
             }
+
             is MapIntent.SelectRoute -> {
                 _uiState.update { reduce(it, intent) }
             }
+
+            MapIntent.ConfirmUserName -> confirmUserName()
+
+            is MapIntent.UpdateUserName -> _uiState.update { reduce(it, intent) }
+
         }
     }
 
@@ -161,23 +185,29 @@ class MapViewModel @Inject constructor(
                 searchedRoutes = emptyList(),
                 selectedRouteIndex = null
             )
+
             MapIntent.ShowSelectStartPlace -> state.copy(
                 showSelectStartPlace = true,
                 showRouteDialog = false
             )
+
             MapIntent.DismissSelectStartPlace -> state.copy(
                 showSelectStartPlace = false,
                 showRouteDialog = true
             )
+
             is MapIntent.StartPlaceSelected -> state.copy(
                 startPlace = intent.place,
                 showSelectStartPlace = false,
                 showRouteDialog = true
             )
+
             MapIntent.ShowSearchPlace -> state.copy(showSearchPlace = true)
             MapIntent.DismissSearchPlace -> state.copy(showSearchPlace = false)
             MapIntent.SearchRoute -> state
             is MapIntent.SelectRoute -> state.copy(selectedRouteIndex = intent.routeIndex)
+            MapIntent.ConfirmUserName -> state
+            is MapIntent.UpdateUserName -> state.copy(userName = intent.userName)
         }
     }
 
@@ -218,6 +248,34 @@ class MapViewModel @Inject constructor(
             }
         }
     }
+
+    private fun confirmUserName() {
+        val userName = _uiState.value.userName
+        if (userName.isBlank()) {
+            _uiState.update { it.copy(error = "이름을 입력해주세요") }
+            return
+        }
+
+        _uiState.update { it.copy(showUserNameInput = false) }
+
+        // 이름 입력 완료 후 방 참가 처리
+        viewModelScope.launch {
+            joinRoom(roomId, userId, userName)
+                .catch { e ->
+                    _uiState.update { it.copy(error = "방 참가 실패: ${e.message}") }
+                    emit(null to emptyList())
+                }
+                .collect { (room, participants) ->
+                    _uiState.update { currentState ->
+                        currentState.copy(
+                            room = room?.toUiModel(),
+                            participants = participants.toUiModels()
+                        )
+                    }
+                }
+        }
+    }
+
 
     override fun onCleared() {
         super.onCleared()

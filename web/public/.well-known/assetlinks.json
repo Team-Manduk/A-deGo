@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.teammanduk.adego",
+      "sha256_cert_fingerprints": [
+        "A8:47:AA:D9:9F:40:F4:B4:56:BF:2F:35:E3:1F:DF:FB:07:6D:3F:D7:99:7C:5A:52:68:7C:F3:2F:F3:14:48:85"
+      ]
+    }
+  }
+]

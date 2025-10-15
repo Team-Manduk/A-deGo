@@ -26,4 +26,7 @@ sealed interface MapIntent {
 
     // 경로 선택
     data class SelectRoute(val routeIndex: Int) : MapIntent
+
+    data class UpdateUserName(val userName: String) : MapIntent
+    data object ConfirmUserName : MapIntent
 }

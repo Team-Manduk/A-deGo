@@ -1,0 +1,23 @@
+{
+  "hosting": {
+    "public": "public",
+    "cleanUrls": true,
+    "rewrites": [
+      {
+        "source": "/join/**",
+        "destination": "/join.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      }
+    ]
+  }
+}

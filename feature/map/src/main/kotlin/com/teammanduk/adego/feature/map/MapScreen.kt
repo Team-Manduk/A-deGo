@@ -1,24 +1,20 @@
 package com.teammanduk.adego.feature.map
 
-import android.Manifest
 import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -28,12 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,13 +39,13 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
-import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.ui.component.LoadingScreen
-import com.teammanduk.adego.feature.map.Participant
+import com.teammanduk.adego.core.ui.permission.PermissionRequester
+import com.teammanduk.adego.core.ui.permission.PermissionType
 import com.teammanduk.adego.feature.map.component.InviteDialog
 import com.teammanduk.adego.feature.map.component.ParticipantCardPager
 import com.teammanduk.adego.feature.map.component.TopInfoSection
-import com.teammanduk.adego.feature.map.createParticipantMarkerIcon
+import com.teammanduk.adego.feature.map.component.UserNameInputDialog
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapUiState
 import kotlinx.coroutines.launch
@@ -76,41 +66,63 @@ internal fun MapRoute(
         }
     }
 
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
-            viewModel.startLocationTracking()
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        locationPermissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
-    }
-
-    if (!uiState.isInitialLocationLoaded || uiState.participants.isEmpty()) {
-        LoadingScreen(text = "현재 위치를 가져오는 중...")
-    } else {
-        MapScreen(
+    PermissionRequester(
+        permissionTypes = listOf(PermissionType.Location),
+        onGranted = { viewModel.startLocationTracking() }
+    ) {
+        MapRouteContent(
             uiState = uiState,
-            onAction = viewModel::onAction,
-            onInviteClick = { showInviteDialog = true },
+            viewModel = viewModel,
+            showInviteDialog = showInviteDialog,
+            onShowInviteDialogChange = { showInviteDialog = it },
             onNavigateToSelectStartPlace = onNavigateToSelectStartPlace
         )
     }
+}
 
-    if (showInviteDialog) {
-        InviteDialog(
-            inviteCode = uiState.room?.roomId ?: "",
-            onDismiss = { showInviteDialog = false }
-        )
+@Composable
+private fun MapRouteContent(
+    uiState: MapUiState,
+    viewModel: MapViewModel,
+    showInviteDialog: Boolean,
+    onShowInviteDialogChange: (Boolean) -> Unit,
+    onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> }
+) {
+    when {
+        uiState.showUserNameInput -> {
+            UserNameInputDialog(
+                userName = uiState.userName,
+                onUserNameChange = { viewModel.onAction(MapIntent.UpdateUserName(it)) },
+                onConfirm = { viewModel.onAction(MapIntent.ConfirmUserName) },
+                error = uiState.error
+            )
+        }
+
+        uiState.myLocation == null -> {
+            LoadingScreen(text = "현재 위치를 가져오는 중...")
+        }
+
+        uiState.participants.isEmpty() -> {
+            LoadingScreen(text = "방 정보를 불러오는 중...")
+        }
+
+        else -> {
+            MapScreen(
+                uiState = uiState,
+                onAction = viewModel::onAction,
+                onInviteClick = { onShowInviteDialogChange(true) },
+                onNavigateToSelectStartPlace = onNavigateToSelectStartPlace
+            )
+
+            if (showInviteDialog) {
+                InviteDialog(
+                    inviteCode = uiState.room?.roomId ?: "",
+                    roomName = uiState.room?.roomName ?: "",
+                    destinationName = uiState.room?.destination?.name ?: "",
+                    meetingTime = uiState.room?.meetingTime ?: "",
+                    onDismiss = { onShowInviteDialogChange(false) })
+            }
+        }
     }
 }
 
@@ -119,12 +131,11 @@ private fun MapScreen(
     uiState: MapUiState,
     onAction: (MapIntent) -> Unit,
     onInviteClick: () -> Unit,
-    onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> }
+    onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
 ) {
     // UI 상태
     val pagerState = rememberPagerState(
-        pageCount = { uiState.participants.size },
-        initialPage = uiState.selectedParticipantIndex
+        pageCount = { uiState.participants.size }, initialPage = uiState.selectedParticipantIndex
     )
     val coroutineScope = rememberCoroutineScope()
     var isCameraInitialized by remember { mutableStateOf(false) }
@@ -134,8 +145,7 @@ private fun MapScreen(
             uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location
         if (initialLocation != null) {
             position = CameraPosition.fromLatLngZoom(
-                LatLng(initialLocation.latitude, initialLocation.longitude),
-                15f
+                LatLng(initialLocation.latitude, initialLocation.longitude), 15f
             )
         }
     }
@@ -161,10 +171,8 @@ private fun MapScreen(
             selectedParticipant?.location?.let { location ->
                 cameraPositionState.animate(
                     CameraUpdateFactory.newLatLngZoom(
-                        LatLng(location.latitude, location.longitude),
-                        15f
-                    ),
-                    durationMs = 500
+                        LatLng(location.latitude, location.longitude), 15f
+                    ), durationMs = 500
                 )
             }
         } else {
@@ -222,10 +230,16 @@ private fun MapScreen(
             }
 
             // 선택한 경로 그리기 (TMAP Transit API 방식)
-            Log.d("MapScreen", "경로 그리기 체크 - selectedRouteIndex: ${uiState.selectedRouteIndex}, searchedRoutes size: ${uiState.searchedRoutes.size}")
+            Log.d(
+                "MapScreen",
+                "경로 그리기 체크 - selectedRouteIndex: ${uiState.selectedRouteIndex}, searchedRoutes size: ${uiState.searchedRoutes.size}"
+            )
             if (uiState.selectedRouteIndex != null) {
                 val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
-                Log.d("MapScreen", "selectedRoute: ${if (selectedRoute != null) "존재 (subPaths: ${selectedRoute.subPaths.size})" else "null"}")
+                Log.d(
+                    "MapScreen",
+                    "selectedRoute: ${if (selectedRoute != null) "존재 (subPaths: ${selectedRoute.subPaths.size})" else "null"}"
+                )
 
                 selectedRoute?.let { route ->
                     Log.d("MapScreen", "경로 그리기 시작 - subPaths: ${route.subPaths.size}개")
@@ -239,13 +253,18 @@ private fun MapScreen(
                             val points = mutableListOf<LatLng>()
                             val graphicData = subPath.graphicData
 
-                            Log.d("MapScreen", "SubPath[$index] 처리 - trafficType: ${subPath.trafficType}, graphicData: ${graphicData?.size ?: 0}개")
+                            Log.d(
+                                "MapScreen",
+                                "SubPath[$index] 처리 - trafficType: ${subPath.trafficType}, graphicData: ${graphicData?.size ?: 0}개"
+                            )
 
                             // TMAP graphicData 사용 (실제 경로)
                             if (!graphicData.isNullOrEmpty()) {
                                 // 이전 SubPath와 연결이 끊긴 경우 연결선 추가
                                 if (lastPoint != null) {
-                                    val firstPoint = LatLng(graphicData.first().latitude, graphicData.first().longitude)
+                                    val firstPoint = LatLng(
+                                        graphicData.first().latitude, graphicData.first().longitude
+                                    )
                                     val distance = calculateDistance(lastPoint!!, firstPoint)
 
                                     // 50미터 이상 떨어져 있으면 연결선 그리기 (반투명 회색)
@@ -253,7 +272,9 @@ private fun MapScreen(
                                         list.add(
                                             PolylineData(
                                                 points = listOf(lastPoint!!, firstPoint),
-                                                color = androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.4f),
+                                                color = Color.Gray.copy(
+                                                    alpha = 0.4f
+                                                ),
                                                 width = 4f,
                                                 key = "connector_$index"
                                             )
@@ -293,9 +314,17 @@ private fun MapScreen(
                             if (points.size >= 2) {
                                 // 교통수단에 따라 다른 색상과 두께 사용
                                 val lineColor = when (subPath.trafficType) {
-                                    com.teammanduk.adego.core.model.TrafficType.SUBWAY -> androidx.compose.ui.graphics.Color(0xFF0052A4)
-                                    com.teammanduk.adego.core.model.TrafficType.BUS -> androidx.compose.ui.graphics.Color(0xFF53B332)
-                                    com.teammanduk.adego.core.model.TrafficType.WALK -> androidx.compose.ui.graphics.Color(0xFF808080)
+                                    com.teammanduk.adego.core.model.TrafficType.SUBWAY -> Color(
+                                        0xFF0052A4
+                                    )
+
+                                    com.teammanduk.adego.core.model.TrafficType.BUS -> Color(
+                                        0xFF53B332
+                                    )
+
+                                    com.teammanduk.adego.core.model.TrafficType.WALK -> Color(
+                                        0xFF808080
+                                    )
                                 }
 
                                 val lineWidth = when (subPath.trafficType) {
@@ -304,7 +333,10 @@ private fun MapScreen(
                                     com.teammanduk.adego.core.model.TrafficType.WALK -> 6f
                                 }
 
-                                Log.d("MapScreen", "SubPath[$index] Polyline 데이터 생성 - points: ${points.size}개, color: $lineColor")
+                                Log.d(
+                                    "MapScreen",
+                                    "SubPath[$index] Polyline 데이터 생성 - points: ${points.size}개, color: $lineColor"
+                                )
                                 if (index == 0 && points.isNotEmpty()) {
                                     Log.d("MapScreen", "  첫 번째 경로의 첫 좌표: ${points.first()}")
                                 }
@@ -329,9 +361,7 @@ private fun MapScreen(
                     polylineDataList.forEach { data ->
                         key(data.key) {
                             Polyline(
-                                points = data.points,
-                                color = data.color,
-                                width = data.width
+                                points = data.points, color = data.color, width = data.width
                             )
                         }
                     }
@@ -353,10 +383,8 @@ private fun MapScreen(
                     uiState.participants.getOrNull(index)?.location?.let { location ->
                         cameraPositionState.animate(
                             CameraUpdateFactory.newLatLngZoom(
-                                LatLng(location.latitude, location.longitude),
-                                15f
-                            ),
-                            durationMs = 500
+                                LatLng(location.latitude, location.longitude), 15f
+                            ), durationMs = 500
                         )
                     }
                 }
@@ -366,10 +394,8 @@ private fun MapScreen(
                     uiState.room?.destination?.let { destination ->
                         cameraPositionState.animate(
                             CameraUpdateFactory.newLatLngZoom(
-                                LatLng(destination.latitude, destination.longitude),
-                                15f
-                            ),
-                            durationMs = 500
+                                LatLng(destination.latitude, destination.longitude), 15f
+                            ), durationMs = 500
                         )
                     }
                 }
@@ -415,8 +441,7 @@ private fun MapScreen(
 
             // 참가자 카드
             ParticipantCardPager(
-                participants = uiState.participants,
-                pagerState = pagerState
+                participants = uiState.participants, pagerState = pagerState
             )
         }
     }
@@ -426,10 +451,7 @@ private fun MapScreen(
  * Polyline 데이터를 저장하는 데이터 클래스
  */
 private data class PolylineData(
-    val points: List<LatLng>,
-    val color: Color,
-    val width: Float,
-    val key: String
+    val points: List<LatLng>, val color: Color, val width: Float, val key: String
 )
 
 /**
@@ -443,9 +465,10 @@ private fun calculateDistance(point1: LatLng, point2: LatLng): Double {
     val deltaLat = Math.toRadians(point2.latitude - point1.latitude)
     val deltaLng = Math.toRadians(point2.longitude - point1.longitude)
 
-    val a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-            Math.cos(lat1Rad) * Math.cos(lat2Rad) *
-            Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2)
+    val a =
+        Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) + Math.cos(lat1Rad) * Math.cos(lat2Rad) * Math.sin(
+            deltaLng / 2
+        ) * Math.sin(deltaLng / 2)
 
     val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 
