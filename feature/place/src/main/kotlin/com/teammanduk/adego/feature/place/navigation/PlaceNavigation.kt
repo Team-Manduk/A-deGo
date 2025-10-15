@@ -20,9 +20,28 @@ fun NavController.navigateToSearchPlace(
     navigate(Route.SearchPlace, navOptions)
 }
 
+fun NavController.navigateToSelectStartPlace(
+    roomId: String,
+    userId: String,
+    destLat: Double,
+    destLng: Double,
+    navOptions: NavOptions? = null
+) {
+    navigate(
+        Route.SelectStartPlace(
+            roomId = roomId,
+            userId = userId,
+            destLat = destLat,
+            destLng = destLng
+        ),
+        navOptions
+    )
+}
+
 fun NavGraphBuilder.placeNavGraph(
     navController: NavController,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onStartPlaceSelected: (String, String, Double, Double, Double, Double) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     selectPlaceScreen(
         onBackClick = onNavigateBack,
@@ -33,6 +52,12 @@ fun NavGraphBuilder.placeNavGraph(
     searchPlaceScreen(
         onBackClick = { navController.popBackStack() },
         onPlaceClick = { navController.popBackStack() }
+    )
+
+    selectStartPlaceScreen(
+        navController = navController,
+        onBackClick = onNavigateBack,
+        onPlaceSelected = onStartPlaceSelected
     )
 }
 
@@ -47,7 +72,7 @@ fun NavGraphBuilder.selectPlaceScreen(
             buttonText = "모임 장소 선택하기",
             showTopBar = true,
             onBackClick = onBackClick,
-            onPlaceSelected = onPlaceSelected,
+            onPlaceSelected = { _ -> onPlaceSelected() },
             onSearchClick = onSearchClick
         )
     }
@@ -61,6 +86,41 @@ fun NavGraphBuilder.searchPlaceScreen(
         SearchPlaceRoute(
             onBackClick = onBackClick,
             onPlaceClick = onPlaceClick
+        )
+    }
+}
+
+fun NavGraphBuilder.selectStartPlaceScreen(
+    navController: NavController,
+    onBackClick: () -> Unit,
+    onPlaceSelected: (String, String, Double, Double, Double, Double) -> Unit
+) {
+    composable<Route.SelectStartPlace> { backStackEntry ->
+        val args = backStackEntry.arguments?.let {
+            Route.SelectStartPlace(
+                roomId = it.getString("roomId") ?: "",
+                userId = it.getString("userId") ?: "",
+                destLat = it.getDouble("destLat"),
+                destLng = it.getDouble("destLng")
+            )
+        } ?: return@composable
+
+        SelectPlaceRoute(
+            title = "출발지 선택",
+            buttonText = "출발지 선택하기",
+            showTopBar = true,
+            onBackClick = onBackClick,
+            onPlaceSelected = { place ->
+                onPlaceSelected(
+                    args.roomId,
+                    args.userId,
+                    place.latitude,
+                    place.longitude,
+                    args.destLat,
+                    args.destLng
+                )
+            },
+            onSearchClick = { navController.navigateToSearchPlace() }
         )
     }
 }

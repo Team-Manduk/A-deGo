@@ -15,8 +15,14 @@ fun NavController.navigateToMap(
     navigate(Route.Map(roomId = roomId, userId = userId), navOptions)
 }
 
-fun NavGraphBuilder.mapNavGraph() {
+fun NavGraphBuilder.mapNavGraph(
+    onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
+    getSelectedRoute: () -> com.teammanduk.adego.core.model.Route? = { null }
+) {
     composable<Route.Map> {
-        MapRoute()
+        MapRoute(
+            onNavigateToSelectStartPlace = onNavigateToSelectStartPlace,
+            selectedRoute = getSelectedRoute()
+        )
     }
 }
