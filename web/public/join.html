@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-dego 초대</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            text-align: center;
+            max-width: 400px;
+        }
+        h1 {
+            font-size: 2em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            font-size: 1.2em;
+            margin-bottom: 1em;
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .fallback {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            display: none;
+        }
+        .fallback a {
+            color: white;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 A-dego 초대</h1>
+        <p>앱으로 이동 중입니다...</p>
+        <div class="spinner"></div>
+
+        <div class="fallback" id="fallback">
+            <p>앱이 자동으로 열리지 않나요?</p>
+            <p><a href="#" id="playStoreLink">Play Store에서 다운로드</a></p>
+        </div>
+    </div>
+
+    <script>
+        // URL에서 roomId 추출
+        const pathParts = window.location.pathname.split('/');
+        const roomId = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2];
+
+        // 앱 딥링크와 Play Store 링크
+        const appUrl = `adego://join/${roomId}`;
+        const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.teammanduk.adego';
+
+        // Play Store 링크 설정
+        document.getElementById('playStoreLink').href = playStoreUrl;
+
+        // 앱 열기 시도
+        window.location.href = appUrl;
+
+        // 1.5초 후 fallback 메시지 표시
+        setTimeout(() => {
+            document.getElementById('fallback').style.display = 'block';
+        }, 1500);
+
+        // 2.5초 후에도 페이지에 있으면 Play Store로 이동
+        setTimeout(() => {
+            if (document.visibilityState === 'visible') {
+                window.location.href = playStoreUrl;
+            }
+        }, 2500);
+
+        // 페이지 visibility 변경 감지 (앱이 열리면 페이지가 숨겨짐)
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                // 앱이 성공적으로 열렸을 가능성이 높음
+                console.log('App opened successfully');
+            }
+        });
+    </script>
+</body>
+</html>

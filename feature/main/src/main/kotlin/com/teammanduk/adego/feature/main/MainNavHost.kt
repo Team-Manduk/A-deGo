@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.NavHost
+import com.teammanduk.adego.core.navigation.Route
 import com.teammanduk.adego.feature.create.navigation.createNavGraph
 import com.teammanduk.adego.feature.home.navigation.homeNavGraph
 import com.teammanduk.adego.feature.main.navigation.MainNavigator
@@ -61,7 +62,7 @@ internal fun MainNavHost(
                     selectedRoute = route
                     // 경로 선택 화면과 출발지 선택 화면을 모두 pop하고 MapScreen으로 돌아가기
                     navigator.navController.popBackStack(
-                        route = com.teammanduk.adego.core.navigation.Route.Map::class,
+                        route = Route.Map::class,
                         inclusive = false
                     )
                 }
