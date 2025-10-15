@@ -109,6 +109,45 @@ private data class OdsayStation(
     val stationID: String? = null // 정류장/역 ID
 )
 
+// loadLane API Response Models
+@Serializable
+private data class LoadLaneResponse(
+    val result: LoadLaneResult? = null,
+    val error: OdsayError? = null
+)
+
+@Serializable
+private data class LoadLaneResult(
+    val lane: List<LoadLaneLane> = emptyList(),
+    val boundary: LoadLaneBoundary? = null
+)
+
+@Serializable
+private data class LoadLaneLane(
+    val class_: Int? = null, // 1: 버스, 2: 지하철 (class는 예약어라 class_로)
+    val type: Int? = null,
+    val section: List<LoadLaneSection> = emptyList()
+)
+
+@Serializable
+private data class LoadLaneSection(
+    val graphPos: List<LoadLaneGraphPos> = emptyList()
+)
+
+@Serializable
+private data class LoadLaneGraphPos(
+    val x: Double, // 경도
+    val y: Double  // 위도
+)
+
+@Serializable
+private data class LoadLaneBoundary(
+    val left: Double,
+    val top: Double,
+    val right: Double,
+    val bottom: Double
+)
+
 @Serializable
 private data class OdsayError(
     val code: Int,
@@ -180,9 +219,9 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                 return@withContext emptyList()
             }
 
-            // 경로 변환
+            // 경로 변환 (그래픽 데이터 포함)
             val routes = odsayResponse.result?.path?.map { path ->
-                mapOdsayPathToRoute(path)
+                mapOdsayPathToRouteWithGraphics(path)
             } ?: emptyList()
 
             Log.d("RouteRepository", "ODsay API: ${routes.size}개 경로 발견")
@@ -194,10 +233,38 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
     }
 
     /**
-     * ODsay API 응답을 도메인 모델로 변환합니다.
+     * ODsay API 응답을 도메인 모델로 변환합니다 (그래픽 데이터 포함).
      */
-    private fun mapOdsayPathToRoute(path: OdsayPath): Route {
+    private suspend fun mapOdsayPathToRouteWithGraphics(path: OdsayPath): Route {
+        // path.info.mapObj를 @로 split하여 각 대중교통 구간에 매핑
+        val mapObjs = path.info.mapObj?.split("@") ?: emptyList()
+        var mapObjIndex = 0
+
+        Log.d("RouteRepository", "Path mapObj: ${path.info.mapObj}")
+        Log.d("RouteRepository", "Split된 mapObj 개수: ${mapObjs.size}")
+
         val subPaths = path.subPath.map { subPath ->
+            // 대중교통 구간인 경우 그래픽 데이터 로드
+            val graphicData = if (subPath.trafficType in listOf(1, 2)) {
+                val mapObj = mapObjs.getOrNull(mapObjIndex)
+                mapObjIndex++
+
+                Log.d("RouteRepository", "대중교통 구간 - trafficType: ${subPath.trafficType}, mapObj: $mapObj")
+
+                if (!mapObj.isNullOrEmpty()) {
+                    Log.d("RouteRepository", "loadLane API 호출")
+                    loadLaneGraphicData(mapObj)
+                } else {
+                    Log.d("RouteRepository", "mapObj 없음")
+                    null
+                }
+            } else {
+                Log.d("RouteRepository", "도보 구간 - trafficType: ${subPath.trafficType}")
+                null
+            }
+
+            Log.d("RouteRepository", "GraphicData 개수: ${graphicData?.size ?: 0}")
+
             SubPath(
                 trafficType = when (subPath.trafficType) {
                     1 -> TrafficType.SUBWAY
@@ -234,7 +301,9 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                     } else {
                         null
                     }
-                }
+                },
+                // 그래픽 데이터 매핑
+                graphicData = graphicData
             )
         }
 
@@ -246,6 +315,64 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
             pathType = path.pathType, // path.info.pathType이 아니라 path.pathType!
             subPaths = subPaths
         )
+    }
+
+    /**
+     * loadLane API를 호출하여 노선 그래픽 데이터를 가져옵니다.
+     */
+    private suspend fun loadLaneGraphicData(mapObj: String): List<com.teammanduk.adego.core.model.GraphicCoordinate> {
+        return try {
+            val apiKey = getApiKey()
+            if (apiKey.isEmpty() || mapObj.isEmpty()) {
+                return emptyList()
+            }
+
+            // mapObject 파라미터 형식: "0:0@{mapObj}"
+            val mapObjectParam = "0:0@$mapObj"
+
+            Log.d("RouteRepository", "loadLane API 호출 시작 - mapObj: $mapObj")
+
+            val response = httpClient.get("https://api.odsay.com/v1/api/loadLane") {
+                parameter("mapObject", mapObjectParam)
+                parameter("apiKey", apiKey)
+            }
+
+            if (response.status.value !in 200..299) {
+                Log.e("RouteRepository", "loadLane API 요청 실패: ${response.status.value}")
+                return emptyList()
+            }
+
+            val responseBody = response.bodyAsText()
+            Log.d("RouteRepository", "loadLane API 응답: $responseBody")
+
+            val loadLaneResponse = response.body<LoadLaneResponse>()
+
+            if (loadLaneResponse.error != null) {
+                Log.e("RouteRepository", "loadLane API 에러: ${loadLaneResponse.error.message}")
+                return emptyList()
+            }
+
+            // 모든 section의 graphPos를 하나의 리스트로 병합
+            val graphicCoordinates = mutableListOf<com.teammanduk.adego.core.model.GraphicCoordinate>()
+            loadLaneResponse.result?.lane?.forEach { lane ->
+                lane.section.forEach { section ->
+                    section.graphPos.forEach { pos ->
+                        graphicCoordinates.add(
+                            com.teammanduk.adego.core.model.GraphicCoordinate(
+                                latitude = pos.y,
+                                longitude = pos.x
+                            )
+                        )
+                    }
+                }
+            }
+
+            Log.d("RouteRepository", "loadLane API: ${graphicCoordinates.size}개 좌표 획득")
+            graphicCoordinates
+        } catch (e: Exception) {
+            Log.e("RouteRepository", "loadLane API 호출 실패", e)
+            emptyList()
+        }
     }
 
     /**

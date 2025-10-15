@@ -36,7 +36,18 @@ data class SubPath(
     val endLongitude: Double? = null, // 도착지 경도
 
     // 경유 정류장 목록 (좌표 포함)
-    val passStations: List<Station>? = null
+    val passStations: List<Station>? = null,
+
+    // 노선 그래픽 데이터 (실제 경로 좌표)
+    val graphicData: List<GraphicCoordinate>? = null
+)
+
+/**
+ * 그래픽 좌표 정보
+ */
+data class GraphicCoordinate(
+    val latitude: Double, // 위도
+    val longitude: Double // 경도
 )
 
 /**
