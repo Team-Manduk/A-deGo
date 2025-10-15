@@ -59,7 +59,11 @@ internal fun MainNavHost(
                 onNavigateBack = navigator::navigateBack,
                 onRouteSelected = { route ->
                     selectedRoute = route
-                    navigator.navigateBack()
+                    // 경로 선택 화면과 출발지 선택 화면을 모두 pop하고 MapScreen으로 돌아가기
+                    navigator.navController.popBackStack(
+                        route = com.teammanduk.adego.core.navigation.Route.Map::class,
+                        inclusive = false
+                    )
                 }
             )
         }

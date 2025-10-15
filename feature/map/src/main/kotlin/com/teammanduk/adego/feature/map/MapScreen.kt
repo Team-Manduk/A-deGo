@@ -53,7 +53,6 @@ import com.teammanduk.adego.core.ui.component.LoadingScreen
 import com.teammanduk.adego.feature.map.Participant
 import com.teammanduk.adego.feature.map.component.InviteDialog
 import com.teammanduk.adego.feature.map.component.ParticipantCardPager
-import com.teammanduk.adego.feature.map.component.ParticipantMapMarker
 import com.teammanduk.adego.feature.map.component.TopInfoSection
 import com.teammanduk.adego.feature.map.createParticipantMarkerIcon
 import com.teammanduk.adego.feature.map.model.MapIntent
@@ -296,17 +295,6 @@ private fun MapScreen(
             },
             modifier = Modifier.align(Alignment.TopCenter)
         )
-
-        // 화면 밖 참가자 마커
-        uiState.participants.forEachIndexed { index, participant ->
-            key(participant.userId) {
-                ParticipantMapMarker(
-                    participant = participant,
-                    isSelected = pagerState.currentPage == index,
-                    cameraPositionState = cameraPositionState
-                )
-            }
-        }
 
         // 하단 영역: 경로 선택 버튼 + 참가자 카드
         Column(
