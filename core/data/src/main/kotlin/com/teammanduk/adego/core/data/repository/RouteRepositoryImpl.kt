@@ -1,6 +1,8 @@
 package com.teammanduk.adego.core.data.repository
 
 import android.util.Log
+import com.teammanduk.adego.core.data.model.TmapAddressInfo
+import com.teammanduk.adego.core.data.model.TmapReverseGeocodingResponse
 import com.teammanduk.adego.core.domain.repository.RouteRepository
 import com.teammanduk.adego.core.model.Lane
 import com.teammanduk.adego.core.model.Route
@@ -217,32 +219,6 @@ private data class TmapProperties(
     val categoryRoadType: Int? = null
 )
 
-// TMAP Reverse Geocoding API Response Models
-@Serializable
-private data class TmapReverseGeocodingResponse(
-    val addressInfo: TmapAddressInfo? = null
-)
-
-@Serializable
-private data class TmapAddressInfo(
-    val fullAddress: String? = null,
-    val addressType: String? = null,
-    val city_do: String? = null, // 시/도
-    val gu_gun: String? = null, // 구/군
-    val eup_myun: String? = null, // 읍/면
-    val adminDong: String? = null, // 행정동
-    val adminDongCode: String? = null,
-    val legalDong: String? = null, // 법정동
-    val legalDongCode: String? = null,
-    val ri: String? = null, // 리
-    val bunji: String? = null, // 번지
-    val roadName: String? = null, // 도로명
-    val buildingIndex: String? = null, // 건물번호
-    val buildingName: String? = null, // 건물명
-    val mappingDistance: String? = null,
-    val roadCode: String? = null
-)
-
 @Singleton
 class RouteRepositoryImpl @Inject constructor() : RouteRepository {
 
@@ -365,53 +341,64 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                     // 도보 구간
                     Log.d("RouteRepository", "도보 구간 - distance: ${subPath.distance}m, index: $index/${route.subPaths.lastIndex}")
 
-                    // 도보 구간의 시작/끝 좌표 결정
+                    // 도보 구간의 시작/끝 좌표 및 이름 결정
                     val walkStartLat: Double?
                     val walkStartLng: Double?
                     val walkEndLat: Double?
                     val walkEndLng: Double?
+                    val walkStartName: String
+                    val walkEndName: String
 
                     when {
                         // 첫 번째 도보 구간: 출발지 -> 첫 정류장
                         index == 0 -> {
                             walkStartLat = startLat
                             walkStartLng = startLng
-                            // 다음 대중교통 구간의 시작점
+                            // 다음 대중교통 구간의 첫 번째 정류장 좌표 (passStations 사용)
                             val nextTransitSubPath = route.subPaths.getOrNull(index + 1)
-                            walkEndLat = nextTransitSubPath?.startLatitude
-                            walkEndLng = nextTransitSubPath?.startLongitude
+                            val firstStation = nextTransitSubPath?.passStations?.firstOrNull()
+                            walkEndLat = firstStation?.latitude ?: nextTransitSubPath?.startLatitude
+                            walkEndLng = firstStation?.longitude ?: nextTransitSubPath?.startLongitude
+                            // 출발지는 역지오코딩, 도착지는 정류장 이름
+                            walkStartName = reverseGeocode(startLat, startLng)
+                            walkEndName = firstStation?.name ?: nextTransitSubPath?.startName ?: "정류장"
                             Log.d("RouteRepository", "첫 번째 도보 구간 - 출발지 -> 첫 정류장")
+                            Log.d("RouteRepository", "  도착 정류장: $walkEndName (${walkEndLat}, ${walkEndLng})")
                         }
                         // 마지막 도보 구간: 마지막 정류장 -> 도착지
                         index == route.subPaths.lastIndex -> {
-                            // 이전 대중교통 구간의 끝점
+                            // 이전 대중교통 구간의 마지막 정류장 좌표 (passStations 사용)
                             val prevTransitSubPath = route.subPaths.getOrNull(index - 1)
-                            walkStartLat = prevTransitSubPath?.endLatitude
-                            walkStartLng = prevTransitSubPath?.endLongitude
+                            val lastStation = prevTransitSubPath?.passStations?.lastOrNull()
+                            walkStartLat = lastStation?.latitude ?: prevTransitSubPath?.endLatitude
+                            walkStartLng = lastStation?.longitude ?: prevTransitSubPath?.endLongitude
                             walkEndLat = endLat
                             walkEndLng = endLng
+                            // 출발지는 정류장 이름, 도착지는 역지오코딩
+                            walkStartName = lastStation?.name ?: prevTransitSubPath?.endName ?: "정류장"
+                            walkEndName = reverseGeocode(endLat, endLng)
                             Log.d("RouteRepository", "마지막 도보 구간 - 마지막 정류장 -> 도착지")
+                            Log.d("RouteRepository", "  출발 정류장: $walkStartName (${walkStartLat}, ${walkStartLng})")
                         }
                         // 중간 도보 구간 (환승)
                         else -> {
-                            if (subPath.startLatitude != null && subPath.startLongitude != null &&
-                                subPath.endLatitude != null && subPath.endLongitude != null) {
-                                // 기존 좌표 사용
-                                walkStartLat = subPath.startLatitude
-                                walkStartLng = subPath.startLongitude
-                                walkEndLat = subPath.endLatitude
-                                walkEndLng = subPath.endLongitude
-                                Log.d("RouteRepository", "중간 도보 구간 - 기존 좌표 사용")
-                            } else {
-                                // 좌표가 없으면 이전/다음 구간에서 추출
-                                val prevSubPath = route.subPaths.getOrNull(index - 1)
-                                val nextSubPath = route.subPaths.getOrNull(index + 1)
-                                walkStartLat = prevSubPath?.endLatitude
-                                walkStartLng = prevSubPath?.endLongitude
-                                walkEndLat = nextSubPath?.startLatitude
-                                walkEndLng = nextSubPath?.startLongitude
-                                Log.d("RouteRepository", "중간 도보 구간 - 이전/다음 구간 좌표 사용")
-                            }
+                            // 이전 대중교통 구간의 마지막 정류장
+                            val prevSubPath = route.subPaths.getOrNull(index - 1)
+                            val lastStation = prevSubPath?.passStations?.lastOrNull()
+                            walkStartLat = lastStation?.latitude ?: prevSubPath?.endLatitude
+                            walkStartLng = lastStation?.longitude ?: prevSubPath?.endLongitude
+                            walkStartName = lastStation?.name ?: prevSubPath?.endName ?: "정류장"
+
+                            // 다음 대중교통 구간의 첫 번째 정류장
+                            val nextSubPath = route.subPaths.getOrNull(index + 1)
+                            val firstStation = nextSubPath?.passStations?.firstOrNull()
+                            walkEndLat = firstStation?.latitude ?: nextSubPath?.startLatitude
+                            walkEndLng = firstStation?.longitude ?: nextSubPath?.startLongitude
+                            walkEndName = firstStation?.name ?: nextSubPath?.startName ?: "정류장"
+
+                            Log.d("RouteRepository", "중간 도보 구간 - 환승 ($walkStartName -> $walkEndName)")
+                            Log.d("RouteRepository", "  출발: (${walkStartLat}, ${walkStartLng})")
+                            Log.d("RouteRepository", "  도착: (${walkEndLat}, ${walkEndLng})")
                         }
                     }
 
@@ -419,7 +406,14 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                     if (walkStartLat != null && walkStartLng != null &&
                         walkEndLat != null && walkEndLng != null) {
                         Log.d("RouteRepository", "TMAP API 호출 - 출발: ($walkStartLat, $walkStartLng), 도착: ($walkEndLat, $walkEndLng)")
-                        getPedestrianRoute(walkStartLat, walkStartLng, walkEndLat, walkEndLng)
+                        getPedestrianRoute(
+                            startLat = walkStartLat,
+                            startLng = walkStartLng,
+                            endLat = walkEndLat,
+                            endLng = walkEndLng,
+                            startName = walkStartName,
+                            endName = walkEndName
+                        )
                     } else {
                         Log.d("RouteRepository", "도보 좌표 없음 - 스킵")
                         null
@@ -532,53 +526,64 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                     // 도보 구간
                     Log.d("RouteRepository", "도보 구간 - distance: ${subPath.distance}m, index: $index/${path.subPath.lastIndex}")
 
-                    // 도보 구간의 시작/끝 좌표 결정
+                    // 도보 구간의 시작/끝 좌표 및 이름 결정
                     val walkStartLat: Double?
                     val walkStartLng: Double?
                     val walkEndLat: Double?
                     val walkEndLng: Double?
+                    val walkStartName: String
+                    val walkEndName: String
 
                     when {
                         // 첫 번째 도보 구간: 출발지 -> 첫 정류장
                         index == 0 -> {
                             walkStartLat = startLat
                             walkStartLng = startLng
-                            // 다음 대중교통 구간의 시작점
+                            // 다음 대중교통 구간의 첫 번째 정류장 좌표 (passStopList 사용)
                             val nextTransitSubPath = path.subPath.getOrNull(index + 1)
-                            walkEndLat = nextTransitSubPath?.startY
-                            walkEndLng = nextTransitSubPath?.startX
+                            val firstStation = nextTransitSubPath?.passStopList?.stations?.firstOrNull()
+                            walkEndLat = firstStation?.y ?: nextTransitSubPath?.startY
+                            walkEndLng = firstStation?.x ?: nextTransitSubPath?.startX
+                            // 출발지는 역지오코딩, 도착지는 정류장 이름
+                            walkStartName = reverseGeocode(startLat, startLng)
+                            walkEndName = firstStation?.stationName ?: nextTransitSubPath?.startName ?: "정류장"
                             Log.d("RouteRepository", "첫 번째 도보 구간 - 출발지 -> 첫 정류장")
+                            Log.d("RouteRepository", "  도착 정류장: $walkEndName (${walkEndLat}, ${walkEndLng})")
                         }
                         // 마지막 도보 구간: 마지막 정류장 -> 도착지
                         index == path.subPath.lastIndex -> {
-                            // 이전 대중교통 구간의 끝점
+                            // 이전 대중교통 구간의 마지막 정류장 좌표 (passStopList 사용)
                             val prevTransitSubPath = path.subPath.getOrNull(index - 1)
-                            walkStartLat = prevTransitSubPath?.endY
-                            walkStartLng = prevTransitSubPath?.endX
+                            val lastStation = prevTransitSubPath?.passStopList?.stations?.lastOrNull()
+                            walkStartLat = lastStation?.y ?: prevTransitSubPath?.endY
+                            walkStartLng = lastStation?.x ?: prevTransitSubPath?.endX
                             walkEndLat = endLat
                             walkEndLng = endLng
+                            // 출발지는 정류장 이름, 도착지는 역지오코딩
+                            walkStartName = lastStation?.stationName ?: prevTransitSubPath?.endName ?: "정류장"
+                            walkEndName = reverseGeocode(endLat, endLng)
                             Log.d("RouteRepository", "마지막 도보 구간 - 마지막 정류장 -> 도착지")
+                            Log.d("RouteRepository", "  출발 정류장: $walkStartName (${walkStartLat}, ${walkStartLng})")
                         }
                         // 중간 도보 구간 (환승): 이전 정류장 -> 다음 정류장
                         else -> {
-                            if (subPath.startX != null && subPath.startY != null &&
-                                subPath.endX != null && subPath.endY != null) {
-                                // ODsay API에서 좌표를 제공한 경우
-                                walkStartLat = subPath.startY
-                                walkStartLng = subPath.startX
-                                walkEndLat = subPath.endY
-                                walkEndLng = subPath.endX
-                                Log.d("RouteRepository", "중간 도보 구간 - ODsay 좌표 사용")
-                            } else {
-                                // 좌표가 없으면 이전/다음 구간에서 추출
-                                val prevSubPath = path.subPath.getOrNull(index - 1)
-                                val nextSubPath = path.subPath.getOrNull(index + 1)
-                                walkStartLat = prevSubPath?.endY
-                                walkStartLng = prevSubPath?.endX
-                                walkEndLat = nextSubPath?.startY
-                                walkEndLng = nextSubPath?.startX
-                                Log.d("RouteRepository", "중간 도보 구간 - 이전/다음 구간 좌표 사용")
-                            }
+                            // 이전 대중교통 구간의 마지막 정류장
+                            val prevSubPath = path.subPath.getOrNull(index - 1)
+                            val lastStation = prevSubPath?.passStopList?.stations?.lastOrNull()
+                            walkStartLat = lastStation?.y ?: prevSubPath?.endY
+                            walkStartLng = lastStation?.x ?: prevSubPath?.endX
+                            walkStartName = lastStation?.stationName ?: prevSubPath?.endName ?: "정류장"
+
+                            // 다음 대중교통 구간의 첫 번째 정류장
+                            val nextSubPath = path.subPath.getOrNull(index + 1)
+                            val firstStation = nextSubPath?.passStopList?.stations?.firstOrNull()
+                            walkEndLat = firstStation?.y ?: nextSubPath?.startY
+                            walkEndLng = firstStation?.x ?: nextSubPath?.startX
+                            walkEndName = firstStation?.stationName ?: nextSubPath?.startName ?: "정류장"
+
+                            Log.d("RouteRepository", "중간 도보 구간 - 환승 ($walkStartName -> $walkEndName)")
+                            Log.d("RouteRepository", "  출발: (${walkStartLat}, ${walkStartLng})")
+                            Log.d("RouteRepository", "  도착: (${walkEndLat}, ${walkEndLng})")
                         }
                     }
 
@@ -586,7 +591,14 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                     if (walkStartLat != null && walkStartLng != null &&
                         walkEndLat != null && walkEndLng != null) {
                         Log.d("RouteRepository", "TMAP API 호출 - 출발: ($walkStartLat, $walkStartLng), 도착: ($walkEndLat, $walkEndLng)")
-                        getPedestrianRoute(walkStartLat, walkStartLng, walkEndLat, walkEndLng)
+                        getPedestrianRoute(
+                            startLat = walkStartLat,
+                            startLng = walkStartLng,
+                            endLat = walkEndLat,
+                            endLng = walkEndLng,
+                            startName = walkStartName,
+                            endName = walkEndName
+                        )
                     } else {
                         Log.d("RouteRepository", "도보 좌표 없음 - 스킵")
                         null
@@ -760,7 +772,9 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
         startLat: Double,
         startLng: Double,
         endLat: Double,
-        endLng: Double
+        endLng: Double,
+        startName: String = "출발지",
+        endName: String = "도착지"
     ): List<com.teammanduk.adego.core.model.GraphicCoordinate> {
         return try {
             val apiKey = getTmapApiKey()
@@ -771,12 +785,7 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
 
             Log.d("RouteRepository", "TMAP 보행자 경로 API 호출 시작")
             Log.d("RouteRepository", "출발: ($startLat, $startLng), 도착: ($endLat, $endLng)")
-
-            // 역지오코딩으로 출발지와 도착지 이름 가져오기
-            val startName = reverseGeocode(startLat, startLng)
-            val endName = reverseGeocode(endLat, endLng)
-
-            Log.d("RouteRepository", "역지오코딩 - 출발: $startName, 도착: $endName")
+            Log.d("RouteRepository", "출발지명: $startName, 도착지명: $endName")
 
             val requestBody = TmapPedestrianRequest(
                 startX = startLng,
