@@ -1,5 +1,9 @@
 package com.teammanduk.adego.feature.map.component
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -36,6 +41,7 @@ fun InviteDialog(
     inviteCode: String,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -103,7 +109,10 @@ fun InviteDialog(
             // 코드 복사 버튼
             Button(
                 onClick = {
-                    // TODO: 클립보드에 코드 복사
+                    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val clipData = ClipData.newPlainText("invite_code", inviteCode)
+                    clipboardManager.setPrimaryClip(clipData)
+                    Toast.makeText(context, "초대 코드가 복사되었습니다", Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
