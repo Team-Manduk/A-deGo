@@ -35,10 +35,28 @@ class MapViewModel @Inject constructor(
 
     private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
     val userId: String = savedStateHandle.get<String>("userId") ?: ""
+    private val userName: String = savedStateHandle.get<String>("userName") ?: ""
 
     init {
         _uiState.update { it.copy(roomId = roomId, userId = userId) }
         userRepository.setCurrentUser(userId)
+
+        // 방 참가 처리
+        viewModelScope.launch {
+            joinRoom(roomId, userId, userName)
+                .catch { e ->
+                    _uiState.update { it.copy(error = "방 참가 실패: ${e.message}") }
+                    emit(null to emptyList())
+                }
+                .collect { (room, participants) ->
+                    _uiState.update { currentState ->
+                        currentState.copy(
+                            room = room?.toUiModel(),
+                            participants = participants.toUiModels()
+                        )
+                    }
+                }
+        }
     }
 
     fun setSelectedRoute(route: com.teammanduk.adego.core.model.Route) {
