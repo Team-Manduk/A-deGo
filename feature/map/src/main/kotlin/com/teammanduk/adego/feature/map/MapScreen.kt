@@ -50,14 +50,14 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.ui.component.LoadingScreen
+import com.teammanduk.adego.feature.map.Participant
 import com.teammanduk.adego.feature.map.component.InviteDialog
 import com.teammanduk.adego.feature.map.component.ParticipantCardPager
 import com.teammanduk.adego.feature.map.component.ParticipantMapMarker
 import com.teammanduk.adego.feature.map.component.TopInfoSection
-import com.teammanduk.adego.feature.map.component.createParticipantMarkerIcon
+import com.teammanduk.adego.feature.map.createParticipantMarkerIcon
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapUiState
-import com.teammanduk.adego.feature.map.model.Participant
 import kotlinx.coroutines.launch
 
 @Composable
