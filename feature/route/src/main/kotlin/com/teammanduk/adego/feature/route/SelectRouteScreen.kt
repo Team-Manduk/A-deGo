@@ -114,6 +114,7 @@ private fun SelectRouteScreen(
                     // 경로 미리보기
                     RoutePreview(
                         route = uiState.routes[uiState.selectedRouteIndex],
+                        isLoadingDetails = uiState.isLoadingRouteDetails,
                         onConfirm = onConfirmRoute,
                         onCancel = onCancelSelection,
                         modifier = Modifier.padding(paddingValues)
@@ -271,6 +272,7 @@ private fun SubPathChip(
 @Composable
 private fun RoutePreview(
     route: Route,
+    isLoadingDetails: Boolean,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
@@ -431,6 +433,33 @@ private fun RoutePreview(
             }
         }
 
+        // 로딩 인디케이터
+        if (isLoadingDetails) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator()
+                        Text(
+                            text = "경로 세부 정보 로딩 중...",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            }
+        }
+
         // 하단 버튼들
         Row(
             modifier = Modifier
@@ -450,7 +479,8 @@ private fun RoutePreview(
             Button(
                 onClick = onConfirm,
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                enabled = !isLoadingDetails
             ) {
                 Text(text = "이 경로 사용")
             }

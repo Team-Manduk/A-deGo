@@ -36,6 +36,10 @@ android {
         // ODsay API Key
         val odsayApiKey = secretsProperties.getProperty("ODSAY_API_KEY", "")
         buildConfigField("String", "ODSAY_API_KEY", "\"$odsayApiKey\"")
+
+        // TMAP API Key
+        val tmapApiKey = secretsProperties.getProperty("TMAP_API_KEY", "")
+        buildConfigField("String", "TMAP_API_KEY", "\"$tmapApiKey\"")
     }
 
     buildFeatures {

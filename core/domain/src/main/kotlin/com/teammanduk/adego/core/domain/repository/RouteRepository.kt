@@ -21,4 +21,22 @@ interface RouteRepository {
         endLat: Double,
         endLng: Double
     ): List<Route>
+
+    /**
+     * 선택된 경로의 세부 정보 (그래픽 데이터)를 가져옵니다.
+     *
+     * @param route 기본 정보만 있는 경로 (mapObj 포함)
+     * @param startLat 출발지 위도
+     * @param startLng 출발지 경도
+     * @param endLat 도착지 위도
+     * @param endLng 도착지 경도
+     * @return 그래픽 데이터가 포함된 경로
+     */
+    suspend fun getRouteDetails(
+        route: Route,
+        startLat: Double,
+        startLng: Double,
+        endLat: Double,
+        endLng: Double
+    ): Route
 }
