@@ -3,6 +3,8 @@ package com.teammanduk.adego.feature.map.model
 import com.teammanduk.adego.core.model.ParticipantLocation
 
 data class MapUiState(
+    val roomId: String = "",
+    val userId: String = "",
     val room: RoomUiModel? = null,
     val participants: List<ParticipantUiModel> = emptyList(),
     val selectedParticipantIndex: Int = 0,

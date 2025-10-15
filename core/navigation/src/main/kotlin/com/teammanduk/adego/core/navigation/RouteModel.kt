@@ -20,4 +20,22 @@ sealed interface Route {
         val roomId: String,
         val userId: String
     ) : Route
+
+    @Serializable
+    data class SelectStartPlace(
+        val roomId: String,
+        val userId: String,
+        val destLat: Double,
+        val destLng: Double
+    ) : Route
+
+    @Serializable
+    data class SelectRoute(
+        val roomId: String,
+        val userId: String,
+        val startLat: Double,
+        val startLng: Double,
+        val destLat: Double,
+        val destLng: Double
+    ) : Route
 }

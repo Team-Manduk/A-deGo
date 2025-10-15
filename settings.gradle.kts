@@ -28,6 +28,7 @@ include(
     ":feature:create",
     ":feature:map",
     ":feature:place",
+    ":feature:route",
 )
 include(
     ":core:common",

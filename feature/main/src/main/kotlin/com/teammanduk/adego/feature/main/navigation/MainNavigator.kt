@@ -13,6 +13,8 @@ import com.teammanduk.adego.feature.create.navigation.navigateToCreate
 import com.teammanduk.adego.feature.home.navigation.navigateToHome
 import com.teammanduk.adego.feature.map.navigation.navigateToMap
 import com.teammanduk.adego.feature.place.navigation.navigateToSelectPlace
+import com.teammanduk.adego.feature.place.navigation.navigateToSelectStartPlace
+import com.teammanduk.adego.feature.route.navigation.navigateToSelectRoute
 
 internal class MainNavigator(
     val navController: NavHostController,
@@ -42,6 +44,26 @@ internal class MainNavigator(
 
     fun navigateToMap(roomId: String, userId: String) {
         navController.navigateToMap(roomId, userId, navOptions)
+    }
+
+    fun navigateToSelectStartPlace(
+        roomId: String,
+        userId: String,
+        destLat: Double,
+        destLng: Double
+    ) {
+        navController.navigateToSelectStartPlace(roomId, userId, destLat, destLng)
+    }
+
+    fun navigateToSelectRoute(
+        roomId: String,
+        userId: String,
+        startLat: Double,
+        startLng: Double,
+        destLat: Double,
+        destLng: Double
+    ) {
+        navController.navigateToSelectRoute(roomId, userId, startLat, startLng, destLat, destLng)
     }
 
     fun navigateBack() {

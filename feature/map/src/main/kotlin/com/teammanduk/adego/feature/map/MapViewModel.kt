@@ -37,7 +37,17 @@ class MapViewModel @Inject constructor(
     val userId: String = savedStateHandle.get<String>("userId") ?: ""
 
     init {
+        _uiState.update { it.copy(roomId = roomId, userId = userId) }
         userRepository.setCurrentUser(userId)
+    }
+
+    fun setSelectedRoute(route: com.teammanduk.adego.core.model.Route) {
+        _uiState.update {
+            it.copy(
+                searchedRoutes = listOf(route),
+                selectedRouteIndex = 0
+            )
+        }
     }
 
     fun startLocationTracking() {

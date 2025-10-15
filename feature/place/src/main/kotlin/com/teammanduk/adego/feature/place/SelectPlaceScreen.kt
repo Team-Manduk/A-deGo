@@ -60,7 +60,7 @@ fun SelectPlaceRoute(
     buttonText: String = "장소 선택하기",
     showTopBar: Boolean = true,
     onBackClick: () -> Unit = {},
-    onPlaceSelected: () -> Unit = {},
+    onPlaceSelected: (Place) -> Unit = {},
     onSearchClick: () -> Unit = {},
     viewModel: SelectPlaceViewModel = hiltViewModel()
 ) {
@@ -103,7 +103,7 @@ fun SelectPlaceRoute(
                 },
                 onPlaceSelected = {
                     viewModel.confirmSelection()
-                    onPlaceSelected()
+                    searchResult?.let { onPlaceSelected(it) }
                 },
                 onSearchClick = onSearchClick,
                 modifier = Modifier.padding(paddingValues)
@@ -125,7 +125,7 @@ fun SelectPlaceRoute(
             },
             onPlaceSelected = {
                 viewModel.confirmSelection()
-                onPlaceSelected()
+                searchResult?.let { onPlaceSelected(it) }
             },
             onSearchClick = onSearchClick
         )
