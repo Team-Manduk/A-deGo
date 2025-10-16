@@ -10,6 +10,7 @@ import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapUiState
 import com.teammanduk.adego.feature.map.model.toUiModel
 import com.teammanduk.adego.feature.map.model.toUiModels
+import com.teammanduk.adego.feature.map.util.NicknameGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -170,6 +171,9 @@ class MapViewModel @Inject constructor(
 
             is MapIntent.UpdateUserName -> _uiState.update { reduce(it, intent) }
 
+            MapIntent.GenerateRandomName -> {
+                _uiState.update { reduce(it, intent) }
+            }
         }
     }
 
@@ -208,6 +212,10 @@ class MapViewModel @Inject constructor(
             is MapIntent.SelectRoute -> state.copy(selectedRouteIndex = intent.routeIndex)
             MapIntent.ConfirmUserName -> state
             is MapIntent.UpdateUserName -> state.copy(userName = intent.userName)
+            MapIntent.GenerateRandomName -> {
+                val randomName = NicknameGenerator.generate()
+                state.copy(userName = randomName)
+            }
         }
     }
 

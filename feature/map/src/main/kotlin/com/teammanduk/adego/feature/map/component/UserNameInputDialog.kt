@@ -9,8 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults.buttonColors
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +30,8 @@ internal fun UserNameInputDialog(
     userName: String,
     onUserNameChange: (String) -> Unit,
     onConfirm: () -> Unit,
-    error: String?
+    error: String?,
+    onGenerateRandomName: () -> Unit = {}
 ) {
     Dialog(onDismissRequest = { }) {
         Column(
@@ -63,7 +68,16 @@ internal fun UserNameInputDialog(
                         )
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    trailingIcon = {
+                        IconButton(onClick = onGenerateRandomName) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "랜덤 닉네임 생성",
+                                tint = AdegoTheme.colors.main500
+                            )
+                        }
+                    }
                 )
 
                 error?.let {

@@ -1,6 +1,7 @@
 package com.teammanduk.adego.feature.map.model
 
 import com.teammanduk.adego.core.model.ParticipantLocation
+import com.teammanduk.adego.feature.map.util.NicknameGenerator
 
 data class MapUiState(
     val roomId: String = "",
@@ -21,5 +22,5 @@ data class MapUiState(
     val selectedRouteIndex: Int? = null,
     val isSearchingRoute: Boolean = false,
     val showUserNameInput: Boolean = true,
-    val userName: String = "",
+    val userName: String = NicknameGenerator.generate(),
 )
