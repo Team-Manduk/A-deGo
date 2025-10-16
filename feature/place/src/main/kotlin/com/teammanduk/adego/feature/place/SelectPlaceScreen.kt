@@ -3,7 +3,6 @@ package com.teammanduk.adego.feature.place
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,11 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,27 +30,21 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.rememberCameraPositionState
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.model.Place
+import com.teammanduk.adego.core.ui.permission.PermissionRequester
+import com.teammanduk.adego.core.ui.permission.PermissionType
+import com.teammanduk.adego.feature.place.component.PlaceInfoCard
+import com.teammanduk.adego.feature.place.component.SelectPlaceMap
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,27 +61,52 @@ fun SelectPlaceRoute(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isUserDragging by viewModel.isUserDragging.collectAsStateWithLifecycle()
 
-    if (showTopBar) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = title,
-                            style = AdegoTheme.typography.titleLarge
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "뒤로가기"
+    PermissionRequester(
+        permissionTypes = listOf(PermissionType.Location)
+    ) {
+        if (showTopBar) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = title,
+                                style = AdegoTheme.typography.titleLarge
                             )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "뒤로가기"
+                                )
+                            }
                         }
-                    }
+                    )
+                }
+            ) { paddingValues ->
+                SelectPlaceScreen(
+                    searchResult = searchResult,
+                    isLoading = isLoading,
+                    isUserDragging = isUserDragging,
+                    buttonText = buttonText,
+                    onCameraMove = {
+                        viewModel.onCameraMove()
+                    },
+                    onCameraIdle = { latLng ->
+                        viewModel.onCameraIdle()
+                        viewModel.onCameraPositionChanged(latLng)
+                    },
+                    onPlaceSelected = {
+                        viewModel.confirmSelection()
+                        searchResult?.let { onPlaceSelected(it) }
+                    },
+                    onSearchClick = onSearchClick,
+                    modifier = Modifier.padding(paddingValues)
                 )
             }
-        ) { paddingValues ->
+        } else {
+            // TopBar 없이 사용 (다이얼로그 등에서)
             SelectPlaceScreen(
                 searchResult = searchResult,
                 isLoading = isLoading,
@@ -105,30 +123,9 @@ fun SelectPlaceRoute(
                     viewModel.confirmSelection()
                     searchResult?.let { onPlaceSelected(it) }
                 },
-                onSearchClick = onSearchClick,
-                modifier = Modifier.padding(paddingValues)
+                onSearchClick = onSearchClick
             )
         }
-    } else {
-        // TopBar 없이 사용 (다이얼로그 등에서)
-        SelectPlaceScreen(
-            searchResult = searchResult,
-            isLoading = isLoading,
-            isUserDragging = isUserDragging,
-            buttonText = buttonText,
-            onCameraMove = {
-                viewModel.onCameraMove()
-            },
-            onCameraIdle = { latLng ->
-                viewModel.onCameraIdle()
-                viewModel.onCameraPositionChanged(latLng)
-            },
-            onPlaceSelected = {
-                viewModel.confirmSelection()
-                searchResult?.let { onPlaceSelected(it) }
-            },
-            onSearchClick = onSearchClick
-        )
     }
 }
 
@@ -157,7 +154,7 @@ private fun SelectPlaceScreen(
         modifier = modifier.fillMaxSize()
     ) {
         // 지도 표시
-        MapPlaceholder(
+        SelectPlaceMap(
             modifier = Modifier.fillMaxSize(),
             selectedPosition = selectedPosition,
             isUserDragging = isUserDragging,
@@ -257,107 +254,5 @@ private fun SelectPlaceScreen(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun MapPlaceholder(
-    modifier: Modifier = Modifier,
-    selectedPosition: LatLng,
-    isUserDragging: Boolean,
-    onCameraMove: () -> Unit,
-    onCameraIdle: (LatLng) -> Unit
-) {
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(selectedPosition, 15f)
-    }
-
-    // 이전 selectedPosition을 기억하여 실제로 변경되었을 때만 카메라 이동
-    var previousPosition by remember { mutableStateOf<LatLng?>(null) }
-
-    // 자동 애니메이션 진행 중인지 추적 (사용자 드래그와 구분하기 위함)
-    var isAutoAnimating by remember { mutableStateOf(false) }
-
-    // searchResult가 변경될 때만 카메라 이동 (검색 결과가 있을 때)
-    LaunchedEffect(selectedPosition) {
-        // 위치가 실제로 변경되었을 때 카메라 이동 (previousPosition이 null이거나 다를 때)
-        if (previousPosition == null || selectedPosition != previousPosition) {
-            isAutoAnimating = true
-            cameraPositionState.animate(
-                CameraUpdateFactory.newCameraPosition(
-                    CameraPosition(
-                        selectedPosition, // 타겟 위치
-                        cameraPositionState.position.zoom, // 현재 줌 유지
-                        cameraPositionState.position.tilt, // 현재 기울기 유지
-                        cameraPositionState.position.bearing // 현재 회전 유지
-                    )
-                )
-            )
-            previousPosition = selectedPosition
-            isAutoAnimating = false
-        }
-    }
-
-    // 카메라 이동 감지 (사용자 드래그만 감지, 자동 애니메이션 제외)
-    LaunchedEffect(cameraPositionState.isMoving) {
-        if (cameraPositionState.isMoving && !isAutoAnimating) {
-            onCameraMove()
-        }
-    }
-
-    // 카메라 이동 완료 감지 및 역지오코딩
-    LaunchedEffect(cameraPositionState) {
-        snapshotFlow { cameraPositionState.isMoving }
-            .collect { isMoving ->
-                if (!isMoving && !isAutoAnimating) {
-                    // 지도 이동이 완료되고, 자동 애니메이션이 아닐 때만 역지오코딩
-                    // (사용자가 직접 드래그한 경우에만 역지오코딩 실행)
-                    val centerLatLng = cameraPositionState.position.target
-                    onCameraIdle(centerLatLng)
-                }
-            }
-    }
-
-    GoogleMap(
-        modifier = modifier,
-        cameraPositionState = cameraPositionState,
-        properties = MapProperties(
-            isMyLocationEnabled = false
-        ),
-        uiSettings = MapUiSettings(
-            zoomControlsEnabled = true,
-            myLocationButtonEnabled = false
-        )
-    ) {
-        // 마커 제거 - 화면 중앙에 고정된 아이콘 사용
-    }
-}
-
-@Composable
-private fun PlaceInfoCard(
-    place: Place
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                color = Color.White,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        // POI인 경우에만 장소명 표시
-        if (place.isPOI) {
-            Text(
-                text = place.name,
-                style = AdegoTheme.typography.titleLarge
-            )
-        }
-        Text(
-            text = place.address,
-            style = AdegoTheme.typography.bodySmall,
-            color = Color(0xFF757575)
-        )
     }
 }
