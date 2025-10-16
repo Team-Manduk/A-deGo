@@ -28,11 +28,11 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
-                    android:host="a-dego.web.app"
+                    android:host="adego.kr"
                     android:pathPrefix="/join"
                     android:scheme="https" />
                 <data
-                    android:host="adego.kr"
+                    android:host="www.adego.kr"
                     android:pathPrefix="/join"
                     android:scheme="https" />
             </intent-filter>

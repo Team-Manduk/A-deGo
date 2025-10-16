@@ -79,20 +79,22 @@
         // Play Store 링크 설정
         document.getElementById('playStoreLink').href = playStoreUrl;
 
-        // 앱 열기 시도
-        window.location.href = appUrl;
+        // 1초 후 앱 열기 시도 (로딩 느낌 주기)
+        setTimeout(() => {
+            window.location.href = appUrl;
+        }, 1000);
 
-        // 1.5초 후 fallback 메시지 표시
+        // 2.5초 후 fallback 메시지 표시
         setTimeout(() => {
             document.getElementById('fallback').style.display = 'block';
-        }, 1500);
+        }, 2500);
 
-        // 2.5초 후에도 페이지에 있으면 Play Store로 이동
+        // 3.5초 후에도 페이지에 있으면 Play Store로 이동
         setTimeout(() => {
             if (document.visibilityState === 'visible') {
                 window.location.href = playStoreUrl;
             }
-        }, 2500);
+        }, 3500);
 
         // 페이지 visibility 변경 감지 (앱이 열리면 페이지가 숨겨짐)
         document.addEventListener('visibilitychange', () => {
