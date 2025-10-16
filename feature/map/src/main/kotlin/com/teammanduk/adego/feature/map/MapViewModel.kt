@@ -74,6 +74,18 @@ class MapViewModel @Inject constructor(
     fun startLocationTracking() {
         viewModelScope.launch {
             try {
+                // 1. 먼저 현재 위치를 즉시 가져와서 표시 (마지막 알려진 위치)
+                locationRepository.getCurrentLocation()
+                    .onSuccess { location ->
+                        _uiState.update { currentState ->
+                            currentState.copy(
+                                myLocation = location,
+                                isInitialLocationLoaded = true
+                            )
+                        }
+                    }
+
+                // 2. 그 다음 실시간 위치 업데이트 구독
                 trackAndUpdateLocation()
                     .catch { e ->
                         _uiState.update {
@@ -88,11 +100,7 @@ class MapViewModel @Inject constructor(
                             currentState.copy(
                                 myLocation = location,
                                 isLocationTrackingActive = true,
-                                isInitialLocationLoaded = if (!currentState.isInitialLocationLoaded) {
-                                    true
-                                } else {
-                                    currentState.isInitialLocationLoaded
-                                }
+                                isInitialLocationLoaded = true
                             )
                         }
                     }
