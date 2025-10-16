@@ -26,13 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.compose.rememberMarkerState
+import com.teammanduk.adego.core.model.Lane
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.model.SubPath
 import com.teammanduk.adego.core.model.TrafficType
@@ -112,7 +106,7 @@ private fun SelectRouteScreen(
             else -> {
                 if (uiState.selectedRouteIndex != null) {
                     // 경로 미리보기
-                    RoutePreview(
+                    RoutePreviewScreen(
                         route = uiState.routes[uiState.selectedRouteIndex],
                         isLoadingDetails = uiState.isLoadingRouteDetails,
                         onConfirm = onConfirmRoute,
@@ -151,88 +145,440 @@ private fun RouteCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 상단: 시간, 거리, 요금
+            // 시간 + 환승 정보
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 소요 시간
+                // 소요 시간 (크고 굵게)
                 Text(
                     text = "${route.totalTime}분",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color(0xFF000000)
                 )
 
-                // 거리 및 요금
-                Column(horizontalAlignment = Alignment.End) {
+                // 환승 횟수
+                if (route.transferCount > 0) {
                     Text(
-                        text = "%.1fkm".format(route.totalDistance / 1000.0),
+                        text = "환승 ${route.transferCount}회",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${route.totalFare}원",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFF666666)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            // 요금 정보
+            Text(
+                text = "${String.format("%,d", route.totalFare)}원",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF666666)
+            )
 
-            // 환승 정보
-            if (route.transferCount > 0) {
-                Text(
-                    text = "환승 ${route.transferCount}회",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+            // 경로 진행 바 (네이버 스타일)
+            RouteProgressBar(subPaths = route.subPaths)
+
+            // 경로 요약 정보 (대중교통 구간들을 간략하게 표시)
+            val transitSubPaths = route.subPaths.filter { it.trafficType != TrafficType.WALK }
+            if (transitSubPaths.isNotEmpty()) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    transitSubPaths.forEachIndexed { index, transit ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 노선 번호 뱃지
+                            Surface(
+                                shape = RoundedCornerShape(3.dp),
+                                color = if (transit.trafficType == TrafficType.SUBWAY) {
+                                    Color(0xFF0052A4)
+                                } else {
+                                    Color(0xFF00C73C)
+                                }
+                            ) {
+                                Text(
+                                    text = transit.lane?.name ?: transit.lane?.busNo ?: "",
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // 정류장명
+                            Text(
+                                text = "${transit.startName ?: "출발지"} → ${transit.endName ?: "도착지"}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF000000),
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteProgressBar(subPaths: List<SubPath>) {
+    // 전체 시간 계산
+    val totalTime = subPaths.sumOf { it.sectionTime }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 시작 아이콘 (도보)
+        Icon(
+            imageVector = Icons.Default.Person,
+            contentDescription = "출발",
+            modifier = Modifier.size(18.dp),
+            tint = Color(0xFF999999)
+        )
+
+        subPaths.forEach { subPath ->
+            val weight = (subPath.sectionTime.toFloat() / totalTime.toFloat()).coerceAtLeast(0.1f)
+
+            when (subPath.trafficType) {
+                TrafficType.WALK -> {
+                    // 도보 구간은 표시하지 않음 (네이버 스타일)
+                }
+                TrafficType.SUBWAY, TrafficType.BUS -> {
+                    // 노선 번호 표시
+                    Box(
+                        modifier = Modifier
+                            .weight(weight)
+                            .height(20.dp)
+                            .background(
+                                color = if (subPath.trafficType == TrafficType.SUBWAY) {
+                                    Color(0xFF0052A4)
+                                } else {
+                                    Color(0xFF00C73C)
+                                },
+                                shape = RoundedCornerShape(4.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        // 종료 아이콘
+        Icon(
+            imageVector = Icons.Default.LocationOn,
+            contentDescription = "도착",
+            modifier = Modifier.size(18.dp),
+            tint = Color(0xFFFF5252)
+        )
+    }
+}
+
+@Composable
+private fun RouteIconLine(subPaths: List<SubPath>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        subPaths.forEachIndexed { index, subPath ->
+            when (subPath.trafficType) {
+                TrafficType.WALK -> {
+                    // 도보 아이콘 (작게)
+                    if (subPath.distance > 50) { // 50m 이상만 표시
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                            contentDescription = "도보",
+                            modifier = Modifier.size(20.dp),
+                            tint = Color(0xFF999999)
+                        )
+                    }
+                }
+                TrafficType.SUBWAY -> {
+                    // 지하철 원형 아이콘
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFF0052A4),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsSubway,
+                                contentDescription = "지하철",
+                                modifier = Modifier.size(20.dp),
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
+                TrafficType.BUS -> {
+                    // 버스 원형 아이콘
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color(0xFF53B332),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsBus,
+                                contentDescription = "버스",
+                                modifier = Modifier.size(20.dp),
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
             }
 
-            // 경로 상세 (아이콘 및 노선명)
+            // 화살표 추가 (마지막 구간 제외)
+            if (index < subPaths.size - 1 && subPath.trafficType != TrafficType.WALK) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp),
+                    tint = Color(0xFFCCCCCC)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteSimpleSummary(subPaths: List<SubPath>) {
+    // 대중교통 구간만 추출
+    val transitSubPaths = subPaths.filter {
+        it.trafficType == TrafficType.SUBWAY || it.trafficType == TrafficType.BUS
+    }
+
+    if (transitSubPaths.isEmpty()) {
+        // 도보만 있는 경우
+        Text(
+            text = "도보로 이동",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF666666)
+        )
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        transitSubPaths.forEach { subPath ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                route.subPaths.forEach { subPath ->
-                    when (subPath.trafficType) {
-                        TrafficType.SUBWAY -> {
-                            SubPathChip(
-                                icon = Icons.Default.DirectionsSubway,
-                                label = subPath.lane?.name ?: "지하철",
-                                color = Color(0xFF0052A4)
+                // 노선명
+                val lineName = subPath.lane?.name ?: subPath.lane?.busNo ?: ""
+                if (lineName.isNotEmpty()) {
+                    Text(
+                        text = lineName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (subPath.trafficType == TrafficType.SUBWAY) {
+                            Color(0xFF0052A4)
+                        } else {
+                            Color(0xFF53B332)
+                        }
+                    )
+                }
+
+                // 승차역 → 하차역
+                if (subPath.startName != null && subPath.endName != null) {
+                    Text(
+                        text = "${subPath.startName} → ${subPath.endName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF666666),
+                        maxLines = 1
+                    )
+                }
+
+                // 정거장 수
+                subPath.stationCount?.let { count ->
+                    Text(
+                        text = "($count)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF999999)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RouteTimeline(subPaths: List<SubPath>) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        subPaths.forEachIndexed { index, subPath ->
+            when (subPath.trafficType) {
+                TrafficType.WALK -> {
+                    // 도보 구간
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                            contentDescription = "도보",
+                            modifier = Modifier.size(24.dp),
+                            tint = Color(0xFF757575)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "도보 이동",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${(subPath.distance / 1000.0).let { if (it < 1) "${(subPath.distance).toInt()}m" else "%.1fkm".format(it) }} • 약 ${subPath.sectionTime}분",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        TrafficType.BUS -> {
-                            SubPathChip(
-                                icon = Icons.Default.DirectionsBus,
-                                label = subPath.lane?.busNo ?: "버스",
-                                color = Color(0xFF53B332)
-                            )
+                    }
+                }
+
+                TrafficType.SUBWAY, TrafficType.BUS -> {
+                    // 대중교통 구간
+                    val lineColor = if (subPath.trafficType == TrafficType.SUBWAY) {
+                        Color(0xFF0052A4)
+                    } else {
+                        Color(0xFF53B332)
+                    }
+
+                    val icon = if (subPath.trafficType == TrafficType.SUBWAY) {
+                        Icons.Default.DirectionsSubway
+                    } else {
+                        Icons.Default.DirectionsBus
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = lineColor,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp),
+                                    tint = Color.White
+                                )
+                            }
                         }
-                        TrafficType.WALK -> {
-                            if (subPath.distance > 100) { // 100m 이상 도보만 표시
-                                SubPathChip(
-                                    icon = Icons.AutoMirrored.Filled.DirectionsWalk,
-                                    label = "도보",
-                                    color = Color.Gray
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // 노선명
+                            Text(
+                                text = subPath.lane?.name ?: subPath.lane?.busNo ?:
+                                    if (subPath.trafficType == TrafficType.SUBWAY) "지하철" else "버스",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = lineColor
+                            )
+
+                            // 승차 → 하차
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = subPath.startName ?: "출발",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = subPath.endName ?: "도착",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            // 정거장 수 및 시간
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                subPath.stationCount?.let { count ->
+                                    Text(
+                                        text = "${count}개 정거장",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "•",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = "${subPath.sectionTime}분",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
+            }
+
+            // 마지막 구간이 아니면 구분선 추가
+            if (index < subPaths.size - 1) {
+                Box(
+                    modifier = Modifier
+                        .padding(start = 20.dp)
+                        .width(2.dp)
+                        .height(8.dp)
+                        .background(
+                            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(1.dp)
+                        )
+                )
             }
         }
     }
@@ -269,221 +615,155 @@ private fun SubPathChip(
     }
 }
 
+// 프리뷰용 샘플 데이터
+private fun getSampleRoute(): Route {
+    return Route(
+        totalTime = 43,
+        totalDistance = 15000,
+        totalFare = 1500,
+        transferCount = 1,
+        pathType = 3,
+        subPaths = listOf(
+            SubPath(
+                trafficType = TrafficType.WALK,
+                distance = 150.0,
+                sectionTime = 2,
+                startLatitude = 35.1795,
+                startLongitude = 129.0756,
+                endLatitude = 35.1800,
+                endLongitude = 129.0760
+            ),
+            SubPath(
+                trafficType = TrafficType.SUBWAY,
+                distance = 8000.0,
+                sectionTime = 25,
+                startName = "부산사상터미널역",
+                endName = "덕천역",
+                stationCount = 10,
+                lane = Lane(
+                    name = "2호선",
+                    subwayCode = 2
+                ),
+                startLatitude = 35.1800,
+                startLongitude = 129.0760,
+                endLatitude = 35.2050,
+                endLongitude = 129.0850
+            ),
+            SubPath(
+                trafficType = TrafficType.WALK,
+                distance = 200.0,
+                sectionTime = 3,
+                startLatitude = 35.2050,
+                startLongitude = 129.0850,
+                endLatitude = 35.2055,
+                endLongitude = 129.0855
+            ),
+            SubPath(
+                trafficType = TrafficType.BUS,
+                distance = 5000.0,
+                sectionTime = 15,
+                startName = "덕천역",
+                endName = "만덕3동주민센터",
+                stationCount = 8,
+                lane = Lane(
+                    name = "133번",
+                    busNo = "133",
+                    type = 12
+                ),
+                startLatitude = 35.2055,
+                startLongitude = 129.0855,
+                endLatitude = 35.2200,
+                endLongitude = 129.0900
+            ),
+            SubPath(
+                trafficType = TrafficType.WALK,
+                distance = 100.0,
+                sectionTime = 1,
+                startLatitude = 35.2200,
+                startLongitude = 129.0900,
+                endLatitude = 35.2205,
+                endLongitude = 129.0905
+            )
+        )
+    )
+}
+
+private fun getSampleRoutes(): List<Route> {
+    return listOf(
+        getSampleRoute(),
+        Route(
+            totalTime = 48,
+            totalDistance = 16500,
+            totalFare = 1500,
+            transferCount = 2,
+            pathType = 3,
+            subPaths = listOf(
+                SubPath(
+                    trafficType = TrafficType.SUBWAY,
+                    distance = 9000.0,
+                    sectionTime = 28,
+                    startName = "부산사상터미널역",
+                    endName = "화명역",
+                    stationCount = 12,
+                    lane = Lane(
+                        name = "2호선",
+                        subwayCode = 2
+                    )
+                ),
+                SubPath(
+                    trafficType = TrafficType.BUS,
+                    distance = 6000.0,
+                    sectionTime = 18,
+                    startName = "화명역",
+                    endName = "만덕3동주민센터",
+                    stationCount = 9,
+                    lane = Lane(
+                        name = "161번",
+                        busNo = "161"
+                    )
+                )
+            )
+        )
+    )
+}
+
+// 프리뷰
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
 @Composable
-private fun RoutePreview(
-    route: Route,
-    isLoadingDetails: Boolean,
-    onConfirm: () -> Unit,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    // 경로의 중심 좌표 계산
-    val allPoints = mutableListOf<LatLng>()
-    route.subPaths.forEach { subPath ->
-        val startLat = subPath.startLatitude
-        val startLng = subPath.startLongitude
-        val endLat = subPath.endLatitude
-        val endLng = subPath.endLongitude
-
-        if (startLat != null && startLng != null) {
-            allPoints.add(LatLng(startLat, startLng))
-        }
-        subPath.passStations?.forEach { station ->
-            allPoints.add(LatLng(station.latitude, station.longitude))
-        }
-        if (endLat != null && endLng != null) {
-            allPoints.add(LatLng(endLat, endLng))
-        }
+private fun RouteCardPreview() {
+    MaterialTheme {
+        RouteCard(
+            route = getSampleRoute(),
+            onClick = {}
+        )
     }
+}
 
-    val centerPosition = if (allPoints.isNotEmpty()) {
-        val avgLat = allPoints.map { it.latitude }.average()
-        val avgLng = allPoints.map { it.longitude }.average()
-        LatLng(avgLat, avgLng)
-    } else {
-        LatLng(37.5665, 126.9780) // 기본값: 서울
-    }
-
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(centerPosition, 13f)
-    }
-
-    Box(modifier = modifier.fillMaxSize()) {
-        // 지도
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState
-        ) {
-            // 경로 그리기
-            route.subPaths.forEachIndexed { index, subPath ->
-                val points = mutableListOf<LatLng>()
-                val graphicData = subPath.graphicData
-
-                // 그래픽 데이터가 있으면 사용 (실제 경로)
-                if (!graphicData.isNullOrEmpty()) {
-                    graphicData.forEach { coord ->
-                        points.add(LatLng(coord.latitude, coord.longitude))
-                    }
-                } else {
-                    // 그래픽 데이터가 없으면 기존 방식 사용
-                    var startLat = subPath.startLatitude
-                    var startLng = subPath.startLongitude
-                    var endLat = subPath.endLatitude
-                    var endLng = subPath.endLongitude
-
-                    // 좌표가 null인 경우 (주로 도보 구간) 이전/다음 구간의 좌표 사용
-                    if (startLat == null || startLng == null) {
-                        // 이전 구간의 끝점을 시작점으로
-                        val prevSubPath = route.subPaths.getOrNull(index - 1)
-                        startLat = prevSubPath?.endLatitude
-                        startLng = prevSubPath?.endLongitude
-                    }
-                    if (endLat == null || endLng == null) {
-                        // 다음 구간의 시작점을 끝점으로
-                        val nextSubPath = route.subPaths.getOrNull(index + 1)
-                        endLat = nextSubPath?.startLatitude
-                        endLng = nextSubPath?.startLongitude
-                    }
-
-                    if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                        points.add(LatLng(startLat, startLng))
-
-                        subPath.passStations?.forEach { station ->
-                            points.add(LatLng(station.latitude, station.longitude))
-                        }
-
-                        points.add(LatLng(endLat, endLng))
-                    }
-                }
-
-                // 포인트가 있으면 Polyline 그리기
-                if (points.isNotEmpty()) {
-                    val lineColor = when (subPath.trafficType) {
-                        TrafficType.SUBWAY -> Color(0xFF0052A4)
-                        TrafficType.BUS -> Color(0xFF53B332)
-                        TrafficType.WALK -> Color.Gray
-                    }
-
-                    Polyline(
-                        points = points,
-                        color = lineColor,
-                        width = 10f
-                    )
-                }
-            }
-
-            // 시작점과 종점 마커
-            if (allPoints.isNotEmpty()) {
-                Marker(
-                    state = rememberMarkerState(position = allPoints.first()),
-                    title = "출발"
-                )
-                Marker(
-                    state = rememberMarkerState(position = allPoints.last()),
-                    title = "도착"
-                )
-            }
-        }
-
-        // 상단 경로 정보 카드
-        Card(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(12.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "${route.totalTime}분",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "%.1fkm".format(route.totalDistance / 1000.0),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Text(
-                            text = "${route.totalFare}원",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-
-                if (route.transferCount > 0) {
-                    Text(
-                        text = "환승 ${route.transferCount}회",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-
-        // 로딩 인디케이터
-        if (isLoadingDetails) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        CircularProgressIndicator()
-                        Text(
-                            text = "경로 세부 정보 로딩 중...",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-        }
-
-        // 하단 버튼들
-        Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            OutlinedButton(
-                onClick = onCancel,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(text = "다른 경로 선택")
-            }
-
-            Button(
-                onClick = onConfirm,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                enabled = !isLoadingDetails
-            ) {
-                Text(text = "이 경로 사용")
-            }
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+private fun RouteProgressBarPreview() {
+    MaterialTheme {
+        Column(modifier = Modifier.padding(16.dp)) {
+            RouteProgressBar(subPaths = getSampleRoute().subPaths)
         }
     }
 }
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+private fun SelectRouteScreenPreview() {
+    MaterialTheme {
+        SelectRouteScreen(
+            uiState = SelectRouteUiState(
+                routes = getSampleRoutes(),
+                isLoading = false,
+                error = null
+            ),
+            onNavigateBack = {},
+            onRouteClick = {},
+            onConfirmRoute = {},
+            onCancelSelection = {}
+        )
+    }
+}
+
