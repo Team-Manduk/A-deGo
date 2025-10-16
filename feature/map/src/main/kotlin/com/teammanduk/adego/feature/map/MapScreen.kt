@@ -217,10 +217,18 @@ private fun MapScreen(
 
                         val markerIcon = createParticipantMarkerIcon(participant.color, isSelected)
 
+                        val markerState = rememberMarkerState(
+                            key = "${participant.userId}_${location.latitude}_${location.longitude}",
+                            position = LatLng(location.latitude, location.longitude)
+                        )
+
+                        // 위치가 변경되면 MarkerState 업데이트
+                        LaunchedEffect(location.latitude, location.longitude) {
+                            markerState.position = LatLng(location.latitude, location.longitude)
+                        }
+
                         Marker(
-                            state = rememberMarkerState(
-                                position = LatLng(location.latitude, location.longitude)
-                            ),
+                            state = markerState,
                             title = participant.name,
                             icon = markerIcon,
                             anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
