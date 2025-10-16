@@ -44,10 +44,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.teammanduk.adego.core.designsystem.component.AdegoDatePicker
-import com.teammanduk.adego.core.model.Place
 import com.teammanduk.adego.core.designsystem.component.AdegoTimePicker
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
+import com.teammanduk.adego.core.model.Place
 import com.teammanduk.adego.feature.create.model.CreateIntent
+import com.teammanduk.adego.feature.create.model.CreateSideEffect
 import com.teammanduk.adego.feature.create.model.CreateStep
 import com.teammanduk.adego.feature.create.model.CreateUiState
 import java.text.SimpleDateFormat
@@ -56,19 +57,24 @@ import java.util.Locale
 
 @Composable
 internal fun CreateRoute(
-    onNavigateBack: () -> Unit = {},
-    onNavigateToSelectPlace: () -> Unit = {},
-    onNavigateToMap: (String, String) -> Unit = { _, _ -> },  // roomId, userId로 Map 화면 이동
-    selectedPlaceFromNav: String? = null,
+    onNavigateBack: () -> Unit,
+    onNavigateToSelectPlace: () -> Unit,
+    onNavigateToMap: (String, String) -> Unit,
     viewModel: CreateViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 방 생성 성공 시 Map 화면으로 이동
-    LaunchedEffect(uiState.createdRoomInfo) {
-        uiState.createdRoomInfo?.let { info ->
-            onNavigateToMap(info.roomId, info.userId)
-            viewModel.onIntent(CreateIntent.ClearCreatedRoomInfo)
+    // SideEffect 처리
+    LaunchedEffect(Unit) {
+        viewModel.sideEffect.collect { sideEffect ->
+            when (sideEffect) {
+                CreateSideEffect.NavigateToSelectPlace -> onNavigateToSelectPlace()
+                CreateSideEffect.NavigateBack -> onNavigateBack()
+                is CreateSideEffect.NavigateToMap -> onNavigateToMap(
+                    sideEffect.roomId,
+                    sideEffect.userId
+                )
+            }
         }
     }
 
@@ -90,18 +96,14 @@ internal fun CreateRoute(
 
     CreateScreen(
         uiState = uiState,
-        onIntent = viewModel::onIntent,
-        onNavigateBack = onNavigateBack,
-        onNavigateToSelectPlace = onNavigateToSelectPlace
+        onIntent = viewModel::onIntent
     )
 }
 
 @Composable
 private fun CreateScreen(
     uiState: CreateUiState,
-    onIntent: (CreateIntent) -> Unit,
-    onNavigateBack: () -> Unit,
-    onNavigateToSelectPlace: () -> Unit
+    onIntent: (CreateIntent) -> Unit
 ) {
     val currentCalendar = java.util.Calendar.getInstance()
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
@@ -120,7 +122,7 @@ private fun CreateScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onNavigateBack) {
+            IconButton(onClick = { onIntent(CreateIntent.NavigateBack) }) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "뒤로가기",
@@ -167,8 +169,8 @@ private fun CreateScreen(
             PlaceSelectionSection(
                 selectedPlace = uiState.selectedPlace,
                 meetingPlaceName = uiState.meetingPlaceName,
-                onNavigateToSelectPlace = onNavigateToSelectPlace,
-                onMeetingPlaceNameChange = { onIntent(CreateIntent.UpdateMeetingPlaceName(it)) }
+                onMeetingPlaceNameChange = { onIntent(CreateIntent.UpdateMeetingPlaceName(it)) },
+                onSelectPlaceClick = { onIntent(CreateIntent.NavigateToSelectPlace) }
             )
 
             // 시간 선택 (장소 선택 완료 후 표시)
@@ -265,8 +267,8 @@ private fun CreateScreen(
 private fun PlaceSelectionSection(
     selectedPlace: Place?,
     meetingPlaceName: String,
-    onNavigateToSelectPlace: () -> Unit,
-    onMeetingPlaceNameChange: (String) -> Unit
+    onMeetingPlaceNameChange: (String) -> Unit,
+    onSelectPlaceClick: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -283,7 +285,7 @@ private fun PlaceSelectionSection(
             onValueChange = { },
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onNavigateToSelectPlace() },
+                .clickable { onSelectPlaceClick() },
             enabled = false,
             placeholder = {
                 Text(
@@ -499,9 +501,7 @@ private fun CreateScreenPreview() {
     AdegoTheme {
         CreateScreen(
             uiState = CreateUiState(),
-            onIntent = {},
-            onNavigateBack = {},
-            onNavigateToSelectPlace = {}
+            onIntent = {}
         )
     }
 }
