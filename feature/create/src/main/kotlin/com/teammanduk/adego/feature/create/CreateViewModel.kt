@@ -46,10 +46,6 @@ class CreateViewModel @Inject constructor(
         }
     }
 
-    fun resetState() {
-        _uiState.update { CreateUiState() }
-    }
-
     fun onIntent(intent: CreateIntent) {
         when (intent) {
             is CreateIntent.CreateRoom -> {
