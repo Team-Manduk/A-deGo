@@ -3,7 +3,11 @@ package com.teammanduk.adego.feature.map
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.teammanduk.adego.core.domain.repository.LocationRepository
+import com.teammanduk.adego.core.domain.repository.RoomRepository
+import com.teammanduk.adego.core.domain.repository.UserRepository
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
+import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapUiState
@@ -23,10 +27,10 @@ class MapViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val joinRoom: JoinRoomUseCase,
     private val trackAndUpdateLocation: TrackAndUpdateLocationUseCase,
-    private val userRepository: com.teammanduk.adego.core.domain.repository.UserRepository,
-    private val roomRepository: com.teammanduk.adego.core.domain.repository.RoomRepository,
-    private val locationRepository: com.teammanduk.adego.core.domain.repository.LocationRepository,
-    private val searchRouteUseCase: com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
+    private val userRepository: UserRepository,
+    private val roomRepository: RoomRepository,
+    private val locationRepository: LocationRepository,
+    private val searchRouteUseCase: SearchRouteUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
