@@ -9,9 +9,8 @@ data class MapUiState(
     val room: RoomUiModel? = null,
     val participants: List<ParticipantUiModel> = emptyList(),
     val selectedParticipantIndex: Int = 0,
-    val myLocation: ParticipantLocation? = null,
     val isLocationTrackingActive: Boolean = false,
-    val isInitialLocationLoaded: Boolean = false,
+    val isCheckingRoom: Boolean = true,
     val error: String? = null,
     val showInviteDialog: Boolean = false,
     val showRouteDialog: Boolean = false,
@@ -21,6 +20,9 @@ data class MapUiState(
     val searchedRoutes: List<com.teammanduk.adego.core.model.Route> = emptyList(),
     val selectedRouteIndex: Int? = null,
     val isSearchingRoute: Boolean = false,
-    val showUserNameInput: Boolean = true,
-    val userName: String = NicknameGenerator.generate(),
-)
+    val userName: String = "",
+    val showUserNameDialog: Boolean = true,
+) {
+    val currentUser: ParticipantUiModel?
+        get() = participants.find { it.userId == userId }
+}

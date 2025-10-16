@@ -4,6 +4,7 @@ sealed interface MapIntent {
     data object GenerateRandomName : MapIntent
     data class SelectParticipant(val index: Int) : MapIntent
     data object ClearError : MapIntent
+    data object NavigateToHome : MapIntent
 
     // 초대 다이얼로그
     data object ShowInviteDialog : MapIntent
