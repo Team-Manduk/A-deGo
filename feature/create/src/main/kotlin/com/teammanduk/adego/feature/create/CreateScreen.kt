@@ -166,7 +166,9 @@ private fun CreateScreen(
             // 장소 선택 (항상 표시)
             PlaceSelectionSection(
                 selectedPlace = uiState.selectedPlace,
-                onNavigateToSelectPlace = onNavigateToSelectPlace
+                meetingPlaceName = uiState.meetingPlaceName,
+                onNavigateToSelectPlace = onNavigateToSelectPlace,
+                onMeetingPlaceNameChange = { onIntent(CreateIntent.UpdateMeetingPlaceName(it)) }
             )
 
             // 시간 선택 (장소 선택 완료 후 표시)
@@ -262,7 +264,9 @@ private fun CreateScreen(
 @Composable
 private fun PlaceSelectionSection(
     selectedPlace: Place?,
-    onNavigateToSelectPlace: () -> Unit
+    meetingPlaceName: String,
+    onNavigateToSelectPlace: () -> Unit,
+    onMeetingPlaceNameChange: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -273,8 +277,9 @@ private fun PlaceSelectionSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // 주소 표시 필드
         OutlinedTextField(
-            value = selectedPlace?.name ?: "",
+            value = selectedPlace?.address ?: "",
             onValueChange = { },
             modifier = Modifier
                 .fillMaxWidth()
@@ -304,6 +309,42 @@ private fun PlaceSelectionSection(
             ),
             shape = RoundedCornerShape(8.dp)
         )
+
+        // 장소 선택 후 모임 장소 이름 입력 필드 표시
+        if (selectedPlace != null) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = meetingPlaceName,
+                onValueChange = { if (it.length <= 30) onMeetingPlaceNameChange(it) },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        text = "모임 장소 이름을 입력해 주세요",
+                        style = AdegoTheme.typography.bodyLarge,
+                        color = AdegoTheme.colors.line500
+                    )
+                },
+                singleLine = true,
+                supportingText = {
+                    Text(
+                        text = "${meetingPlaceName.length}/30",
+                        style = AdegoTheme.typography.bodySmall,
+                        color = AdegoTheme.colors.line500,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.End
+                    )
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AdegoTheme.colors.main500,
+                    unfocusedBorderColor = AdegoTheme.colors.main500,
+                    focusedTextColor = AdegoTheme.colors.onBackground,
+                    unfocusedTextColor = AdegoTheme.colors.onBackground,
+                    cursorColor = AdegoTheme.colors.main500
+                ),
+                shape = RoundedCornerShape(8.dp)
+            )
+        }
     }
 }
 

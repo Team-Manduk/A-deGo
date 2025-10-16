@@ -5,6 +5,7 @@ import com.teammanduk.adego.core.model.Place
 data class CreateUiState(
     val currentStep: CreateStep = CreateStep.PLACE_SELECTION,
     val selectedPlace: Place? = null,
+    val meetingPlaceName: String = "",
     val roomName: String = "",
     val selectedDate: Long? = null,
     val selectedHour: Int? = null,
