@@ -47,6 +47,7 @@ import com.teammanduk.adego.core.designsystem.component.AdegoDatePicker
 import com.teammanduk.adego.core.designsystem.component.AdegoTimePicker
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.model.Place
+import com.teammanduk.adego.core.ui.extension.clickableWithDebounce
 import com.teammanduk.adego.feature.create.model.CreateIntent
 import com.teammanduk.adego.feature.create.model.CreateSideEffect
 import com.teammanduk.adego.feature.create.model.CreateStep
@@ -285,7 +286,7 @@ private fun PlaceSelectionSection(
             onValueChange = { },
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onSelectPlaceClick() },
+                .clickableWithDebounce { onSelectPlaceClick() },
             enabled = false,
             placeholder = {
                 Text(

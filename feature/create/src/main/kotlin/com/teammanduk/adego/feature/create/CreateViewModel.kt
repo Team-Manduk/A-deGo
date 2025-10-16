@@ -3,6 +3,7 @@ package com.teammanduk.adego.feature.create
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.repository.RoomRepository
+import com.teammanduk.adego.core.domain.usecase.ClearSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.model.Place
 import com.teammanduk.adego.feature.create.model.CreateIntent
@@ -27,6 +28,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CreateViewModel @Inject constructor(
     private val getSelectedPlaceUseCase: GetSelectedPlaceUseCase,
+    private val clearSelectedPlaceUseCase: ClearSelectedPlaceUseCase,
     private val roomRepository: RoomRepository
 ) : ViewModel() {
 
@@ -45,6 +47,7 @@ class CreateViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            clearSelectedPlaceUseCase() // 먼저 초기화
             selectedPlaceFromUseCase.collect { place ->
                 place?.let { onIntent(CreateIntent.SelectPlace(it)) }
             }
