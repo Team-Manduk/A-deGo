@@ -35,7 +35,7 @@ internal class MainNavigator(
     }
 
     fun navigateToCreate() {
-        navController.navigateToCreate(navOptions)
+        navController.navigateToCreate()
     }
 
     fun navigateToSelectPlace() {

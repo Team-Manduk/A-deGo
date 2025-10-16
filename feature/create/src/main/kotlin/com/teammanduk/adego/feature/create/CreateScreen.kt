@@ -64,11 +64,6 @@ internal fun CreateRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 화면 진입 시 상태 초기화
-    LaunchedEffect(Unit) {
-        viewModel.resetState()
-    }
-
     // 방 생성 성공 시 Map 화면으로 이동
     LaunchedEffect(uiState.createdRoomInfo) {
         uiState.createdRoomInfo?.let { info ->
