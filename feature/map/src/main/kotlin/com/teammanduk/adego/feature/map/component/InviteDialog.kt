@@ -142,7 +142,7 @@ fun InviteDialog(
                 ) {
                     IconButton(
                         onClick = {
-                            val deepLink = "https://a-dego.web.app/join/$inviteCode"
+                            val deepLink = "https://adego.kr/join/$inviteCode"
                             val message = """
                                 |🗺️ A-dego 모임 초대
                                 |
@@ -186,7 +186,7 @@ fun InviteDialog(
                 ) {
                     IconButton(
                         onClick = {
-                            val deepLink = "https://a-dego.web.app/join/$inviteCode"
+                            val deepLink = "https://adego.kr/join/$inviteCode"
                             val message = """
                                 |🗺️ A-dego 모임 초대
                                 |
