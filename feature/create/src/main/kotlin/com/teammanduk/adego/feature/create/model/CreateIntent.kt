@@ -10,5 +10,8 @@ sealed interface CreateIntent {
     data class SelectTime(val hour: Int, val minute: Int) : CreateIntent
     data class CreateRoom(val userId: String, val userName: String) : CreateIntent
     data object ClearError : CreateIntent
-    data object ClearCreatedRoomInfo : CreateIntent
+
+    // Navigation
+    data object NavigateToSelectPlace : CreateIntent
+    data object NavigateBack : CreateIntent
 }

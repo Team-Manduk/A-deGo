@@ -5,15 +5,17 @@ import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.model.Place
-import com.teammanduk.adego.feature.create.model.CreatedRoomInfo
 import com.teammanduk.adego.feature.create.model.CreateIntent
+import com.teammanduk.adego.feature.create.model.CreateSideEffect
 import com.teammanduk.adego.feature.create.model.CreateStep
 import com.teammanduk.adego.feature.create.model.CreateUiState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -38,6 +40,9 @@ class CreateViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CreateUiState())
     val uiState: StateFlow<CreateUiState> = _uiState.asStateFlow()
 
+    private val _sideEffect = Channel<CreateSideEffect>()
+    val sideEffect = _sideEffect.receiveAsFlow()
+
     init {
         viewModelScope.launch {
             selectedPlaceFromUseCase.collect { place ->
@@ -50,6 +55,18 @@ class CreateViewModel @Inject constructor(
         when (intent) {
             is CreateIntent.CreateRoom -> {
                 createRoom(intent.userId, intent.userName)
+            }
+
+            CreateIntent.NavigateToSelectPlace -> {
+                viewModelScope.launch {
+                    _sideEffect.send(CreateSideEffect.NavigateToSelectPlace)
+                }
+            }
+
+            CreateIntent.NavigateBack -> {
+                viewModelScope.launch {
+                    _sideEffect.send(CreateSideEffect.NavigateBack)
+                }
             }
 
             else -> {
@@ -122,11 +139,9 @@ class CreateViewModel @Inject constructor(
                 state.copy(error = null)
             }
 
-            is CreateIntent.ClearCreatedRoomInfo -> {
-                state.copy(createdRoomInfo = null)
-            }
-
             is CreateIntent.CreateRoom -> state // 이미 onIntent에서 처리됨
+            CreateIntent.NavigateToSelectPlace -> state // SideEffect로 처리
+            CreateIntent.NavigateBack -> state // SideEffect로 처리
         }
     }
 
@@ -178,14 +193,7 @@ class CreateViewModel @Inject constructor(
                 )
 
                 result.onSuccess { roomId ->
-                    _uiState.update {
-                        it.copy(
-                            createdRoomInfo = CreatedRoomInfo(
-                                roomId = roomId,
-                                userId = userId
-                            )
-                        )
-                    }
+                    _sideEffect.send(CreateSideEffect.NavigateToMap(roomId, userId))
                 }.onFailure { exception ->
                     _uiState.update {
                         it.copy(error = exception.message ?: "방 생성에 실패했습니다")

@@ -11,11 +11,5 @@ data class CreateUiState(
     val selectedHour: Int? = null,
     val selectedMinute: Int? = null,
     val isCreating: Boolean = false,
-    val createdRoomInfo: CreatedRoomInfo? = null,
     val error: String? = null
-)
-
-data class CreatedRoomInfo(
-    val roomId: String,
-    val userId: String
 )

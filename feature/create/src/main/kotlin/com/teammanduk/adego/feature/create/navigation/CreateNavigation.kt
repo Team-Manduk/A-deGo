@@ -1,6 +1,5 @@
 package com.teammanduk.adego.feature.create.navigation
 
-import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
@@ -15,24 +14,15 @@ fun NavController.navigateToCreate(
 }
 
 fun NavGraphBuilder.createNavGraph(
-    navController: NavController,
     onNavigateBack: () -> Unit,
     onNavigateToSelectPlace: () -> Unit,
-    onCreateMeeting: (String, String) -> Unit,
+    onNavigateToMap: (String, String) -> Unit,
 ) {
-    composable<Route.Create> { backStackEntry ->
-        val selectedPlace = navController.currentBackStackEntry
-            ?.savedStateHandle
-            ?.getStateFlow("selected_place", "")
-            ?.collectAsState()
-
+    composable<Route.Create> {
         CreateRoute(
             onNavigateBack = onNavigateBack,
             onNavigateToSelectPlace = onNavigateToSelectPlace,
-            onNavigateToMap = { roomId, userId ->
-                onCreateMeeting(roomId, userId)
-            },
-            selectedPlaceFromNav = selectedPlace?.value,
+            onNavigateToMap = onNavigateToMap
         )
     }
 }
