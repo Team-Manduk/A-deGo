@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.maps.model.LatLng
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.model.Place
+import com.teammanduk.adego.core.ui.component.LoadingScreen
 import com.teammanduk.adego.core.ui.permission.PermissionRequester
 import com.teammanduk.adego.core.ui.permission.PermissionType
 import com.teammanduk.adego.feature.place.component.PlaceInfoCard
@@ -60,33 +61,65 @@ fun SelectPlaceRoute(
     val searchResult by viewModel.currentSearchResult.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isUserDragging by viewModel.isUserDragging.collectAsStateWithLifecycle()
+    val initialPosition by viewModel.initialPosition.collectAsStateWithLifecycle()
 
     PermissionRequester(
         permissionTypes = listOf(PermissionType.Location)
     ) {
-        if (showTopBar) {
-            Scaffold(
-                topBar = {
-                    TopAppBar(
-                        title = {
-                            Text(
-                                text = title,
-                                style = AdegoTheme.typography.titleLarge
-                            )
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = onBackClick) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "뒤로가기"
+        when {
+            initialPosition == null -> {
+                LoadingScreen(text = "현재 위치를 가져오는 중...")
+            }
+
+            showTopBar -> {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    text = title,
+                                    style = AdegoTheme.typography.titleLarge
                                 )
+                            },
+                            navigationIcon = {
+                                IconButton(onClick = onBackClick) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "뒤로가기"
+                                    )
+                                }
                             }
-                        }
+                        )
+                    }
+                ) { paddingValues ->
+                    SelectPlaceScreen(
+                        searchResult = searchResult,
+                        initialPosition = initialPosition,
+                        isLoading = isLoading,
+                        isUserDragging = isUserDragging,
+                        buttonText = buttonText,
+                        onCameraMove = {
+                            viewModel.onCameraMove()
+                        },
+                        onCameraIdle = { latLng ->
+                            viewModel.onCameraIdle()
+                            viewModel.onCameraPositionChanged(latLng)
+                        },
+                        onPlaceSelected = {
+                            viewModel.confirmSelection()
+                            searchResult?.let { onPlaceSelected(it) }
+                        },
+                        onSearchClick = onSearchClick,
+                        modifier = Modifier.padding(paddingValues)
                     )
                 }
-            ) { paddingValues ->
+            }
+
+            else -> {
+                // TopBar 없이 사용 (다이얼로그 등에서)
                 SelectPlaceScreen(
                     searchResult = searchResult,
+                    initialPosition = initialPosition,
                     isLoading = isLoading,
                     isUserDragging = isUserDragging,
                     buttonText = buttonText,
@@ -101,30 +134,9 @@ fun SelectPlaceRoute(
                         viewModel.confirmSelection()
                         searchResult?.let { onPlaceSelected(it) }
                     },
-                    onSearchClick = onSearchClick,
-                    modifier = Modifier.padding(paddingValues)
+                    onSearchClick = onSearchClick
                 )
             }
-        } else {
-            // TopBar 없이 사용 (다이얼로그 등에서)
-            SelectPlaceScreen(
-                searchResult = searchResult,
-                isLoading = isLoading,
-                isUserDragging = isUserDragging,
-                buttonText = buttonText,
-                onCameraMove = {
-                    viewModel.onCameraMove()
-                },
-                onCameraIdle = { latLng ->
-                    viewModel.onCameraIdle()
-                    viewModel.onCameraPositionChanged(latLng)
-                },
-                onPlaceSelected = {
-                    viewModel.confirmSelection()
-                    searchResult?.let { onPlaceSelected(it) }
-                },
-                onSearchClick = onSearchClick
-            )
         }
     }
 }
@@ -132,6 +144,7 @@ fun SelectPlaceRoute(
 @Composable
 private fun SelectPlaceScreen(
     searchResult: Place?,
+    initialPosition: LatLng?,
     isLoading: Boolean,
     isUserDragging: Boolean,
     buttonText: String = "장소 선택하기",
@@ -141,12 +154,14 @@ private fun SelectPlaceScreen(
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // searchResult에서 위치 정보를 가져오거나 기본값 사용
-    val selectedPosition = remember(searchResult) {
+    // searchResult가 있으면 그 위치를, 없으면 initialPosition을, 둘 다 없으면 기본값 사용
+    val selectedPosition = remember(searchResult, initialPosition) {
         if (searchResult != null) {
             LatLng(searchResult.latitude, searchResult.longitude)
+        } else if (initialPosition != null) {
+            initialPosition
         } else {
-            LatLng(35.1979, 129.0758) // 기본 위치
+            LatLng(35.1979, 129.0758) // 기본 위치 (백업)
         }
     }
 
@@ -169,7 +184,7 @@ private fun SelectPlaceScreen(
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(48.dp)
-                .offset(y = (-24).dp), // 마커의 하단이 중심점이 되도록 오프셋
+                .offset(y = (-84).dp), // 마커의 하단이 중심점이 되도록 오프셋 + contentPadding 보정 (24 + 60)
             tint = AdegoTheme.colors.main500
         )
 

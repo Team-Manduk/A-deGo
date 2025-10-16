@@ -1,5 +1,6 @@
 package com.teammanduk.adego.feature.place.component
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -8,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
@@ -25,7 +27,7 @@ fun SelectPlaceMap(
     modifier: Modifier = Modifier
 ) {
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(selectedPosition, 15f)
+        position = CameraPosition.fromLatLngZoom(selectedPosition, 17f)
     }
 
     // 이전 selectedPosition을 기억하여 실제로 변경되었을 때만 카메라 이동
@@ -39,11 +41,13 @@ fun SelectPlaceMap(
         // 위치가 실제로 변경되었을 때 카메라 이동 (previousPosition이 null이거나 다를 때)
         if (previousPosition == null || selectedPosition != previousPosition) {
             isAutoAnimating = true
+            // 첫 번째 위치 설정일 때는 줌을 17로 설정, 이후에는 현재 줌 유지
+            val targetZoom = if (previousPosition == null) 17f else cameraPositionState.position.zoom
             cameraPositionState.animate(
                 CameraUpdateFactory.newCameraPosition(
                     CameraPosition(
                         selectedPosition, // 타겟 위치
-                        cameraPositionState.position.zoom, // 현재 줌 유지
+                        targetZoom, // 첫 진입시 17, 이후 현재 줌 유지
                         cameraPositionState.position.tilt, // 현재 기울기 유지
                         cameraPositionState.position.bearing // 현재 회전 유지
                     )
@@ -78,11 +82,15 @@ fun SelectPlaceMap(
         modifier = modifier,
         cameraPositionState = cameraPositionState,
         properties = MapProperties(
-            isMyLocationEnabled = false
+            isMyLocationEnabled = true
         ),
         uiSettings = MapUiSettings(
             zoomControlsEnabled = true,
-            myLocationButtonEnabled = false
+            myLocationButtonEnabled = true
+        ),
+        contentPadding = PaddingValues(
+            top = 80.dp,
+            bottom = 200.dp
         )
     ) {
         // 마커 제거 - 화면 중앙에 고정된 아이콘 사용
