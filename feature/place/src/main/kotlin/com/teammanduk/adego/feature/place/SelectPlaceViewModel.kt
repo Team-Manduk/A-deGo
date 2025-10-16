@@ -3,6 +3,7 @@ package com.teammanduk.adego.feature.place
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.maps.model.LatLng
+import com.teammanduk.adego.core.domain.usecase.GetCurrentLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchPlaceByCoordinatesUseCase
 import com.teammanduk.adego.core.domain.usecase.SetSelectedPlaceUseCase
@@ -23,7 +24,8 @@ import javax.inject.Inject
 class SelectPlaceViewModel @Inject constructor(
     private val searchPlaceByCoordinatesUseCase: SearchPlaceByCoordinatesUseCase,
     private val getSelectedPlaceUseCase: GetSelectedPlaceUseCase,
-    private val setSelectedPlaceUseCase: SetSelectedPlaceUseCase
+    private val setSelectedPlaceUseCase: SetSelectedPlaceUseCase,
+    private val getCurrentLocationUseCase: GetCurrentLocationUseCase
 ) : ViewModel() {
 
     // Repository의 검색 결과를 구독
@@ -34,6 +36,10 @@ class SelectPlaceViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
         )
+
+    // 초기 위치 (현재 위치 또는 기본값)
+    private val _initialPosition = MutableStateFlow<LatLng?>(null)
+    val initialPosition: StateFlow<LatLng?> = _initialPosition
 
     // 로딩 상태 관리
     private val _isLoading = MutableStateFlow(false)
@@ -56,6 +62,17 @@ class SelectPlaceViewModel @Inject constructor(
     private val cameraPositionFlow = MutableSharedFlow<LatLng>(replay = 0)
 
     init {
+        // 초기 위치 가져오기 (현재 위치)
+        viewModelScope.launch {
+            val currentLocation = getCurrentLocationUseCase()
+            if (currentLocation != null) {
+                _initialPosition.value = LatLng(currentLocation.latitude, currentLocation.longitude)
+            } else {
+                // 현재 위치를 가져올 수 없으면 기본 위치 사용 (부산 만덕동)
+                _initialPosition.value = LatLng(35.1979, 129.0758)
+            }
+        }
+
         // Debouncing: 카메라가 멈춘 후 500ms 대기 후 지오코딩 실행
         viewModelScope.launch {
             cameraPositionFlow
