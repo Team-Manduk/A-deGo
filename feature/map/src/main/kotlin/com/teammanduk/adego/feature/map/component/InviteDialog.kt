@@ -142,7 +142,7 @@ fun InviteDialog(
                 ) {
                     IconButton(
                         onClick = {
-                            val deepLink = "https://adego.kr/join/$inviteCode"
+                            val deepLink = "https://a-dego.web.app/join/$inviteCode"
                             val message = """
                                 |🗺️ A-dego 모임 초대
                                 |
@@ -150,7 +150,7 @@ fun InviteDialog(
                                 |목적지: $destinationName
                                 |시간: $meetingTime
                                 |
-                                |앱으로 바로 참가하기: $deepLink
+                                |참가하기: $deepLink
                             """.trimMargin()
 
                             val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
@@ -186,7 +186,7 @@ fun InviteDialog(
                 ) {
                     IconButton(
                         onClick = {
-                            val deepLink = "https://adego.kr/join/$inviteCode"
+                            val deepLink = "https://a-dego.web.app/join/$inviteCode"
                             val message = """
                                 |🗺️ A-dego 모임 초대
                                 |
@@ -194,7 +194,7 @@ fun InviteDialog(
                                 |목적지: $destinationName
                                 |시간: $meetingTime
                                 |
-                                |앱으로 바로 참가하기: $deepLink
+                                |참가하기: $deepLink
                             """.trimMargin()
 
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {

@@ -46,9 +46,9 @@ class MainActivity : ComponentActivity() {
             data.scheme == "adego" && data.host == "join" -> {
                 data.pathSegments.firstOrNull()
             }
-            // http(s)://adego.kr/join/{roomId} 형식 처리
+            // http(s)://a-dego.web.app/join/{roomId} 또는 adego.kr/join/{roomId} 형식 처리
             (data.scheme == "http" || data.scheme == "https") &&
-            data.host == "adego.kr" &&
+            (data.host == "a-dego.web.app" || data.host == "adego.kr") &&
             data.pathSegments.firstOrNull() == "join" -> {
                 data.pathSegments.getOrNull(1)
             }
