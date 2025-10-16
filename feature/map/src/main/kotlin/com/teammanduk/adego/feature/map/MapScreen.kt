@@ -94,7 +94,8 @@ private fun MapRouteContent(
                 userName = uiState.userName,
                 onUserNameChange = { viewModel.onAction(MapIntent.UpdateUserName(it)) },
                 onConfirm = { viewModel.onAction(MapIntent.ConfirmUserName) },
-                error = uiState.error
+                error = uiState.error,
+                onGenerateRandomName = { viewModel.onAction(MapIntent.GenerateRandomName) }
             )
         }
 
