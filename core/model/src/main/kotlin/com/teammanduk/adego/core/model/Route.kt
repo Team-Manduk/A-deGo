@@ -9,8 +9,7 @@ data class Route(
     val totalFare: Int, // 총 요금 (원)
     val transferCount: Int, // 환승 횟수
     val pathType: Int, // 경로 타입 (1: 지하철, 2: 버스, 3: 지하철+버스)
-    val subPaths: List<SubPath> = emptyList(), // 세부 경로 정보
-    val mapObj: String? = null // ODsay API의 mapObj (세부 경로 로드용)
+    val subPaths: List<SubPath> = emptyList() // 세부 경로 정보
 )
 
 /**

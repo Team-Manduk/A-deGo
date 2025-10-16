@@ -4,12 +4,6 @@ import android.content.Context
 import android.location.Geocoder
 import android.os.Build
 import android.util.Log
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.libraries.places.api.Places
-import com.google.android.libraries.places.api.model.Place as GooglePlace
-import com.google.android.libraries.places.api.net.FindCurrentPlaceRequest
-import com.google.android.libraries.places.api.net.PlacesClient
-import com.teammanduk.adego.core.data.model.TmapAddressInfo
 import com.teammanduk.adego.core.data.model.TmapReverseGeocodingResponse
 import com.teammanduk.adego.core.domain.repository.PlaceRepository
 import com.teammanduk.adego.core.model.Place
@@ -24,18 +18,13 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -49,75 +38,62 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Places API (New) REST API Request/Response Models
+// TMAP POI API Response Models
 @Serializable
-private data class TextSearchRequest(
-    val textQuery: String,
-    val languageCode: String = "ko"
+private data class TmapPoiResponse(
+    val searchPoiInfo: TmapSearchPoiInfo? = null
 )
 
 @Serializable
-private data class NearbySearchRequest(
-    val includedTypes: List<String>,
-    val maxResultCount: Int,
-    val locationRestriction: LocationRestriction
+private data class TmapSearchPoiInfo(
+    val totalCount: String? = null,
+    val count: String? = null,
+    val page: String? = null,
+    val pois: TmapPois? = null
 )
 
 @Serializable
-private data class LocationRestriction(
-    val circle: Circle
+private data class TmapPois(
+    val poi: List<TmapPoi> = emptyList()
 )
 
 @Serializable
-private data class Circle(
-    val center: Center,
-    val radius: Double
-)
-
-@Serializable
-private data class Center(
-    val latitude: Double,
-    val longitude: Double
-)
-
-@Serializable
-private data class TextSearchResponse(
-    val places: List<PlaceResult> = emptyList()
-)
-
-@Serializable
-private data class NearbySearchResponse(
-    val places: List<PlaceResult> = emptyList()
-)
-
-@Serializable
-private data class PlaceResult(
+private data class TmapPoi(
     val id: String? = null,
-    val displayName: DisplayName? = null,
-    val formattedAddress: String? = null,
-    val location: Location? = null
-)
-
-@Serializable
-private data class DisplayName(
-    val text: String? = null,
-    val languageCode: String? = null
-)
-
-@Serializable
-private data class Location(
-    val latitude: Double,
-    val longitude: Double
+    val name: String? = null,
+    val telNo: String? = null,
+    val frontLat: String? = null, // 위도
+    val frontLon: String? = null, // 경도
+    val noorLat: String? = null,
+    val noorLon: String? = null,
+    val upperAddrName: String? = null,
+    val middleAddrName: String? = null,
+    val lowerAddrName: String? = null,
+    val detailAddrName: String? = null,
+    val mlClass: String? = null,
+    val firstNo: String? = null,
+    val secondNo: String? = null,
+    val roadName: String? = null,
+    val firstBuildNo: String? = null,
+    val secondBuildNo: String? = null,
+    val radius: String? = null,
+    val bizName: String? = null,
+    val upperBizName: String? = null,
+    val middleBizName: String? = null,
+    val lowerBizName: String? = null,
+    val detailBizName: String? = null,
+    val rpFlag: String? = null,
+    val parkFlag: String? = null,
+    val detailInfoFlag: String? = null,
+    val navSeq: String? = null,
+    val analyticGoods: String? = null,
+    val roadNameYn: String? = null
 )
 
 @Singleton
 class PlaceRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : PlaceRepository {
-
-    private val placesClient: PlacesClient by lazy {
-        Places.createClient(context)
-    }
 
     private val httpClient = HttpClient(OkHttp) {
         install(ContentNegotiation) {
@@ -163,17 +139,17 @@ class PlaceRepositoryImpl @Inject constructor(
                 return tmapPlace
             }
 
-            // 2단계: Google Places API로 주변 장소 검색
-            Log.d("PlaceRepository", "TMAP 실패 또는 결과 불충분, Google Places API 시도")
-            val nearbyPlace = findNearbyPlaceUsingPlacesApi(latitude, longitude)
+            // 2단계: TMAP POI 주변 검색 시도
+            Log.d("PlaceRepository", "TMAP 실패 또는 결과 불충분, TMAP POI API 시도")
+            val nearbyPlace = findNearbyPlaceUsingTmapPoi(latitude, longitude)
             if (nearbyPlace != null) {
-                Log.d("PlaceRepository", "Google Places API 성공: ${nearbyPlace.name}")
+                Log.d("PlaceRepository", "TMAP POI API 성공: ${nearbyPlace.name}")
                 _currentSearchResult.emit(nearbyPlace)
                 return nearbyPlace
             }
 
             // 3단계: Android Geocoder로 폴백
-            Log.d("PlaceRepository", "Google Places API 실패, Android Geocoder 시도")
+            Log.d("PlaceRepository", "TMAP POI API 실패, Android Geocoder 시도")
             val geocodedPlace = searchUsingGeocoder(latitude, longitude)
             Log.d("PlaceRepository", "Android Geocoder 결과: ${geocodedPlace.name}")
             _currentSearchResult.emit(geocodedPlace)
@@ -187,82 +163,77 @@ class PlaceRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Places API를 사용하여 좌표 근처의 장소를 검색합니다.
+     * TMAP POI API를 사용하여 좌표 근처의 장소를 검색합니다.
      */
-    private suspend fun findNearbyPlaceUsingPlacesApi(
+    private suspend fun findNearbyPlaceUsingTmapPoi(
         latitude: Double,
         longitude: Double
     ): Place? = withContext(Dispatchers.IO) {
         return@withContext try {
-            Log.d("PlaceRepository", "Places API REST 검색 시작: lat=$latitude, lng=$longitude")
+            Log.d("PlaceRepository", "TMAP POI 주변 검색 시작: lat=$latitude, lng=$longitude")
 
             // API 키 가져오기
-            val apiKey = getApiKey()
-            if (apiKey.isEmpty()) {
-                Log.e("PlaceRepository", "API 키를 찾을 수 없습니다")
+            val apiKey = getTmapApiKey()
+            if (apiKey.isEmpty() || apiKey == "YOUR_TMAP_API_KEY_HERE") {
+                Log.e("PlaceRepository", "TMAP API 키를 찾을 수 없습니다")
                 return@withContext null
             }
 
-            // Request Body 생성
-            // Places API (New)에서 지원하는 타입만 사용
-            // https://developers.google.com/maps/documentation/places/web-service/place-types
-            val requestBody = NearbySearchRequest(
-                includedTypes = listOf("restaurant", "cafe", "store", "shopping_mall", "lodging"),
-                maxResultCount = 10,
-                locationRestriction = LocationRestriction(
-                    circle = Circle(
-                        center = Center(latitude, longitude),
-                        radius = 100.0
-                    )
-                )
-            )
-
-            // Ktor를 사용한 API 호출
-            val response = httpClient.post("https://places.googleapis.com/v1/places:searchNearby") {
-                contentType(ContentType.Application.Json)
-                header("X-Goog-Api-Key", apiKey)
-                header("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location")
-                header("Accept-Language", "ko")
-                setBody(requestBody)
+            // TMAP POI 주변 검색 API 호출
+            val response = httpClient.get("https://apis.openapi.sk.com/tmap/pois/search/around") {
+                header("appKey", apiKey)
+                parameter("version", "1")
+                parameter("centerLon", longitude.toString())
+                parameter("centerLat", latitude.toString())
+                parameter("radius", "100") // 100m 반경
+                parameter("searchtypCd", "A") // 전체 검색
+                parameter("reqCoordType", "WGS84GEO")
+                parameter("resCoordType", "WGS84GEO")
+                parameter("count", "10")
             }
 
             val responseBody = response.bodyAsText()
-            Log.d("PlaceRepository", "Places API 응답 코드: ${response.status.value}")
-            Log.d("PlaceRepository", "Places API 응답: $responseBody")
+            Log.d("PlaceRepository", "TMAP POI API 응답 코드: ${response.status.value}")
+            Log.d("PlaceRepository", "TMAP POI API 응답: $responseBody")
 
             if (response.status.value !in 200..299) {
-                Log.e("PlaceRepository", "Places API 요청 실패: ${response.status.value}")
+                Log.e("PlaceRepository", "TMAP POI API 요청 실패: ${response.status.value}")
                 return@withContext null
             }
 
             // 응답 파싱
-            val searchResponse = response.body<NearbySearchResponse>()
-            Log.d("PlaceRepository", "Places API: ${searchResponse.places.size}개 장소 발견")
+            val poiResponse = response.body<TmapPoiResponse>()
+            val pois = poiResponse.searchPoiInfo?.pois?.poi ?: emptyList()
+
+            Log.d("PlaceRepository", "TMAP POI API: ${pois.size}개 장소 발견")
 
             // 모든 장소 정보 로그 출력
-            searchResponse.places.forEachIndexed { index, place ->
+            pois.forEachIndexed { index, poi ->
                 Log.d("PlaceRepository", "장소 #$index:")
-                Log.d("PlaceRepository", "  - ID: ${place.id}")
-                Log.d("PlaceRepository", "  - 이름: ${place.displayName?.text}")
-                Log.d("PlaceRepository", "  - 주소: ${place.formattedAddress}")
-                Log.d("PlaceRepository", "  - 좌표: ${place.location}")
+                Log.d("PlaceRepository", "  - 이름: ${poi.name}")
+                Log.d("PlaceRepository", "  - 주소: ${poi.upperAddrName} ${poi.middleAddrName} ${poi.lowerAddrName}")
+                Log.d("PlaceRepository", "  - 좌표: (${poi.frontLat}, ${poi.frontLon})")
             }
 
             // 가장 가까운 장소 찾기
-            val nearestPlace = searchResponse.places
-                .filter { it.location != null }
-                .minByOrNull { place ->
-                    val distance = calculateDistance(
-                        LatLng(latitude, longitude),
-                        LatLng(place.location!!.latitude, place.location.longitude)
-                    )
-                    Log.d("PlaceRepository", "${place.displayName?.text}까지 거리: ${distance}m")
+            val nearestPoi = pois
+                .filter { it.frontLat != null && it.frontLon != null }
+                .minByOrNull { poi ->
+                    val poiLat = poi.frontLat!!.toDoubleOrNull() ?: return@minByOrNull Double.MAX_VALUE
+                    val poiLon = poi.frontLon!!.toDoubleOrNull() ?: return@minByOrNull Double.MAX_VALUE
+                    val distance = calculateDistance(latitude, longitude, poiLat, poiLon)
+                    Log.d("PlaceRepository", "${poi.name}까지 거리: ${distance}m")
                     distance
                 }
 
-            nearestPlace?.let { placeResult ->
-                val placeName = placeResult.displayName?.text ?: "알 수 없는 장소"
-                val placeAddress = placeResult.formattedAddress ?: "주소 정보 없음"
+            nearestPoi?.let { poi ->
+                val placeName = poi.name ?: "알 수 없는 장소"
+                val placeAddress = buildString {
+                    poi.upperAddrName?.let { append(it).append(" ") }
+                    poi.middleAddrName?.let { append(it).append(" ") }
+                    poi.lowerAddrName?.let { append(it).append(" ") }
+                    poi.detailAddrName?.let { append(it) }
+                }.trim().ifEmpty { "주소 정보 없음" }
 
                 Log.d("PlaceRepository", "선택된 장소: $placeName")
                 Log.d("PlaceRepository", "주소: $placeAddress")
@@ -275,24 +246,12 @@ class PlaceRepositoryImpl @Inject constructor(
                 )
             }.also {
                 if (it == null) {
-                    Log.w("PlaceRepository", "Places API에서 가장 가까운 장소를 찾지 못했습니다")
+                    Log.w("PlaceRepository", "TMAP POI API에서 가장 가까운 장소를 찾지 못했습니다")
                 }
             }
         } catch (e: Exception) {
-            Log.e("PlaceRepository", "Places API search failed", e)
+            Log.e("PlaceRepository", "TMAP POI search failed", e)
             null
-        }
-    }
-
-    private fun getApiKey(): String {
-        return try {
-            // BuildConfig에서 API 키 가져오기
-            val buildConfigClass = Class.forName("com.teammanduk.adego.BuildConfig")
-            val field = buildConfigClass.getDeclaredField("MAPS_API_KEY")
-            field.get(null) as? String ?: ""
-        } catch (e: Exception) {
-            Log.e("PlaceRepository", "API 키를 가져올 수 없습니다", e)
-            ""
         }
     }
 
@@ -465,13 +424,13 @@ class PlaceRepositoryImpl @Inject constructor(
     /**
      * 두 좌표 사이의 거리를 미터 단위로 계산합니다. (Haversine formula)
      */
-    private fun calculateDistance(from: LatLng, to: LatLng): Double {
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val earthRadius = 6371000.0 // 지구 반지름 (미터)
 
-        val lat1Rad = Math.toRadians(from.latitude)
-        val lat2Rad = Math.toRadians(to.latitude)
-        val deltaLat = Math.toRadians(to.latitude - from.latitude)
-        val deltaLng = Math.toRadians(to.longitude - from.longitude)
+        val lat1Rad = Math.toRadians(lat1)
+        val lat2Rad = Math.toRadians(lat2)
+        val deltaLat = Math.toRadians(lat2 - lat1)
+        val deltaLng = Math.toRadians(lon2 - lon1)
 
         val a = sin(deltaLat / 2).pow(2) +
                 cos(lat1Rad) * cos(lat2Rad) *
@@ -492,7 +451,7 @@ class PlaceRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Places API Text Search를 사용하여 텍스트 쿼리로 장소를 검색합니다.
+     * TMAP POI API를 사용하여 텍스트 쿼리로 장소를 검색합니다.
      */
     override suspend fun searchPlacesByText(query: String): List<Place> = withContext(Dispatchers.IO) {
         return@withContext try {
@@ -501,64 +460,68 @@ class PlaceRepositoryImpl @Inject constructor(
                 return@withContext emptyList()
             }
 
-            Log.d("PlaceRepository", "Text Search 시작: query=$query")
+            Log.d("PlaceRepository", "TMAP POI 통합 검색 시작: query=$query")
 
             // API 키 가져오기
-            val apiKey = getApiKey()
-            if (apiKey.isEmpty()) {
-                Log.e("PlaceRepository", "API 키를 찾을 수 없습니다")
+            val apiKey = getTmapApiKey()
+            if (apiKey.isEmpty() || apiKey == "YOUR_TMAP_API_KEY_HERE") {
+                Log.e("PlaceRepository", "TMAP API 키를 찾을 수 없습니다")
                 return@withContext emptyList()
             }
 
-            // Request Body 생성
-            val requestBody = TextSearchRequest(
-                textQuery = query,
-                languageCode = "ko"
-            )
-
-            // Ktor를 사용한 API 호출
-            val response = httpClient.post("https://places.googleapis.com/v1/places:searchText") {
-                contentType(ContentType.Application.Json)
-                header("X-Goog-Api-Key", apiKey)
-                header("X-Goog-FieldMask", "places.id,places.displayName,places.formattedAddress,places.location")
-                header("Accept-Language", "ko")
-                setBody(requestBody)
+            // TMAP POI 통합 검색 API 호출
+            val response = httpClient.get("https://apis.openapi.sk.com/tmap/pois") {
+                header("appKey", apiKey)
+                parameter("version", "1")
+                parameter("searchKeyword", query)
+                parameter("resCoordType", "WGS84GEO")
+                parameter("reqCoordType", "WGS84GEO")
+                parameter("count", "20")
             }
 
             val responseBody = response.bodyAsText()
-            Log.d("PlaceRepository", "Text Search 응답 코드: ${response.status.value}")
-            Log.d("PlaceRepository", "Text Search 응답: $responseBody")
+            Log.d("PlaceRepository", "TMAP POI 통합 검색 응답 코드: ${response.status.value}")
+            Log.d("PlaceRepository", "TMAP POI 통합 검색 응답: $responseBody")
 
             if (response.status.value !in 200..299) {
-                Log.e("PlaceRepository", "Text Search 요청 실패: ${response.status.value}")
+                Log.e("PlaceRepository", "TMAP POI 통합 검색 요청 실패: ${response.status.value}")
                 return@withContext emptyList()
             }
 
             // 응답 파싱
-            val searchResponse = response.body<TextSearchResponse>()
-            Log.d("PlaceRepository", "Text Search: ${searchResponse.places.size}개 장소 발견")
+            val poiResponse = response.body<TmapPoiResponse>()
+            val pois = poiResponse.searchPoiInfo?.pois?.poi ?: emptyList()
+
+            Log.d("PlaceRepository", "TMAP POI 통합 검색: ${pois.size}개 장소 발견")
 
             // 장소 목록 변환
-            searchResponse.places.mapNotNull { placeResult ->
-                val name = placeResult.displayName?.text
-                val address = placeResult.formattedAddress
-                val location = placeResult.location
+            pois.mapNotNull { poi ->
+                val name = poi.name
+                val lat = poi.frontLat?.toDoubleOrNull()
+                val lon = poi.frontLon?.toDoubleOrNull()
 
-                if (name != null && address != null && location != null) {
+                val address = buildString {
+                    poi.upperAddrName?.let { append(it).append(" ") }
+                    poi.middleAddrName?.let { append(it).append(" ") }
+                    poi.lowerAddrName?.let { append(it).append(" ") }
+                    poi.detailAddrName?.let { append(it) }
+                }.trim().ifEmpty { "주소 정보 없음" }
+
+                if (name != null && lat != null && lon != null) {
                     Log.d("PlaceRepository", "장소 발견: $name at ($address)")
                     Place(
                         name = name,
                         address = address,
-                        latitude = location.latitude,
-                        longitude = location.longitude
+                        latitude = lat,
+                        longitude = lon
                     )
                 } else {
-                    Log.w("PlaceRepository", "불완전한 장소 정보: name=$name, address=$address, location=$location")
+                    Log.w("PlaceRepository", "불완전한 장소 정보: name=$name, lat=$lat, lon=$lon")
                     null
                 }
             }
         } catch (e: Exception) {
-            Log.e("PlaceRepository", "Text Search failed", e)
+            Log.e("PlaceRepository", "TMAP POI Text Search failed", e)
             emptyList()
         }
     }

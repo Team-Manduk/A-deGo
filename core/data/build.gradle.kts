@@ -10,9 +10,6 @@ setNamespace("core.data")
 dependencies {
     implementation(projects.core.dataApi)
 
-    // Google Places API
-    implementation(libs.play.services.places)
-
     // Network - Ktor
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.client.okhttp)

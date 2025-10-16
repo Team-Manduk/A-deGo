@@ -33,10 +33,6 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
 
-        // ODsay API Key
-        val odsayApiKey = secretsProperties.getProperty("ODSAY_API_KEY", "")
-        buildConfigField("String", "ODSAY_API_KEY", "\"$odsayApiKey\"")
-
         // TMAP API Key
         val tmapApiKey = secretsProperties.getProperty("TMAP_API_KEY", "")
         buildConfigField("String", "TMAP_API_KEY", "\"$tmapApiKey\"")
@@ -59,7 +55,4 @@ android {
 
 dependencies {
     implementation(projects.feature.main)
-
-    // Google Places API
-    implementation(libs.play.services.places)
 }

@@ -221,69 +221,119 @@ private fun MapScreen(
                 }
             }
 
-            // 선택한 경로 그리기
+            // 선택한 경로 그리기 (TMAP Transit API 방식)
+            Log.d("MapScreen", "경로 그리기 체크 - selectedRouteIndex: ${uiState.selectedRouteIndex}, searchedRoutes size: ${uiState.searchedRoutes.size}")
             if (uiState.selectedRouteIndex != null) {
                 val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
-                selectedRoute?.subPaths?.forEachIndexed { index, subPath ->
-                    val points = mutableListOf<LatLng>()
-                    val graphicData = subPath.graphicData
+                Log.d("MapScreen", "selectedRoute: ${if (selectedRoute != null) "존재 (subPaths: ${selectedRoute.subPaths.size})" else "null"}")
 
-                    Log.d("MapScreen", "SubPath[$index] - trafficType: ${subPath.trafficType}, graphicData size: ${graphicData?.size ?: 0}")
+                selectedRoute?.let { route ->
+                    Log.d("MapScreen", "경로 그리기 시작 - subPaths: ${route.subPaths.size}개")
 
-                    // 그래픽 데이터가 있으면 사용 (실제 경로)
-                    if (!graphicData.isNullOrEmpty()) {
-                        Log.d("MapScreen", "SubPath[$index] - 그래픽 데이터 사용 (${graphicData.size}개 좌표)")
-                        graphicData.forEach { coord ->
-                            points.add(LatLng(coord.latitude, coord.longitude))
-                        }
-                    } else {
-                        Log.d("MapScreen", "SubPath[$index] - 기존 방식 사용 (정류장 간 직선)")
-                        // 그래픽 데이터가 없으면 기존 방식 사용
-                        var startLat = subPath.startLatitude
-                        var startLng = subPath.startLongitude
-                        var endLat = subPath.endLatitude
-                        var endLng = subPath.endLongitude
+                    // 모든 SubPath를 미리 처리하여 Polyline 데이터 생성 (remember로 메모이제이션)
+                    val polylineDataList = remember(route) {
+                        val list = mutableListOf<PolylineData>()
+                        var lastPoint: LatLng? = null
 
-                        // 좌표가 null인 경우 (주로 도보 구간) 이전/다음 구간의 좌표 사용
-                        if (startLat == null || startLng == null) {
-                            // 이전 구간의 끝점을 시작점으로
-                            val prevSubPath = selectedRoute.subPaths.getOrNull(index - 1)
-                            startLat = prevSubPath?.endLatitude
-                            startLng = prevSubPath?.endLongitude
-                        }
-                        if (endLat == null || endLng == null) {
-                            // 다음 구간의 시작점을 끝점으로
-                            val nextSubPath = selectedRoute.subPaths.getOrNull(index + 1)
-                            endLat = nextSubPath?.startLatitude
-                            endLng = nextSubPath?.startLongitude
-                        }
+                        route.subPaths.forEachIndexed { index, subPath ->
+                            val points = mutableListOf<LatLng>()
+                            val graphicData = subPath.graphicData
 
-                        if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                            points.add(LatLng(startLat, startLng))
+                            Log.d("MapScreen", "SubPath[$index] 처리 - trafficType: ${subPath.trafficType}, graphicData: ${graphicData?.size ?: 0}개")
 
-                            // 경유 정류장이 있으면 추가
-                            subPath.passStations?.forEach { station ->
-                                points.add(LatLng(station.latitude, station.longitude))
+                            // TMAP graphicData 사용 (실제 경로)
+                            if (!graphicData.isNullOrEmpty()) {
+                                // 이전 SubPath와 연결이 끊긴 경우 연결선 추가
+                                if (lastPoint != null) {
+                                    val firstPoint = LatLng(graphicData.first().latitude, graphicData.first().longitude)
+                                    val distance = calculateDistance(lastPoint!!, firstPoint)
+
+                                    // 50미터 이상 떨어져 있으면 연결선 그리기 (반투명 회색)
+                                    if (distance > 50) {
+                                        list.add(
+                                            PolylineData(
+                                                points = listOf(lastPoint!!, firstPoint),
+                                                color = androidx.compose.ui.graphics.Color.Gray.copy(alpha = 0.4f),
+                                                width = 4f,
+                                                key = "connector_$index"
+                                            )
+                                        )
+                                    }
+                                }
+
+                                // graphicData의 모든 좌표를 points에 추가
+                                graphicData.forEach { coord ->
+                                    points.add(LatLng(coord.latitude, coord.longitude))
+                                }
+
+                                lastPoint = points.lastOrNull()
+                            } else {
+                                // graphicData가 없는 경우: 시작-끝 직선으로 대체
+                                val startLat = subPath.startLatitude
+                                val startLng = subPath.startLongitude
+                                val endLat = subPath.endLatitude
+                                val endLng = subPath.endLongitude
+
+                                if (startLat != null && startLng != null && endLat != null && endLng != null) {
+                                    val startPoint = LatLng(startLat, startLng)
+                                    val endPoint = LatLng(endLat, endLng)
+
+                                    // 이전 SubPath와 연결
+                                    if (lastPoint != null && lastPoint != startPoint) {
+                                        points.add(lastPoint!!)
+                                    }
+
+                                    points.add(startPoint)
+                                    points.add(endPoint)
+                                    lastPoint = endPoint
+                                }
                             }
 
-                            points.add(LatLng(endLat, endLng))
+                            // 포인트가 있으면 Polyline 데이터 추가
+                            if (points.size >= 2) {
+                                // 교통수단에 따라 다른 색상과 두께 사용
+                                val lineColor = when (subPath.trafficType) {
+                                    com.teammanduk.adego.core.model.TrafficType.SUBWAY -> androidx.compose.ui.graphics.Color(0xFF0052A4)
+                                    com.teammanduk.adego.core.model.TrafficType.BUS -> androidx.compose.ui.graphics.Color(0xFF53B332)
+                                    com.teammanduk.adego.core.model.TrafficType.WALK -> androidx.compose.ui.graphics.Color(0xFF808080)
+                                }
+
+                                val lineWidth = when (subPath.trafficType) {
+                                    com.teammanduk.adego.core.model.TrafficType.SUBWAY -> 12f
+                                    com.teammanduk.adego.core.model.TrafficType.BUS -> 10f
+                                    com.teammanduk.adego.core.model.TrafficType.WALK -> 6f
+                                }
+
+                                Log.d("MapScreen", "SubPath[$index] Polyline 데이터 생성 - points: ${points.size}개, color: $lineColor")
+                                if (index == 0 && points.isNotEmpty()) {
+                                    Log.d("MapScreen", "  첫 번째 경로의 첫 좌표: ${points.first()}")
+                                }
+
+                                list.add(
+                                    PolylineData(
+                                        points = points.toList(),
+                                        color = lineColor,
+                                        width = lineWidth,
+                                        key = "subpath_$index"
+                                    )
+                                )
+                            }
                         }
+
+                        Log.d("MapScreen", "총 ${list.size}개의 Polyline 데이터 생성 완료")
+                        list.toList()
                     }
 
-                    // 포인트가 있으면 Polyline 그리기
-                    if (points.isNotEmpty()) {
-                        // 교통수단에 따라 다른 색상 사용
-                        val lineColor = when (subPath.trafficType) {
-                            com.teammanduk.adego.core.model.TrafficType.SUBWAY -> androidx.compose.ui.graphics.Color(0xFF0052A4)
-                            com.teammanduk.adego.core.model.TrafficType.BUS -> androidx.compose.ui.graphics.Color(0xFF53B332)
-                            com.teammanduk.adego.core.model.TrafficType.WALK -> androidx.compose.ui.graphics.Color.Gray
+                    // 생성된 Polyline 데이터를 기반으로 실제 Polyline 그리기
+                    Log.d("MapScreen", "Polyline 렌더링 시작 - ${polylineDataList.size}개")
+                    polylineDataList.forEach { data ->
+                        key(data.key) {
+                            Polyline(
+                                points = data.points,
+                                color = data.color,
+                                width = data.width
+                            )
                         }
-
-                        Polyline(
-                            points = points,
-                            color = lineColor,
-                            width = 10f
-                        )
                     }
                 }
             }
@@ -370,4 +420,34 @@ private fun MapScreen(
             )
         }
     }
+}
+
+/**
+ * Polyline 데이터를 저장하는 데이터 클래스
+ */
+private data class PolylineData(
+    val points: List<LatLng>,
+    val color: Color,
+    val width: Float,
+    val key: String
+)
+
+/**
+ * 두 LatLng 포인트 간의 거리를 미터 단위로 계산합니다 (Haversine formula).
+ */
+private fun calculateDistance(point1: LatLng, point2: LatLng): Double {
+    val earthRadius = 6371000.0 // 지구 반지름 (미터)
+
+    val lat1Rad = Math.toRadians(point1.latitude)
+    val lat2Rad = Math.toRadians(point2.latitude)
+    val deltaLat = Math.toRadians(point2.latitude - point1.latitude)
+    val deltaLng = Math.toRadians(point2.longitude - point1.longitude)
+
+    val a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+            Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+            Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2)
+
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+    return earthRadius * c
 }
