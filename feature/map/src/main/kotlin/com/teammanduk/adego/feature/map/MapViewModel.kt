@@ -60,12 +60,17 @@ class MapViewModel @Inject constructor(
     }
 
     fun setSelectedRoute(route: com.teammanduk.adego.core.model.Route) {
+        Log.d("MapViewModel", "setSelectedRoute 호출 - route: totalTime=${route.totalTime}분, subPaths=${route.subPaths.size}개")
+        route.subPaths.forEachIndexed { index, subPath ->
+            Log.d("MapViewModel", "  SubPath[$index]: ${subPath.trafficType}, graphicData size=${subPath.graphicData?.size ?: 0}")
+        }
         _uiState.update {
             it.copy(
                 searchedRoutes = listOf(route),
                 selectedRouteIndex = 0
             )
         }
+        Log.d("MapViewModel", "setSelectedRoute 완료 - searchedRoutes size=${_uiState.value.searchedRoutes.size}, selectedRouteIndex=${_uiState.value.selectedRouteIndex}")
     }
 
     fun startLocationTracking() {
