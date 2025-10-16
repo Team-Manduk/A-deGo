@@ -33,6 +33,13 @@ internal fun UserNameInputDialog(
     error: String?,
     onGenerateRandomName: () -> Unit = {}
 ) {
+    // 최초 다이얼로그 표시 시 랜덤 닉네임 생성
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        if (userName.isBlank()) {
+            onGenerateRandomName()
+        }
+    }
+
     Dialog(onDismissRequest = { }) {
         Column(
             modifier = Modifier

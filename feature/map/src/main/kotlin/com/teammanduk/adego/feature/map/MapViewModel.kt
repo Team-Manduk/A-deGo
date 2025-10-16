@@ -10,14 +10,34 @@ import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
+import com.teammanduk.adego.feature.map.model.MapIntent.ClearError
+import com.teammanduk.adego.feature.map.model.MapIntent.ConfirmUserName
+import com.teammanduk.adego.feature.map.model.MapIntent.DismissInviteDialog
+import com.teammanduk.adego.feature.map.model.MapIntent.DismissRouteDialog
+import com.teammanduk.adego.feature.map.model.MapIntent.DismissSearchPlace
+import com.teammanduk.adego.feature.map.model.MapIntent.DismissSelectStartPlace
+import com.teammanduk.adego.feature.map.model.MapIntent.GenerateRandomName
+import com.teammanduk.adego.feature.map.model.MapIntent.NavigateToHome
+import com.teammanduk.adego.feature.map.model.MapIntent.SearchRoute
+import com.teammanduk.adego.feature.map.model.MapIntent.SelectParticipant
+import com.teammanduk.adego.feature.map.model.MapIntent.SelectRoute
+import com.teammanduk.adego.feature.map.model.MapIntent.ShowInviteDialog
+import com.teammanduk.adego.feature.map.model.MapIntent.ShowRouteDialog
+import com.teammanduk.adego.feature.map.model.MapIntent.ShowSearchPlace
+import com.teammanduk.adego.feature.map.model.MapIntent.ShowSelectStartPlace
+import com.teammanduk.adego.feature.map.model.MapIntent.StartPlaceSelected
+import com.teammanduk.adego.feature.map.model.MapIntent.UpdateUserName
+import com.teammanduk.adego.feature.map.model.MapSideEffect
 import com.teammanduk.adego.feature.map.model.MapUiState
 import com.teammanduk.adego.feature.map.model.toUiModel
 import com.teammanduk.adego.feature.map.model.toUiModels
 import com.teammanduk.adego.feature.map.util.NicknameGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,26 +56,35 @@ class MapViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MapUiState())
     val uiState: StateFlow<MapUiState> = _uiState
 
+    private val _sideEffect = Channel<MapSideEffect>()
+    val sideEffect = _sideEffect.receiveAsFlow()
+
     private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
     private val userId: String = savedStateHandle.get<String>("userId") ?: ""
-    private val userName: String = savedStateHandle.get<String>("userName") ?: ""
 
     init {
         _uiState.update { it.copy(roomId = roomId, userId = userId) }
-        userRepository.setCurrentUser(userId)
 
-        // 방 참가 처리
+        // 방 존재 여부 확인
         viewModelScope.launch {
-            joinRoom(roomId, userId, userName)
-                .catch { e ->
-                    _uiState.update { it.copy(error = "방 참가 실패: ${e.message}") }
-                    emit(null to emptyList())
+            roomRepository.getRoomInfo(roomId)
+                .onSuccess { room ->
+                    if (room == null) {
+                        _uiState.update {
+                            it.copy(
+                                error = "존재하지 않는 방입니다. 초대 코드를 확인해주세요.",
+                                isCheckingRoom = false
+                            )
+                        }
+                    } else {
+                        _uiState.update { it.copy(isCheckingRoom = false) }
+                    }
                 }
-                .collect { (room, participants) ->
-                    _uiState.update { currentState ->
-                        currentState.copy(
-                            room = room?.toUiModel(),
-                            participants = participants.toUiModels()
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(
+                            error = "방 정보를 불러올 수 없습니다: ${e.message}",
+                            isCheckingRoom = false
                         )
                     }
                 }
@@ -74,18 +103,34 @@ class MapViewModel @Inject constructor(
     fun startLocationTracking() {
         viewModelScope.launch {
             try {
-                // 1. 먼저 현재 위치를 즉시 가져와서 표시 (마지막 알려진 위치)
-                locationRepository.getCurrentLocation()
-                    .onSuccess { location ->
-                        _uiState.update { currentState ->
-                            currentState.copy(
-                                myLocation = location,
-                                isInitialLocationLoaded = true
-                            )
-                        }
-                    }
+                // 1. 현재 위치를 가져올 때까지 재시도 (최대 10회, 2초 간격)
+                var retryCount = 0
+                var locationObtained = false
 
-                // 2. 그 다음 실시간 위치 업데이트 구독
+                while (!locationObtained && retryCount < 10) {
+                    locationRepository.getCurrentLocation()
+                        .onSuccess { location ->
+                            // 초기 위치를 Firebase에 즉시 업데이트 (participants에 자동 반영됨)
+                            roomRepository.updateMyLocation(userId, location)
+                            locationObtained = true
+                        }
+                        .onFailure { e ->
+                            retryCount++
+                            if (retryCount < 10) {
+                                kotlinx.coroutines.delay(2000) // 2초 대기 후 재시도
+                            }
+                        }
+                }
+
+                // 위치를 가져오지 못한 경우 에러 표시
+                if (!locationObtained) {
+                    _uiState.update {
+                        it.copy(error = "위치를 가져올 수 없습니다. 위치 서비스를 확인해주세요.")
+                    }
+                    return@launch
+                }
+
+                // 2. 위치를 성공적으로 가져온 후 실시간 위치 업데이트 구독
                 trackAndUpdateLocation()
                     .catch { e ->
                         _uiState.update {
@@ -97,11 +142,7 @@ class MapViewModel @Inject constructor(
                     }
                     .collect { location ->
                         _uiState.update { currentState ->
-                            currentState.copy(
-                                myLocation = location,
-                                isLocationTrackingActive = true,
-                                isInitialLocationLoaded = true
-                            )
+                            currentState.copy(isLocationTrackingActive = true)
                         }
                     }
             } catch (e: Exception) {
@@ -112,107 +153,75 @@ class MapViewModel @Inject constructor(
 
     fun onAction(intent: MapIntent) {
         when (intent) {
-            is MapIntent.SelectParticipant -> {
-                _uiState.update { reduce(it, intent) }
-            }
+            is SelectParticipant -> {}
+            ClearError -> {}
+            NavigateToHome -> navigateToHome()
+            ShowInviteDialog -> {}
+            DismissInviteDialog -> {}
+            ShowRouteDialog -> {}
+            DismissRouteDialog -> {}
+            ShowSelectStartPlace -> {}
+            DismissSelectStartPlace -> {}
+            is StartPlaceSelected -> {}
+            ShowSearchPlace -> {}
+            DismissSearchPlace -> {}
+            SearchRoute -> searchRoute()
+            is SelectRoute -> {}
+            ConfirmUserName -> confirmUserName()
+            is UpdateUserName -> {}
+            GenerateRandomName -> {}
+        }
 
-            MapIntent.ClearError -> {
-                _uiState.update { reduce(it, intent) }
-            }
+        _uiState.update { reduce(it, intent) }
+    }
 
-            MapIntent.ShowInviteDialog -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.DismissInviteDialog -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.ShowRouteDialog -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.DismissRouteDialog -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.ShowSelectStartPlace -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.DismissSelectStartPlace -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            is MapIntent.StartPlaceSelected -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.ShowSearchPlace -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.DismissSearchPlace -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.SearchRoute -> {
-                searchRoute()
-            }
-
-            is MapIntent.SelectRoute -> {
-                _uiState.update { reduce(it, intent) }
-            }
-
-            MapIntent.ConfirmUserName -> confirmUserName()
-
-            is MapIntent.UpdateUserName -> _uiState.update { reduce(it, intent) }
-
-            MapIntent.GenerateRandomName -> {
-                _uiState.update { reduce(it, intent) }
-            }
+    private fun navigateToHome() {
+        viewModelScope.launch {
+            _sideEffect.send(MapSideEffect.NavigateToHome)
         }
     }
 
     private fun reduce(state: MapUiState, intent: MapIntent): MapUiState {
         return when (intent) {
-            is MapIntent.SelectParticipant -> state.copy(selectedParticipantIndex = intent.index)
-            MapIntent.ClearError -> state.copy(error = null)
-            MapIntent.ShowInviteDialog -> state.copy(showInviteDialog = true)
-            MapIntent.DismissInviteDialog -> state.copy(showInviteDialog = false)
-            MapIntent.ShowRouteDialog -> state.copy(showRouteDialog = true)
-            MapIntent.DismissRouteDialog -> state.copy(
+            is SelectParticipant -> state.copy(selectedParticipantIndex = intent.index)
+            ClearError -> state.copy(error = null)
+            ShowInviteDialog -> state.copy(showInviteDialog = true)
+            DismissInviteDialog -> state.copy(showInviteDialog = false)
+            ShowRouteDialog -> state.copy(showRouteDialog = true)
+            DismissRouteDialog -> state.copy(
                 showRouteDialog = false,
                 searchedRoutes = emptyList(),
                 selectedRouteIndex = null
             )
 
-            MapIntent.ShowSelectStartPlace -> state.copy(
+            ShowSelectStartPlace -> state.copy(
                 showSelectStartPlace = true,
                 showRouteDialog = false
             )
 
-            MapIntent.DismissSelectStartPlace -> state.copy(
+            DismissSelectStartPlace -> state.copy(
                 showSelectStartPlace = false,
                 showRouteDialog = true
             )
 
-            is MapIntent.StartPlaceSelected -> state.copy(
+            is StartPlaceSelected -> state.copy(
                 startPlace = intent.place,
                 showSelectStartPlace = false,
                 showRouteDialog = true
             )
 
-            MapIntent.ShowSearchPlace -> state.copy(showSearchPlace = true)
-            MapIntent.DismissSearchPlace -> state.copy(showSearchPlace = false)
-            MapIntent.SearchRoute -> state
-            is MapIntent.SelectRoute -> state.copy(selectedRouteIndex = intent.routeIndex)
-            MapIntent.ConfirmUserName -> state
-            is MapIntent.UpdateUserName -> state.copy(userName = intent.userName)
-            MapIntent.GenerateRandomName -> {
+            ShowSearchPlace -> state.copy(showSearchPlace = true)
+            DismissSearchPlace -> state.copy(showSearchPlace = false)
+            SearchRoute -> state
+            is SelectRoute -> state.copy(selectedRouteIndex = intent.routeIndex)
+            ConfirmUserName -> state
+            is UpdateUserName -> state.copy(userName = intent.userName)
+            GenerateRandomName -> {
                 val randomName = NicknameGenerator.generate()
                 state.copy(userName = randomName)
             }
+
+            NavigateToHome -> state
         }
     }
 
@@ -261,8 +270,6 @@ class MapViewModel @Inject constructor(
             return
         }
 
-        _uiState.update { it.copy(showUserNameInput = false) }
-
         // 이름 입력 완료 후 방 참가 처리
         viewModelScope.launch {
             joinRoom(roomId, userId, userName)
@@ -274,8 +281,16 @@ class MapViewModel @Inject constructor(
                     _uiState.update { currentState ->
                         currentState.copy(
                             room = room?.toUiModel(),
-                            participants = participants.toUiModels()
+                            participants = participants.toUiModels(),
+                            showUserNameDialog = false
                         )
+                    }
+
+                    // 방 참가 성공 후 현재 방 설정 및 위치 추적 시작
+                    if (room != null) {
+                        userRepository.setCurrentUser(userId)
+                        roomRepository.setCurrentRoom(roomId)
+                        startLocationTracking()
                     }
                 }
         }

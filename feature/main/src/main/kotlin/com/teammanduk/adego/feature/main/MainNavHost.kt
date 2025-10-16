@@ -51,6 +51,7 @@ internal fun MainNavHost(
             )
             mapNavGraph(
                 onNavigateToSelectStartPlace = navigator::navigateToSelectStartPlace,
+                onNavigateToHome = navigator::navigateHome,
                 getSelectedRoute = { selectedRoute }
             )
             selectRouteNavGraph(

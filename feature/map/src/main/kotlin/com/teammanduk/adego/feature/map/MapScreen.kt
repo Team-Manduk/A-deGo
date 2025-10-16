@@ -1,6 +1,5 @@
 package com.teammanduk.adego.feature.map
 
-import android.util.Log
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,11 +41,13 @@ import com.google.maps.android.compose.rememberMarkerState
 import com.teammanduk.adego.core.ui.component.LoadingScreen
 import com.teammanduk.adego.core.ui.permission.PermissionRequester
 import com.teammanduk.adego.core.ui.permission.PermissionType
+import com.teammanduk.adego.feature.map.component.ErrorScreen
 import com.teammanduk.adego.feature.map.component.InviteDialog
 import com.teammanduk.adego.feature.map.component.ParticipantCardPager
 import com.teammanduk.adego.feature.map.component.TopInfoSection
 import com.teammanduk.adego.feature.map.component.UserNameInputDialog
 import com.teammanduk.adego.feature.map.model.MapIntent
+import com.teammanduk.adego.feature.map.model.MapSideEffect
 import com.teammanduk.adego.feature.map.model.MapUiState
 import kotlinx.coroutines.launch
 
@@ -54,10 +55,22 @@ import kotlinx.coroutines.launch
 internal fun MapRoute(
     viewModel: MapViewModel = hiltViewModel(),
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
+    onNavigateToHome: () -> Unit = {},
     selectedRoute: com.teammanduk.adego.core.model.Route? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showInviteDialog by remember { mutableStateOf(false) }
+
+    // SideEffect 처리
+    LaunchedEffect(Unit) {
+        viewModel.sideEffect.collect { sideEffect ->
+            when (sideEffect) {
+                is MapSideEffect.NavigateToHome -> {
+                    onNavigateToHome()
+                }
+            }
+        }
+    }
 
     // 선택된 경로가 있으면 ViewModel에 설정
     LaunchedEffect(selectedRoute) {
@@ -67,61 +80,51 @@ internal fun MapRoute(
     }
 
     PermissionRequester(
-        permissionTypes = listOf(PermissionType.Location),
-        onGranted = { viewModel.startLocationTracking() }
+        permissionTypes = listOf(PermissionType.Location)
     ) {
-        MapRouteContent(
-            uiState = uiState,
-            viewModel = viewModel,
-            showInviteDialog = showInviteDialog,
-            onShowInviteDialogChange = { showInviteDialog = it },
-            onNavigateToSelectStartPlace = onNavigateToSelectStartPlace
-        )
-    }
-}
+        when {
+            uiState.isCheckingRoom -> {
+                LoadingScreen(text = "방 정보를 확인하는 중...")
+            }
 
-@Composable
-private fun MapRouteContent(
-    uiState: MapUiState,
-    viewModel: MapViewModel,
-    showInviteDialog: Boolean,
-    onShowInviteDialogChange: (Boolean) -> Unit,
-    onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> }
-) {
-    when {
-        uiState.showUserNameInput -> {
-            UserNameInputDialog(
-                userName = uiState.userName,
-                onUserNameChange = { viewModel.onAction(MapIntent.UpdateUserName(it)) },
-                onConfirm = { viewModel.onAction(MapIntent.ConfirmUserName) },
-                error = uiState.error,
-                onGenerateRandomName = { viewModel.onAction(MapIntent.GenerateRandomName) }
-            )
-        }
+            uiState.error != null -> {
+                // 방 존재 여부 확인 실패 등의 치명적 에러
+                ErrorScreen(
+                    message = uiState.error!!,
+                    onAction = { viewModel.onAction(MapIntent.NavigateToHome) }
+                )
+            }
 
-        uiState.myLocation == null -> {
-            LoadingScreen(text = "현재 위치를 가져오는 중...")
-        }
+            uiState.showUserNameDialog -> {
+                UserNameInputDialog(
+                    userName = uiState.userName,
+                    onUserNameChange = { viewModel.onAction(MapIntent.UpdateUserName(it)) },
+                    onConfirm = { viewModel.onAction(MapIntent.ConfirmUserName) },
+                    error = uiState.error,
+                    onGenerateRandomName = { viewModel.onAction(MapIntent.GenerateRandomName) }
+                )
+            }
 
-        uiState.participants.isEmpty() -> {
-            LoadingScreen(text = "방 정보를 불러오는 중...")
-        }
+            uiState.currentUser?.location == null -> {
+                LoadingScreen(text = "현재 위치를 가져오는 중...")
+            }
 
-        else -> {
-            MapScreen(
-                uiState = uiState,
-                onAction = viewModel::onAction,
-                onInviteClick = { onShowInviteDialogChange(true) },
-                onNavigateToSelectStartPlace = onNavigateToSelectStartPlace
-            )
+            else -> {
+                MapScreen(
+                    uiState = uiState,
+                    onAction = viewModel::onAction,
+                    onInviteClick = { showInviteDialog = true },
+                    onNavigateToSelectStartPlace = onNavigateToSelectStartPlace
+                )
 
-            if (showInviteDialog) {
-                InviteDialog(
-                    inviteCode = uiState.room?.roomId ?: "",
-                    roomName = uiState.room?.roomName ?: "",
-                    destinationName = uiState.room?.destination?.name ?: "",
-                    meetingTime = uiState.room?.meetingTime ?: "",
-                    onDismiss = { onShowInviteDialogChange(false) })
+                if (showInviteDialog) {
+                    InviteDialog(
+                        inviteCode = uiState.room?.roomId ?: "",
+                        roomName = uiState.room?.roomName ?: "",
+                        destinationName = uiState.room?.destination?.name ?: "",
+                        meetingTime = uiState.room?.meetingTime ?: "",
+                        onDismiss = { showInviteDialog = false })
+                }
             }
         }
     }
@@ -142,8 +145,9 @@ private fun MapScreen(
     var isCameraInitialized by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState {
-        val initialLocation =
-            uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location
+        // currentUser 위치를 우선적으로 사용하고, 없으면 선택된 참가자 위치 사용
+        val initialLocation = uiState.currentUser?.location
+            ?: uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location
         if (initialLocation != null) {
             position = CameraPosition.fromLatLngZoom(
                 LatLng(initialLocation.latitude, initialLocation.longitude), 15f
@@ -239,20 +243,10 @@ private fun MapScreen(
             }
 
             // 선택한 경로 그리기 (TMAP Transit API 방식)
-            Log.d(
-                "MapScreen",
-                "경로 그리기 체크 - selectedRouteIndex: ${uiState.selectedRouteIndex}, searchedRoutes size: ${uiState.searchedRoutes.size}"
-            )
             if (uiState.selectedRouteIndex != null) {
                 val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
-                Log.d(
-                    "MapScreen",
-                    "selectedRoute: ${if (selectedRoute != null) "존재 (subPaths: ${selectedRoute.subPaths.size})" else "null"}"
-                )
 
                 selectedRoute?.let { route ->
-                    Log.d("MapScreen", "경로 그리기 시작 - subPaths: ${route.subPaths.size}개")
-
                     // 모든 SubPath를 미리 처리하여 Polyline 데이터 생성 (remember로 메모이제이션)
                     val polylineDataList = remember(route) {
                         val list = mutableListOf<PolylineData>()
@@ -261,11 +255,6 @@ private fun MapScreen(
                         route.subPaths.forEachIndexed { index, subPath ->
                             val points = mutableListOf<LatLng>()
                             val graphicData = subPath.graphicData
-
-                            Log.d(
-                                "MapScreen",
-                                "SubPath[$index] 처리 - trafficType: ${subPath.trafficType}, graphicData: ${graphicData?.size ?: 0}개"
-                            )
 
                             // TMAP graphicData 사용 (실제 경로)
                             if (!graphicData.isNullOrEmpty()) {
@@ -342,14 +331,6 @@ private fun MapScreen(
                                     com.teammanduk.adego.core.model.TrafficType.WALK -> 6f
                                 }
 
-                                Log.d(
-                                    "MapScreen",
-                                    "SubPath[$index] Polyline 데이터 생성 - points: ${points.size}개, color: $lineColor"
-                                )
-                                if (index == 0 && points.isNotEmpty()) {
-                                    Log.d("MapScreen", "  첫 번째 경로의 첫 좌표: ${points.first()}")
-                                }
-
                                 list.add(
                                     PolylineData(
                                         points = points.toList(),
@@ -361,12 +342,10 @@ private fun MapScreen(
                             }
                         }
 
-                        Log.d("MapScreen", "총 ${list.size}개의 Polyline 데이터 생성 완료")
                         list.toList()
                     }
 
                     // 생성된 Polyline 데이터를 기반으로 실제 Polyline 그리기
-                    Log.d("MapScreen", "Polyline 렌더링 시작 - ${polylineDataList.size}개")
                     polylineDataList.forEach { data ->
                         key(data.key) {
                             Polyline(
