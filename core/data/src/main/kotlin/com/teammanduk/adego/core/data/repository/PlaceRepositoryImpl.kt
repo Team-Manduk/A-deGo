@@ -331,7 +331,8 @@ class PlaceRepositoryImpl @Inject constructor(
                 name = placeName,
                 address = address,
                 latitude = latitude,
-                longitude = longitude
+                longitude = longitude,
+                isPOI = false  // TMAP 역지오코딩 결과는 POI가 아님
             )
         } catch (e: Exception) {
             Log.e("PlaceRepository", "TMAP 역지오코딩 실패", e)
@@ -373,7 +374,8 @@ class PlaceRepositoryImpl @Inject constructor(
                                 name = placeName,
                                 address = address.getAddressLine(0) ?: "주소 정보 없음",
                                 latitude = latitude,
-                                longitude = longitude
+                                longitude = longitude,
+                                isPOI = false  // Geocoder 결과도 POI가 아님
                             )
                         } else {
                             Log.w("PlaceRepository", "Geocoder에서 주소를 찾지 못했습니다")
@@ -408,7 +410,8 @@ class PlaceRepositoryImpl @Inject constructor(
                         name = placeName,
                         address = address.getAddressLine(0) ?: "주소 정보 없음",
                         latitude = latitude,
-                        longitude = longitude
+                        longitude = longitude,
+                        isPOI = false  // Geocoder 결과도 POI가 아님
                     )
                 } else {
                     Log.w("PlaceRepository", "Geocoder에서 주소를 찾지 못했습니다")
@@ -446,7 +449,8 @@ class PlaceRepositoryImpl @Inject constructor(
             name = "위도: ${String.format("%.6f", latitude)}, 경도: ${String.format("%.6f", longitude)}",
             address = "주소를 가져올 수 없습니다",
             latitude = latitude,
-            longitude = longitude
+            longitude = longitude,
+            isPOI = false  // Fallback도 POI가 아님
         )
     }
 

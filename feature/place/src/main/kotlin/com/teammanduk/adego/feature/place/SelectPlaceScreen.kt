@@ -234,8 +234,7 @@ private fun SelectPlaceScreen(
             ) {
                 searchResult?.let {
                     PlaceInfoCard(
-                        placeName = it.name,
-                        placeAddress = it.address
+                        place = it
                     )
                 }
             }
@@ -336,8 +335,7 @@ private fun MapPlaceholder(
 
 @Composable
 private fun PlaceInfoCard(
-    placeName: String,
-    placeAddress: String
+    place: Place
 ) {
     Column(
         modifier = Modifier
@@ -349,12 +347,15 @@ private fun PlaceInfoCard(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        // POI인 경우에만 장소명 표시
+        if (place.isPOI) {
+            Text(
+                text = place.name,
+                style = AdegoTheme.typography.titleLarge
+            )
+        }
         Text(
-            text = placeName,
-            style = AdegoTheme.typography.titleLarge
-        )
-        Text(
-            text = placeAddress,
+            text = place.address,
             style = AdegoTheme.typography.bodySmall,
             color = Color(0xFF757575)
         )
