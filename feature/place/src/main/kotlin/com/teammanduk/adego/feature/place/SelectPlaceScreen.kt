@@ -13,11 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,7 +31,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -154,7 +156,8 @@ private fun SelectPlaceScreen(
     onSearchClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // searchResult가 있으면 그 위치를, 없으면 initialPosition을, 둘 다 없으면 기본값 사용
+    var hasClicked by remember { mutableStateOf(false) }
+    // searchResult에서 위치 정보를 가져오거나 기본값 사용
     val selectedPosition = remember(searchResult, initialPosition) {
         if (searchResult != null) {
             LatLng(searchResult.latitude, searchResult.longitude)
@@ -252,7 +255,12 @@ private fun SelectPlaceScreen(
             }
 
             Button(
-                onClick = onPlaceSelected,
+                onClick = {
+                    if (!hasClicked) {
+                        hasClicked = true
+                        onPlaceSelected()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -260,7 +268,7 @@ private fun SelectPlaceScreen(
                     containerColor = AdegoTheme.colors.main500
                 ),
                 shape = RoundedCornerShape(12.dp),
-                enabled = !isLoading && searchResult != null
+                enabled = !isLoading && searchResult != null && !hasClicked
             ) {
                 Text(
                     text = buttonText,

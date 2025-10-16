@@ -47,7 +47,7 @@ import com.teammanduk.adego.core.designsystem.component.AdegoDatePicker
 import com.teammanduk.adego.core.designsystem.component.AdegoTimePicker
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
 import com.teammanduk.adego.core.model.Place
-import com.teammanduk.adego.core.ui.extension.clickableWithDebounce
+import com.teammanduk.adego.core.ui.extension.clickableOnce
 import com.teammanduk.adego.feature.create.model.CreateIntent
 import com.teammanduk.adego.feature.create.model.CreateSideEffect
 import com.teammanduk.adego.feature.create.model.CreateStep
@@ -171,7 +171,7 @@ private fun CreateScreen(
                 selectedPlace = uiState.selectedPlace,
                 meetingPlaceName = uiState.meetingPlaceName,
                 onMeetingPlaceNameChange = { onIntent(CreateIntent.UpdateMeetingPlaceName(it)) },
-                onSelectPlaceClick = { onIntent(CreateIntent.NavigateToSelectPlace) }
+                onIntent = onIntent
             )
 
             // 시간 선택 (장소 선택 완료 후 표시)
@@ -269,7 +269,7 @@ private fun PlaceSelectionSection(
     selectedPlace: Place?,
     meetingPlaceName: String,
     onMeetingPlaceNameChange: (String) -> Unit,
-    onSelectPlaceClick: () -> Unit
+    onIntent: (CreateIntent) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -286,7 +286,7 @@ private fun PlaceSelectionSection(
             onValueChange = { },
             modifier = Modifier
                 .fillMaxWidth()
-                .clickableWithDebounce { onSelectPlaceClick() },
+                .clickableOnce { onIntent(CreateIntent.NavigateToSelectPlace) },
             enabled = false,
             placeholder = {
                 Text(
