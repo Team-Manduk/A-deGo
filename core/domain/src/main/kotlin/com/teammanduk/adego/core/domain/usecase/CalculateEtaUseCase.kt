@@ -1,6 +1,7 @@
 package com.teammanduk.adego.core.domain.usecase
 
 import com.teammanduk.adego.core.domain.service.DistanceCalculator
+import com.teammanduk.adego.core.model.EtaCalculationResult
 import com.teammanduk.adego.core.model.GraphicCoordinate
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.Route
@@ -21,26 +22,16 @@ class CalculateEtaUseCase @Inject constructor(
 ) {
 
     /**
-     * ETA 계산 결과
-     */
-    data class EtaResult(
-        val remainingTimeInSeconds: Int, // 남은 시간 (초)
-        val remainingDistanceInMeters: Double, // 남은 거리 (미터)
-        val currentSubPathIndex: Int, // 현재 구간 인덱스
-        val progressInCurrentSubPath: Double // 현재 구간 내 진행률 (0.0 ~ 1.0)
-    )
-
-    /**
      * ETA 계산 실행
      *
      * @param route 선택된 경로
      * @param currentLocation 현재 위치
-     * @return EtaResult 계산 결과, 계산 불가능한 경우 null
+     * @return EtaCalculationResult 계산 결과, 계산 불가능한 경우 null
      */
     operator fun invoke(
         route: Route,
         currentLocation: ParticipantLocation
-    ): EtaResult? {
+    ): EtaCalculationResult? {
         // SubPath가 비어있는 경우 계산 불가
         if (route.subPaths.isEmpty()) return null
 
@@ -65,7 +56,7 @@ class CalculateEtaUseCase @Inject constructor(
             currentLocation
         )
 
-        return EtaResult(
+        return EtaCalculationResult(
             remainingTimeInSeconds = remainingTime,
             remainingDistanceInMeters = remainingDistance,
             currentSubPathIndex = subPathIndex,

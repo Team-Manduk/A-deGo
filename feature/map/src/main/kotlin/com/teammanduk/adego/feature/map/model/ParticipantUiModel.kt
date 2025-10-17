@@ -5,6 +5,7 @@ import androidx.core.graphics.toColorInt
 import com.teammanduk.adego.core.model.Participant
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
+import com.teammanduk.adego.feature.map.util.EtaFormatter
 import kotlin.math.absoluteValue
 
 data class ParticipantUiModel(
@@ -19,17 +20,23 @@ data class ParticipantUiModel(
     val distanceToDestination: Int? = null
 )
 
-fun Participant.toUiModel(): ParticipantUiModel = ParticipantUiModel(
-    userId = this.userId,
-    name = this.name,
-    color = this.getParticipantColor(),
-    status = if (route?.eta != null) "도착중" else "대기중",
-    eta = this.route?.eta,
-    distance = this.route?.distance,
-    location = this.location,
-    route = this.route,
-    distanceToDestination = this.distanceToDestination
-)
+fun Participant.toUiModel(): ParticipantUiModel {
+    // Domain Model에서 원본 숫자 데이터를 가져와 UI에서 포맷팅
+    val formattedEta = route?.durationInSeconds?.let { EtaFormatter.formatTime(it) }
+    val formattedDistance = route?.distanceInMeters?.let { EtaFormatter.formatDistance(it) }
+
+    return ParticipantUiModel(
+        userId = this.userId,
+        name = this.name,
+        color = this.getParticipantColor(),
+        status = if (formattedEta != null) "도착중" else "대기중",
+        eta = formattedEta,
+        distance = formattedDistance,
+        location = this.location,
+        route = this.route,
+        distanceToDestination = this.distanceToDestination
+    )
+}
 
 private fun Participant.getParticipantColor(): Color {
     return if (profileColor.isNotEmpty()) {

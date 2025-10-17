@@ -10,7 +10,6 @@ import com.teammanduk.adego.core.domain.usecase.DebugSetLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
-import com.teammanduk.adego.core.domain.usecase.UpdateLocationAndEtaUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapIntent.ClearError
 import com.teammanduk.adego.feature.map.model.MapIntent.ConfirmUserName
@@ -56,7 +55,6 @@ class MapViewModel @Inject constructor(
     private val roomRepository: RoomRepository,
     private val locationRepository: LocationRepository,
     private val searchRouteUseCase: SearchRouteUseCase,
-    private val updateLocationAndEtaUseCase: UpdateLocationAndEtaUseCase,
     private val debugSetLocationUseCase: DebugSetLocationUseCase
 ) : ViewModel() {
 
@@ -68,11 +66,6 @@ class MapViewModel @Inject constructor(
 
     private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
     private val userId: String = savedStateHandle.get<String>("userId") ?: ""
-
-    // ETA 계산 관련 상태
-    private var etaCalculationJob: Job? = null
-    private var lastEtaCalculationTime = 0L
-    private val ETA_CALCULATION_INTERVAL_MS = 30000L // 30초마다만 계산 (Firebase 부하 감소)
 
     // 위치 추적 Job (중복 구독 방지)
     private var locationTrackingJob: Job? = null
@@ -154,7 +147,12 @@ class MapViewModel @Inject constructor(
                 android.util.Log.d("MapViewModel", "위치 추적 시작 - 실시간 업데이트 구독")
 
                 // 2. 위치를 성공적으로 가져온 후 실시간 위치 업데이트 구독
-                trackAndUpdateLocation()
+                // 선택된 경로 가져오기
+                val selectedRoute = _uiState.value.searchedRoutes.getOrNull(
+                    _uiState.value.selectedRouteIndex ?: -1
+                )
+
+                trackAndUpdateLocation(selectedRoute)
                     .catch { e ->
                         _uiState.update {
                             it.copy(
@@ -167,9 +165,6 @@ class MapViewModel @Inject constructor(
                         _uiState.update { currentState ->
                             currentState.copy(isLocationTrackingActive = true)
                         }
-
-                        // 3. 위치 업데이트 시 ETA 계산 및 업데이트
-                        calculateAndUpdateEta(location)
                     }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "위치 추적 시작 실패: ${e.message}") }
@@ -325,40 +320,6 @@ class MapViewModel @Inject constructor(
     }
 
 
-    /**
-     * 위치 업데이트 시 ETA 계산 및 Firebase 업데이트
-     * - 디바운싱: 30초마다만 계산
-     * - 중복 계산 방지
-     * - 비즈니스 로직은 UpdateLocationAndEtaUseCase에 위임
-     */
-    private fun calculateAndUpdateEta(currentLocation: com.teammanduk.adego.core.model.ParticipantLocation) {
-        val currentTime = System.currentTimeMillis()
-
-        // 마지막 계산으로부터 30초가 지나지 않았으면 스킵 (디바운싱)
-        if (currentTime - lastEtaCalculationTime < ETA_CALCULATION_INTERVAL_MS) {
-            return
-        }
-
-        // 이미 계산 중이면 스킵
-        if (etaCalculationJob?.isActive == true) {
-            return
-        }
-
-        etaCalculationJob = viewModelScope.launch {
-            val selectedRoute = _uiState.value.searchedRoutes.getOrNull(
-                _uiState.value.selectedRouteIndex ?: -1
-            )
-
-            // UseCase에 위임
-            updateLocationAndEtaUseCase(userId, currentLocation, selectedRoute)
-                .onSuccess {
-                    lastEtaCalculationTime = currentTime
-                }
-                .onFailure { e ->
-                    android.util.Log.e("MapViewModel", "위치/ETA 업데이트 실패: ${e.message}", e)
-                }
-        }
-    }
 
     /**
      * 디버그: 지도 클릭으로 위치 설정
@@ -387,7 +348,6 @@ class MapViewModel @Inject constructor(
 
         // 위치 추적 Job 취소
         locationTrackingJob?.cancel()
-        etaCalculationJob?.cancel()
 
         viewModelScope.launch {
             locationRepository.stopLocationTracking()
