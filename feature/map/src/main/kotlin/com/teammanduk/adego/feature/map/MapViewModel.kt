@@ -29,11 +29,13 @@ import com.teammanduk.adego.feature.map.model.MapIntent.ShowSearchPlace
 import com.teammanduk.adego.feature.map.model.MapIntent.ShowSelectStartPlace
 import com.teammanduk.adego.feature.map.model.MapIntent.StartPlaceSelected
 import com.teammanduk.adego.feature.map.model.MapIntent.UpdateUserName
+import com.teammanduk.adego.feature.map.model.MapIntent.DebugSetLocation
 import com.teammanduk.adego.feature.map.model.MapSideEffect
 import com.teammanduk.adego.feature.map.model.MapUiState
 import com.teammanduk.adego.feature.map.model.toUiModel
 import com.teammanduk.adego.feature.map.model.toUiModels
 import com.teammanduk.adego.feature.map.util.NicknameGenerator
+import com.teammanduk.adego.core.model.ParticipantLocation
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -196,6 +198,7 @@ class MapViewModel @Inject constructor(
             ConfirmUserName -> confirmUserName()
             is UpdateUserName -> {}
             GenerateRandomName -> {}
+            is DebugSetLocation -> handleDebugSetLocation(intent.latitude, intent.longitude)
         }
 
         _uiState.update { reduce(it, intent) }
@@ -248,6 +251,7 @@ class MapViewModel @Inject constructor(
             }
 
             NavigateToHome -> state
+            is DebugSetLocation -> state // 상태 변경 없음
         }
     }
 
@@ -378,6 +382,72 @@ class MapViewModel @Inject constructor(
                 // ETA 계산 실패는 무시 (위치 추적은 계속)
                 android.util.Log.e("MapViewModel", "ETA 계산 실패: ${e.message}", e)
             }
+        }
+    }
+
+    /**
+     * 디버그: 지도 클릭으로 위치 설정
+     */
+    private fun handleDebugSetLocation(latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            val debugLocation = ParticipantLocation(
+                latitude = latitude,
+                longitude = longitude,
+                updatedAt = System.currentTimeMillis(),
+                accuracy = 1.0f
+            )
+
+            // Firebase에 디버그 위치 업데이트
+            roomRepository.updateMyLocation(userId, debugLocation)
+
+            // 디버그 모드에서는 디바운싱 무시하고 강제로 ETA 계산
+            calculateEtaImmediately(debugLocation)
+
+            android.util.Log.d("MapViewModel", "🔧 DEBUG: 위치 설정됨 - lat: $latitude, lng: $longitude")
+        }
+    }
+
+    /**
+     * 디바운싱 없이 즉시 ETA 계산 (디버그 전용)
+     */
+    private suspend fun calculateEtaImmediately(currentLocation: com.teammanduk.adego.core.model.ParticipantLocation) {
+        try {
+            val currentState = _uiState.value
+            val selectedRoute = currentState.searchedRoutes.getOrNull(currentState.selectedRouteIndex ?: -1)
+
+            if (selectedRoute == null) {
+                android.util.Log.d("MapViewModel", "🔧 DEBUG: 선택된 경로가 없어 ETA 계산 불가")
+                return
+            }
+
+            // 백그라운드 스레드에서 ETA 계산
+            val etaResult = withContext(Dispatchers.Default) {
+                calculateEtaUseCase(selectedRoute, currentLocation)
+            }
+
+            if (etaResult != null) {
+                android.util.Log.d("MapViewModel", "🔧 DEBUG: ETA 계산 완료 - 남은시간: ${etaResult.remainingTimeInSeconds}초, 남은거리: ${etaResult.remainingDistanceInMeters}m, 현재구간: ${etaResult.currentSubPathIndex}")
+
+                // ParticipantRoute 생성
+                val participantRoute = ParticipantRoute(
+                    eta = formatEtaString(etaResult.remainingTimeInSeconds),
+                    distance = formatDistanceString(etaResult.remainingDistanceInMeters),
+                    polyline = "",
+                    durationInSeconds = etaResult.remainingTimeInSeconds,
+                    distanceInMeters = etaResult.remainingDistanceInMeters.toInt(),
+                    updatedAt = System.currentTimeMillis(),
+                    currentSubPathIndex = etaResult.currentSubPathIndex,
+                    progressInCurrentSubPath = etaResult.progressInCurrentSubPath
+                )
+
+                // Firebase에 업데이트
+                roomRepository.updateMyRoute(userId, participantRoute)
+                android.util.Log.d("MapViewModel", "🔧 DEBUG: Firebase에 ETA 업데이트 완료")
+            } else {
+                android.util.Log.d("MapViewModel", "🔧 DEBUG: ETA 계산 결과가 null")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MapViewModel", "🔧 DEBUG: ETA 계산 실패: ${e.message}", e)
         }
     }
 

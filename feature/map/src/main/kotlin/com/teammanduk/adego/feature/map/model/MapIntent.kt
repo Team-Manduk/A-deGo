@@ -31,4 +31,7 @@ sealed interface MapIntent {
 
     data class UpdateUserName(val userName: String) : MapIntent
     data object ConfirmUserName : MapIntent
+
+    // 디버그: 지도 클릭으로 위치 설정
+    data class DebugSetLocation(val latitude: Double, val longitude: Double) : MapIntent
 }

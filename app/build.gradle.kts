@@ -38,6 +38,15 @@ android {
         buildConfigField("String", "TMAP_API_KEY", "\"$tmapApiKey\"")
     }
 
+    buildTypes {
+        debug {
+            buildConfigField("Boolean", "DEBUG_LOCATION_MODE", "true")
+        }
+        release {
+            buildConfigField("Boolean", "DEBUG_LOCATION_MODE", "false")
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }

@@ -49,6 +49,7 @@ import com.teammanduk.adego.feature.map.component.UserNameInputDialog
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapSideEffect
 import com.teammanduk.adego.feature.map.model.MapUiState
+import com.teammanduk.adego.feature.map.BuildConfig
 import kotlinx.coroutines.launch
 
 @Composable
@@ -201,7 +202,13 @@ private fun MapScreen(
                 myLocationButtonEnabled = false,
                 compassEnabled = false,
                 mapToolbarEnabled = false
-            )
+            ),
+            onMapClick = { latLng ->
+                // 디버그 모드에서만 지도 클릭으로 위치 설정
+                if (BuildConfig.DEBUG_LOCATION_MODE) {
+                    onAction(MapIntent.DebugSetLocation(latLng.latitude, latLng.longitude))
+                }
+            }
         ) {
             // 목적지 마커
             uiState.room?.destination?.let {
