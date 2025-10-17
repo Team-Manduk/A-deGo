@@ -16,6 +16,10 @@ class LocationRepositoryImpl @Inject constructor(
     private val locationDataSource: LocationDataSource
 ) : LocationRepository {
 
+    // Firebase에 마지막으로 업로드된 위치 및 시각 저장
+    private var lastUpdatedLocation: ParticipantLocation? = null
+    private var lastUploadTimestamp: Long? = null
+
     override suspend fun getCurrentLocation(): Result<ParticipantLocation> {
         return try {
             val locationDto = locationDataSource.getCurrentLocation().getOrThrow()
@@ -76,5 +80,18 @@ class LocationRepositoryImpl @Inject constructor(
 
     override suspend fun stopLocationTracking(): Result<Unit> {
         return locationDataSource.stopTracking()
+    }
+
+    override fun getLastUpdatedLocation(): ParticipantLocation? {
+        return lastUpdatedLocation
+    }
+
+    override fun setLastUpdatedLocation(location: ParticipantLocation) {
+        lastUpdatedLocation = location
+        lastUploadTimestamp = System.currentTimeMillis()
+    }
+
+    override fun getLastUploadTimestamp(): Long? {
+        return lastUploadTimestamp
     }
 }

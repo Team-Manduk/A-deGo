@@ -23,4 +23,22 @@ interface LocationRepository {
      * 위치 추적 중지
      */
     suspend fun stopLocationTracking(): Result<Unit>
+
+    /**
+     * 마지막으로 업로드된 위치 조회
+     * Firebase에 업로드 여부를 판단하기 위해 사용
+     */
+    fun getLastUpdatedLocation(): ParticipantLocation?
+
+    /**
+     * 업로드 완료된 위치 기록
+     * Firebase 업로드 성공 후 호출
+     */
+    fun setLastUpdatedLocation(location: ParticipantLocation)
+
+    /**
+     * 마지막 업로드 시각 조회 (밀리초)
+     * Firebase 업로드 시간 간격 판단에 사용
+     */
+    fun getLastUploadTimestamp(): Long?
 }

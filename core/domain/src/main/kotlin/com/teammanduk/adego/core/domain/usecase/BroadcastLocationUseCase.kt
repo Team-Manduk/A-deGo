@@ -20,13 +20,13 @@ import javax.inject.Inject
  */
 class BroadcastLocationUseCase @Inject constructor(
     private val locationRepository: LocationRepository,
-    private val updateLocationToFirebase: UpdateLocationToFirebaseUseCase
+    private val updateLocation: UpdateLocationUseCase
 ) {
     operator fun invoke(): Flow<ParticipantLocation> {
         return locationRepository.observeLocationUpdates()
             .onEach { location ->
-                // 위치 수집 시마다 Firebase 업데이트 (정책은 UpdateLocationToFirebaseUseCase에서 판단)
-                updateLocationToFirebase(location)
+                // 위치 수집 시마다 업데이트 (정책은 UpdateLocationUseCase에서 판단)
+                updateLocation(location)
             }
     }
 }
