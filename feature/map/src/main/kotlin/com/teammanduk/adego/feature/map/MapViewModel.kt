@@ -154,7 +154,10 @@ class MapViewModel @Inject constructor(
 
     private fun startLocationTracking() {
         viewModelScope.launch {
-            broadcastLocation()
+            val selectedRoute = _uiState.value.searchedRoutes
+                .getOrNull(_uiState.value.selectedRouteIndex ?: -1)
+
+            broadcastLocation(selectedRoute)
                 .catch { e ->
                     _uiState.update {
                         it.copy(
