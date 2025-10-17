@@ -54,6 +54,7 @@ class RoomRepositoryImpl @Inject constructor(
         userId: String,
         location: ParticipantLocation
     ): Result<Unit> {
+        Log.d("updateCheck", "update excuetion")
         val roomId = currentRoomId
             ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
         return updateMyLocation(roomId, userId, location)
@@ -204,7 +205,10 @@ class RoomRepositoryImpl @Inject constructor(
             .map { roomDto ->
                 Log.d(TAG, "[Repository] observeRoom - RoomDto 수신: ${roomDto?.roomId}")
                 val room = roomDto?.toModel()
-                Log.d(TAG, "[Repository] observeRoom - Room 변환 완료: roomId=${room?.roomId}, destination=${room?.destination?.name}")
+                Log.d(
+                    TAG,
+                    "[Repository] observeRoom - Room 변환 완료: roomId=${room?.roomId}, destination=${room?.destination?.name}"
+                )
                 room
             }
     }
