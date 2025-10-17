@@ -1,6 +1,8 @@
 package com.teammanduk.adego.core.domain.usecase
 
+import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.model.ParticipantLocation
+import com.teammanduk.adego.core.model.ParticipantRoute
 import com.teammanduk.adego.core.model.Route
 import javax.inject.Inject
 
@@ -9,10 +11,11 @@ import javax.inject.Inject
  *
  * 책임:
  * - 디버그 위치 생성 (ParticipantLocation)
- * - 위치 및 ETA 업데이트 (UpdateLocationAndEtaUseCase 위임)
+ * - 위치 및 ETA 업데이트 (디바운싱 없이 즉시 실행)
  */
 class DebugSetLocationUseCase @Inject constructor(
-    private val updateLocationAndEtaUseCase: UpdateLocationAndEtaUseCase
+    private val roomRepository: RoomRepository,
+    private val calculateEtaUseCase: CalculateEtaUseCase
 ) {
     /**
      * @param userId 사용자 ID
@@ -27,19 +30,39 @@ class DebugSetLocationUseCase @Inject constructor(
         longitude: Double,
         selectedRoute: Route?
     ): Result<Unit> {
-        // 디버그 위치 생성
-        val debugLocation = ParticipantLocation(
-            latitude = latitude,
-            longitude = longitude,
-            updatedAt = System.currentTimeMillis(),
-            accuracy = 1.0f
-        )
+        return try {
+            // 디버그 위치 생성
+            val debugLocation = ParticipantLocation(
+                latitude = latitude,
+                longitude = longitude,
+                updatedAt = System.currentTimeMillis(),
+                accuracy = 1.0f
+            )
 
-        // 위치 및 ETA 업데이트 (디바운싱 없이 즉시 실행)
-        return updateLocationAndEtaUseCase(
-            userId = userId,
-            location = debugLocation,
-            selectedRoute = selectedRoute
-        )
+            // 1. 위치 업데이트
+            roomRepository.updateMyLocation(userId, debugLocation)
+
+            // 2. 선택된 경로가 있으면 ETA 계산 및 업데이트
+            selectedRoute?.let { route ->
+                val etaResult = calculateEtaUseCase(route, debugLocation)
+
+                etaResult?.let { result ->
+                    val participantRoute = ParticipantRoute(
+                        durationInSeconds = result.remainingTimeInSeconds,
+                        distanceInMeters = result.remainingDistanceInMeters.toInt(),
+                        polyline = "",
+                        updatedAt = System.currentTimeMillis(),
+                        currentSubPathIndex = result.currentSubPathIndex,
+                        progressInCurrentSubPath = result.progressInCurrentSubPath
+                    )
+
+                    roomRepository.updateMyRoute(userId, participantRoute)
+                }
+            }
+
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

@@ -241,11 +241,9 @@ class RoomRepositoryImpl @Inject constructor(
         return roomDataSource.updateParticipantRoute(
             roomId = roomId,
             userId = userId,
-            eta = route.eta,
-            distance = route.distance,
-            polyline = route.polyline,
             durationInSeconds = route.durationInSeconds,
             distanceInMeters = route.distanceInMeters,
+            polyline = route.polyline,
             timestamp = route.updatedAt
         )
     }

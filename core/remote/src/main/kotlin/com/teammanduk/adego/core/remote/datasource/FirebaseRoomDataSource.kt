@@ -186,20 +186,16 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
     override suspend fun updateParticipantRoute(
         roomId: String,
         userId: String,
-        eta: String,
-        distance: String,
-        polyline: String,
         durationInSeconds: Int,
         distanceInMeters: Int,
+        polyline: String,
         timestamp: Long
     ): Result<Unit> {
         return try {
             val routeMap = mapOf(
-                "eta" to eta,
-                "distance" to distance,
-                "polyline" to polyline,
                 "durationInSeconds" to durationInSeconds,
                 "distanceInMeters" to distanceInMeters,
+                "polyline" to polyline,
                 "updatedAt" to timestamp
             )
 

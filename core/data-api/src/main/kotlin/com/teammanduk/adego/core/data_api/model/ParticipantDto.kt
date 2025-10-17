@@ -16,11 +16,9 @@ data class ParticipantLocationDto(
 )
 
 data class ParticipantRouteDto(
-    val eta: String = "",
-    val distance: String = "",
-    val polyline: String = "",
     val durationInSeconds: Int = 0,
     val distanceInMeters: Int = 0,
+    val polyline: String = "",
     val updatedAt: Long = 0L,
     val currentSubPathIndex: Int = -1,
     val progressInCurrentSubPath: Double = 0.0
