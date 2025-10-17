@@ -35,13 +35,17 @@ import com.teammanduk.adego.feature.map.model.toUiModel
 import com.teammanduk.adego.feature.map.model.toUiModels
 import com.teammanduk.adego.feature.map.util.NicknameGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -64,6 +68,14 @@ class MapViewModel @Inject constructor(
 
     private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
     private val userId: String = savedStateHandle.get<String>("userId") ?: ""
+
+    // ETA 계산 관련 상태
+    private var etaCalculationJob: Job? = null
+    private var lastEtaCalculationTime = 0L
+    private val ETA_CALCULATION_INTERVAL_MS = 30000L // 30초마다만 계산 (Firebase 부하 감소)
+
+    // 위치 추적 Job (중복 구독 방지)
+    private var locationTrackingJob: Job? = null
 
     init {
         _uiState.update { it.copy(roomId = roomId, userId = userId) }
@@ -104,7 +116,13 @@ class MapViewModel @Inject constructor(
     }
 
     fun startLocationTracking() {
-        viewModelScope.launch {
+        // 이미 위치 추적 중이면 중복 실행 방지
+        if (locationTrackingJob?.isActive == true) {
+            android.util.Log.d("MapViewModel", "위치 추적이 이미 실행 중입니다. 중복 호출 무시.")
+            return
+        }
+
+        locationTrackingJob = viewModelScope.launch {
             try {
                 // 1. 현재 위치를 가져올 때까지 재시도 (최대 10회, 2초 간격)
                 var retryCount = 0
@@ -132,6 +150,8 @@ class MapViewModel @Inject constructor(
                     }
                     return@launch
                 }
+
+                android.util.Log.d("MapViewModel", "위치 추적 시작 - 실시간 업데이트 구독")
 
                 // 2. 위치를 성공적으로 가져온 후 실시간 위치 업데이트 구독
                 trackAndUpdateLocation()
@@ -305,33 +325,58 @@ class MapViewModel @Inject constructor(
 
     /**
      * 위치 업데이트 시 ETA 계산 및 Firebase 업데이트
+     * - 디바운싱: 10초마다만 계산
+     * - 백그라운드 스레드에서 계산 (메인 스레드 블로킹 방지)
+     * - 중복 계산 방지
      */
     private fun calculateAndUpdateEta(currentLocation: com.teammanduk.adego.core.model.ParticipantLocation) {
-        viewModelScope.launch {
-            val currentState = _uiState.value
-            val selectedRoute = currentState.searchedRoutes.getOrNull(currentState.selectedRouteIndex ?: -1)
+        val currentTime = System.currentTimeMillis()
 
-            // 선택된 경로가 없으면 계산하지 않음
-            if (selectedRoute == null) return@launch
+        // 마지막 계산으로부터 10초가 지나지 않았으면 스킵
+        if (currentTime - lastEtaCalculationTime < ETA_CALCULATION_INTERVAL_MS) {
+            return
+        }
 
-            // ETA 계산
-            val etaResult = calculateEtaUseCase(selectedRoute, currentLocation)
+        // 이미 계산 중이면 스킵
+        if (etaCalculationJob?.isActive == true) {
+            return
+        }
 
-            if (etaResult != null) {
-                // ParticipantRoute 생성
-                val participantRoute = ParticipantRoute(
-                    eta = formatEtaString(etaResult.remainingTimeInSeconds),
-                    distance = formatDistanceString(etaResult.remainingDistanceInMeters),
-                    polyline = "", // 필요시 polyline 인코딩 구현
-                    durationInSeconds = etaResult.remainingTimeInSeconds,
-                    distanceInMeters = etaResult.remainingDistanceInMeters.toInt(),
-                    updatedAt = System.currentTimeMillis(),
-                    currentSubPathIndex = etaResult.currentSubPathIndex,
-                    progressInCurrentSubPath = etaResult.progressInCurrentSubPath
-                )
+        etaCalculationJob = viewModelScope.launch {
+            try {
+                val currentState = _uiState.value
+                val selectedRoute = currentState.searchedRoutes.getOrNull(currentState.selectedRouteIndex ?: -1)
 
-                // Firebase에 업데이트
-                roomRepository.updateMyRoute(userId, participantRoute)
+                // 선택된 경로가 없으면 계산하지 않음
+                if (selectedRoute == null) return@launch
+
+                // 백그라운드 스레드에서 ETA 계산 (무거운 연산)
+                val etaResult = withContext(Dispatchers.Default) {
+                    calculateEtaUseCase(selectedRoute, currentLocation)
+                }
+
+                if (etaResult != null) {
+                    // ParticipantRoute 생성
+                    val participantRoute = ParticipantRoute(
+                        eta = formatEtaString(etaResult.remainingTimeInSeconds),
+                        distance = formatDistanceString(etaResult.remainingDistanceInMeters),
+                        polyline = "", // 필요시 polyline 인코딩 구현
+                        durationInSeconds = etaResult.remainingTimeInSeconds,
+                        distanceInMeters = etaResult.remainingDistanceInMeters.toInt(),
+                        updatedAt = System.currentTimeMillis(),
+                        currentSubPathIndex = etaResult.currentSubPathIndex,
+                        progressInCurrentSubPath = etaResult.progressInCurrentSubPath
+                    )
+
+                    // Firebase에 업데이트
+                    roomRepository.updateMyRoute(userId, participantRoute)
+
+                    // 계산 시간 업데이트
+                    lastEtaCalculationTime = currentTime
+                }
+            } catch (e: Exception) {
+                // ETA 계산 실패는 무시 (위치 추적은 계속)
+                android.util.Log.e("MapViewModel", "ETA 계산 실패: ${e.message}", e)
             }
         }
     }
@@ -367,6 +412,11 @@ class MapViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+
+        // 위치 추적 Job 취소
+        locationTrackingJob?.cancel()
+        etaCalculationJob?.cancel()
+
         viewModelScope.launch {
             locationRepository.stopLocationTracking()
             roomRepository.clearCurrentRoom()

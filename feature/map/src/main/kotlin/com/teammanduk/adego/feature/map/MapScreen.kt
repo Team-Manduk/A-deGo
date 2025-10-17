@@ -221,9 +221,9 @@ private fun MapScreen(
 
                         val markerIcon = createParticipantMarkerIcon(participant.color, isSelected)
 
+                        // MarkerState는 userId만으로 key 생성 (위치 변경 시 재생성 방지)
                         val markerState = rememberMarkerState(
-                            key = "${participant.userId}_${location.latitude}_${location.longitude}",
-                            position = LatLng(location.latitude, location.longitude)
+                            key = participant.userId
                         )
 
                         // 위치가 변경되면 MarkerState 업데이트
@@ -348,12 +348,14 @@ private fun MapScreen(
                         list.toList()
                     }
 
+                    // 현재 참가자의 진행 중인 구간 확인 (remember로 캐싱)
+                    val currentSubPathIndex = remember(selectedParticipant?.route?.currentSubPathIndex) {
+                        selectedParticipant?.route?.currentSubPathIndex ?: -1
+                    }
+
                     // 생성된 Polyline 데이터를 기반으로 실제 Polyline 그리기
                     polylineDataList.forEach { data ->
                         key(data.key) {
-                            // 현재 참가자의 경로 정보에서 진행 중인 구간 확인
-                            val currentSubPathIndex = selectedParticipant?.route?.currentSubPathIndex ?: -1
-
                             // 현재 구간이면 더 두껍고 밝게 표시 (하이라이트)
                             val isCurrentSegment = data.subPathIndex == currentSubPathIndex && currentSubPathIndex >= 0
 
@@ -361,17 +363,21 @@ private fun MapScreen(
                             val isPastSegment = data.subPathIndex >= 0 && data.subPathIndex < currentSubPathIndex
                             val isFutureSegment = data.subPathIndex > currentSubPathIndex
 
-                            val displayColor = when {
-                                isCurrentSegment -> data.color.copy(alpha = 1f) // 현재: 밝게
-                                isPastSegment -> data.color.copy(alpha = 0.4f) // 과거: 흐리게
-                                isFutureSegment -> data.color.copy(alpha = 0.7f) // 미래: 보통
-                                else -> data.color.copy(alpha = 0.6f) // 연결선 등
+                            val displayColor = remember(currentSubPathIndex, data.subPathIndex) {
+                                when {
+                                    isCurrentSegment -> data.color.copy(alpha = 1f) // 현재: 밝게
+                                    isPastSegment -> data.color.copy(alpha = 0.4f) // 과거: 흐리게
+                                    isFutureSegment -> data.color.copy(alpha = 0.7f) // 미래: 보통
+                                    else -> data.color.copy(alpha = 0.6f) // 연결선 등
+                                }
                             }
 
-                            val displayWidth = if (isCurrentSegment) {
-                                data.width * 1.3f // 현재 구간은 더 두껍게
-                            } else {
-                                data.width
+                            val displayWidth = remember(currentSubPathIndex, data.subPathIndex) {
+                                if (isCurrentSegment) {
+                                    data.width * 1.3f // 현재 구간은 더 두껍게
+                                } else {
+                                    data.width
+                                }
                             }
 
                             Polyline(

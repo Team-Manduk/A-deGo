@@ -144,7 +144,7 @@ class FusedLocationDataSource @Inject constructor(
 
     companion object {
         private const val TAG = "FusedLocationDataSource"
-        private const val LOCATION_UPDATE_INTERVAL = 5000L // 5초
-        private const val FASTEST_LOCATION_INTERVAL = 2000L // 2초
+        private const val LOCATION_UPDATE_INTERVAL = 15000L // 15초 (Firebase 부하 감소)
+        private const val FASTEST_LOCATION_INTERVAL = 10000L // 10초 (최소 간격)
     }
 }
