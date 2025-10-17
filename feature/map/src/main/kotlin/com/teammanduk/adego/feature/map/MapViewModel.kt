@@ -6,9 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.repository.LocationRepository
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
+import com.teammanduk.adego.core.domain.usecase.CalculateEtaUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
+import com.teammanduk.adego.core.model.ParticipantRoute
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapIntent.ClearError
 import com.teammanduk.adego.feature.map.model.MapIntent.ConfirmUserName
@@ -50,7 +52,8 @@ class MapViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val roomRepository: RoomRepository,
     private val locationRepository: LocationRepository,
-    private val searchRouteUseCase: SearchRouteUseCase
+    private val searchRouteUseCase: SearchRouteUseCase,
+    private val calculateEtaUseCase: CalculateEtaUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -144,6 +147,9 @@ class MapViewModel @Inject constructor(
                         _uiState.update { currentState ->
                             currentState.copy(isLocationTrackingActive = true)
                         }
+
+                        // 3. 위치 업데이트 시 ETA 계산 및 업데이트
+                        calculateAndUpdateEta(location)
                     }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "위치 추적 시작 실패: ${e.message}") }
@@ -296,6 +302,68 @@ class MapViewModel @Inject constructor(
         }
     }
 
+
+    /**
+     * 위치 업데이트 시 ETA 계산 및 Firebase 업데이트
+     */
+    private fun calculateAndUpdateEta(currentLocation: com.teammanduk.adego.core.model.ParticipantLocation) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val selectedRoute = currentState.searchedRoutes.getOrNull(currentState.selectedRouteIndex ?: -1)
+
+            // 선택된 경로가 없으면 계산하지 않음
+            if (selectedRoute == null) return@launch
+
+            // ETA 계산
+            val etaResult = calculateEtaUseCase(selectedRoute, currentLocation)
+
+            if (etaResult != null) {
+                // ParticipantRoute 생성
+                val participantRoute = ParticipantRoute(
+                    eta = formatEtaString(etaResult.remainingTimeInSeconds),
+                    distance = formatDistanceString(etaResult.remainingDistanceInMeters),
+                    polyline = "", // 필요시 polyline 인코딩 구현
+                    durationInSeconds = etaResult.remainingTimeInSeconds,
+                    distanceInMeters = etaResult.remainingDistanceInMeters.toInt(),
+                    updatedAt = System.currentTimeMillis(),
+                    currentSubPathIndex = etaResult.currentSubPathIndex,
+                    progressInCurrentSubPath = etaResult.progressInCurrentSubPath
+                )
+
+                // Firebase에 업데이트
+                roomRepository.updateMyRoute(userId, participantRoute)
+            }
+        }
+    }
+
+    /**
+     * 남은 시간을 문자열로 포맷 (예: "15분", "1시간 30분")
+     */
+    private fun formatEtaString(seconds: Int): String {
+        val minutes = (seconds / 60).coerceAtLeast(1)
+        return when {
+            minutes < 60 -> "${minutes}분"
+            else -> {
+                val hours = minutes / 60
+                val remainingMinutes = minutes % 60
+                if (remainingMinutes == 0) {
+                    "${hours}시간"
+                } else {
+                    "${hours}시간 ${remainingMinutes}분"
+                }
+            }
+        }
+    }
+
+    /**
+     * 남은 거리를 문자열로 포맷 (예: "3.2km", "850m")
+     */
+    private fun formatDistanceString(meters: Double): String {
+        return when {
+            meters >= 1000 -> String.format("%.1fkm", meters / 1000)
+            else -> String.format("%.0fm", meters)
+        }
+    }
 
     override fun onCleared() {
         super.onCleared()

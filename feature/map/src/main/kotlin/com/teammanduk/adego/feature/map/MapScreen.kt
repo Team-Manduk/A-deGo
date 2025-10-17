@@ -245,6 +245,7 @@ private fun MapScreen(
             // 선택한 경로 그리기 (TMAP Transit API 방식)
             if (uiState.selectedRouteIndex != null) {
                 val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
+                val selectedParticipant = uiState.participants.getOrNull(pagerState.currentPage)
 
                 selectedRoute?.let { route ->
                     // 모든 SubPath를 미리 처리하여 Polyline 데이터 생성 (remember로 메모이제이션)
@@ -274,7 +275,8 @@ private fun MapScreen(
                                                     alpha = 0.4f
                                                 ),
                                                 width = 4f,
-                                                key = "connector_$index"
+                                                key = "connector_$index",
+                                                subPathIndex = -1
                                             )
                                         )
                                     }
@@ -311,7 +313,7 @@ private fun MapScreen(
                             // 포인트가 있으면 Polyline 데이터 추가
                             if (points.size >= 2) {
                                 // 교통수단에 따라 다른 색상과 두께 사용
-                                val lineColor = when (subPath.trafficType) {
+                                val baseLineColor = when (subPath.trafficType) {
                                     com.teammanduk.adego.core.model.TrafficType.SUBWAY -> Color(
                                         0xFF0052A4
                                     )
@@ -334,9 +336,10 @@ private fun MapScreen(
                                 list.add(
                                     PolylineData(
                                         points = points.toList(),
-                                        color = lineColor,
+                                        color = baseLineColor,
                                         width = lineWidth,
-                                        key = "subpath_$index"
+                                        key = "subpath_$index",
+                                        subPathIndex = index
                                     )
                                 )
                             }
@@ -348,8 +351,34 @@ private fun MapScreen(
                     // 생성된 Polyline 데이터를 기반으로 실제 Polyline 그리기
                     polylineDataList.forEach { data ->
                         key(data.key) {
+                            // 현재 참가자의 경로 정보에서 진행 중인 구간 확인
+                            val currentSubPathIndex = selectedParticipant?.route?.currentSubPathIndex ?: -1
+
+                            // 현재 구간이면 더 두껍고 밝게 표시 (하이라이트)
+                            val isCurrentSegment = data.subPathIndex == currentSubPathIndex && currentSubPathIndex >= 0
+
+                            // 이미 지나간 구간은 흐리게, 현재 구간은 밝게, 미래 구간은 보통으로
+                            val isPastSegment = data.subPathIndex >= 0 && data.subPathIndex < currentSubPathIndex
+                            val isFutureSegment = data.subPathIndex > currentSubPathIndex
+
+                            val displayColor = when {
+                                isCurrentSegment -> data.color.copy(alpha = 1f) // 현재: 밝게
+                                isPastSegment -> data.color.copy(alpha = 0.4f) // 과거: 흐리게
+                                isFutureSegment -> data.color.copy(alpha = 0.7f) // 미래: 보통
+                                else -> data.color.copy(alpha = 0.6f) // 연결선 등
+                            }
+
+                            val displayWidth = if (isCurrentSegment) {
+                                data.width * 1.3f // 현재 구간은 더 두껍게
+                            } else {
+                                data.width
+                            }
+
                             Polyline(
-                                points = data.points, color = data.color, width = data.width
+                                points = data.points,
+                                color = displayColor,
+                                width = displayWidth,
+                                zIndex = if (isCurrentSegment) 1f else 0f
                             )
                         }
                     }
@@ -439,7 +468,11 @@ private fun MapScreen(
  * Polyline 데이터를 저장하는 데이터 클래스
  */
 private data class PolylineData(
-    val points: List<LatLng>, val color: Color, val width: Float, val key: String
+    val points: List<LatLng>,
+    val color: Color,
+    val width: Float,
+    val key: String,
+    val subPathIndex: Int = -1 // 어떤 SubPath에 속하는지 (-1은 connector)
 )
 
 /**

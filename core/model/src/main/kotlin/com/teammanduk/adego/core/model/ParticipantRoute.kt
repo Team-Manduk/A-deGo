@@ -9,5 +9,7 @@ data class ParticipantRoute(
     val polyline: String, // 인코딩된 경로
     val durationInSeconds: Int = 0,
     val distanceInMeters: Int = 0,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val currentSubPathIndex: Int = -1, // 현재 진행 중인 구간 인덱스
+    val progressInCurrentSubPath: Double = 0.0 // 현재 구간 내 진행률 (0.0 ~ 1.0)
 )

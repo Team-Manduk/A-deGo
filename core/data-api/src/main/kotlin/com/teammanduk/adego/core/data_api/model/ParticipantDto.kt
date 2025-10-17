@@ -21,5 +21,7 @@ data class ParticipantRouteDto(
     val polyline: String = "",
     val durationInSeconds: Int = 0,
     val distanceInMeters: Int = 0,
-    val updatedAt: Long = 0L
+    val updatedAt: Long = 0L,
+    val currentSubPathIndex: Int = -1,
+    val progressInCurrentSubPath: Double = 0.0
 )

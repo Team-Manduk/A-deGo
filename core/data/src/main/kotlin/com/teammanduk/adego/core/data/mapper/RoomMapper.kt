@@ -82,7 +82,9 @@ fun ParticipantRouteDto.toModel(): ParticipantRoute {
         polyline = polyline,
         durationInSeconds = durationInSeconds,
         distanceInMeters = distanceInMeters,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        currentSubPathIndex = currentSubPathIndex,
+        progressInCurrentSubPath = progressInCurrentSubPath
     )
 }
 
@@ -93,6 +95,8 @@ fun ParticipantRoute.toDto(): ParticipantRouteDto {
         polyline = polyline,
         durationInSeconds = durationInSeconds,
         distanceInMeters = distanceInMeters,
-        updatedAt = updatedAt
+        updatedAt = updatedAt,
+        currentSubPathIndex = currentSubPathIndex,
+        progressInCurrentSubPath = progressInCurrentSubPath
     )
 }
