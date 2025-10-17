@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.repository.RoomRepository
+import com.teammanduk.adego.core.domain.service.ColorGenerator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +21,8 @@ data class RoomJoinInfo(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val roomRepository: RoomRepository
+    private val roomRepository: RoomRepository,
+    private val colorGenerator: ColorGenerator
 ) : ViewModel() {
 
     private val _isJoining = MutableStateFlow(false)
@@ -57,12 +59,16 @@ class HomeViewModel @Inject constructor(
                         val tempUserId = "user_${System.currentTimeMillis()}"
                         val tempUserName = "사용자"
 
-                        // 3. 방 참여
+                        // 3. 사용자 색상 생성
+                        val profileColor = colorGenerator.generateColorFromUserId(tempUserId)
+
+                        // 4. 방 참여
                         Log.d(TAG, "[HomeViewModel] 방 참여 시도 - userId: $tempUserId, userName: $tempUserName")
                         val joinResult = roomRepository.joinRoom(
                             roomId = inviteCode,
                             userId = tempUserId,
-                            userName = tempUserName
+                            userName = tempUserName,
+                            profileColor = profileColor
                         )
 
                         joinResult.fold(
