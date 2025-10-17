@@ -7,6 +7,7 @@ import com.teammanduk.adego.core.domain.repository.LocationRepository
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
 import com.teammanduk.adego.core.domain.usecase.DebugSetLocationUseCase
+import com.teammanduk.adego.core.domain.usecase.GetRoomInfoUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
@@ -50,12 +51,13 @@ import javax.inject.Inject
 class MapViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val joinRoom: JoinRoomUseCase,
+    private val getRoomInfo: GetRoomInfoUseCase,
     private val trackAndUpdateLocation: TrackAndUpdateLocationUseCase,
+    private val searchRouteUseCase: SearchRouteUseCase,
+    private val debugSetLocationUseCase: DebugSetLocationUseCase,
     private val userRepository: UserRepository,
     private val roomRepository: RoomRepository,
-    private val locationRepository: LocationRepository,
-    private val searchRouteUseCase: SearchRouteUseCase,
-    private val debugSetLocationUseCase: DebugSetLocationUseCase
+    private val locationRepository: LocationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -75,7 +77,7 @@ class MapViewModel @Inject constructor(
 
         // 방 존재 여부 확인
         viewModelScope.launch {
-            roomRepository.getRoomInfo(roomId)
+            getRoomInfo(roomId)
                 .onSuccess { room ->
                     if (room == null) {
                         _uiState.update {
@@ -304,7 +306,7 @@ class MapViewModel @Inject constructor(
                     _uiState.update { currentState ->
                         currentState.copy(
                             room = room?.toUiModel(),
-                            participants = participants.toUiModels(),
+                            participants = participants.toUiModels(room?.destination),
                             showUserNameDialog = false
                         )
                     }

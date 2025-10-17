@@ -204,24 +204,9 @@ private data class TmapProperties(
  * TMAP API를 사용한 경로 검색 DataSource 구현체
  */
 @Singleton
-class TmapRouteDataSource @Inject constructor() : RouteDataSource {
-
-    private val httpClient = HttpClient(OkHttp) {
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-            })
-        }
-        install(Logging) {
-            logger = object : Logger {
-                override fun log(message: String) {
-                    Log.d(TAG, message)
-                }
-            }
-            level = LogLevel.ALL
-        }
-    }
+class TmapRouteDataSource @Inject constructor(
+    private val httpClient: HttpClient
+) : RouteDataSource {
 
     override suspend fun searchTransitRoute(
         startLat: Double,
