@@ -2,9 +2,8 @@ package com.teammanduk.adego.feature.create
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.teammanduk.adego.core.domain.repository.RoomRepository
-import com.teammanduk.adego.core.domain.service.ColorGenerator
 import com.teammanduk.adego.core.domain.usecase.ClearSelectedPlaceUseCase
+import com.teammanduk.adego.core.domain.usecase.CreateRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.model.Place
 import com.teammanduk.adego.feature.create.model.CreateIntent
@@ -30,8 +29,7 @@ import javax.inject.Inject
 class CreateViewModel @Inject constructor(
     private val getSelectedPlaceUseCase: GetSelectedPlaceUseCase,
     private val clearSelectedPlaceUseCase: ClearSelectedPlaceUseCase,
-    private val roomRepository: RoomRepository,
-    private val colorGenerator: ColorGenerator
+    private val createRoomUseCase: CreateRoomUseCase
 ) : ViewModel() {
 
     private val selectedPlaceFromUseCase: StateFlow<Place?> = getSelectedPlaceUseCase()
@@ -189,16 +187,12 @@ class CreateViewModel @Inject constructor(
 
                 val dateTime = formatDateTime(dateMillis, hour, minute)
 
-                // 사용자 색상 생성
-                val profileColor = colorGenerator.generateColorFromUserId(userId)
-
-                val result = roomRepository.createRoom(
+                val result = createRoomUseCase(
                     roomName = roomName,
                     destination = place,
                     dateTime = dateTime,
                     userId = userId,
-                    userName = userName,
-                    profileColor = profileColor
+                    userName = userName
                 )
 
                 result.onSuccess { roomId ->

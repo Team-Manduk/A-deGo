@@ -6,7 +6,6 @@ import com.teammanduk.adego.core.data.mapper.toModel
 import com.teammanduk.adego.core.data_api.datasource.RoomDataSource
 import com.teammanduk.adego.core.data_api.model.ParticipantDto
 import com.teammanduk.adego.core.domain.repository.RoomRepository
-import com.teammanduk.adego.core.domain.service.DistanceCalculator
 import com.teammanduk.adego.core.model.Participant
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
@@ -19,8 +18,7 @@ import javax.inject.Singleton
 
 @Singleton
 class RoomRepositoryImpl @Inject constructor(
-    private val roomDataSource: RoomDataSource,
-    private val distanceCalculator: DistanceCalculator
+    private val roomDataSource: RoomDataSource
 ) : RoomRepository {
 
     // 현재 참여 중인 방 ID (세션 정보)
@@ -189,32 +187,10 @@ class RoomRepositoryImpl @Inject constructor(
     }
 
     override fun observeParticipants(roomId: String): Flow<List<Participant>> {
-        // Room 정보와 참가자 정보를 combine하여 거리 계산
-        return kotlinx.coroutines.flow.combine(
-            roomDataSource.observeRoom(roomId),
-            roomDataSource.observeParticipants(roomId)
-        ) { roomDto, participantDtos ->
-            val destination = roomDto?.destination
-
-            participantDtos.map { participantDto ->
-                val participant = participantDto.toModel()
-
-                // 목적지와 참가자 위치가 모두 있으면 거리 계산
-                val location = participant.location
-                val distance = if (destination != null && location != null) {
-                    distanceCalculator.calculateDistanceInMetersInt(
-                        lat1 = location.latitude,
-                        lon1 = location.longitude,
-                        lat2 = destination.latitude,
-                        lon2 = destination.longitude
-                    )
-                } else {
-                    null
-                }
-
-                participant.copy(distanceToDestination = distance)
+        return roomDataSource.observeParticipants(roomId)
+            .map { participantDtos ->
+                participantDtos.map { it.toModel() }
             }
-        }
     }
 
 

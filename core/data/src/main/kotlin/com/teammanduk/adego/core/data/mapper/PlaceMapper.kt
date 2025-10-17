@@ -8,7 +8,8 @@ fun PlaceDto.toModel(): Place {
         name = name,
         address = address,
         latitude = latitude,
-        longitude = longitude
+        longitude = longitude,
+        isPOI = isPOI
     )
 }
 
@@ -17,6 +18,7 @@ fun Place.toDto(): PlaceDto {
         name = name,
         address = address,
         latitude = latitude,
-        longitude = longitude
+        longitude = longitude,
+        isPOI = isPOI
     )
 }
