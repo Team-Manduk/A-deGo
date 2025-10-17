@@ -203,10 +203,11 @@ private fun CreateScreen(
             if (uiState.currentStep == CreateStep.READY_TO_CREATE) {
                 Button(
                     onClick = {
+                        val timestamp = System.currentTimeMillis()
                         onIntent(
                             CreateIntent.CreateRoom(
-                                userId = "user_${System.currentTimeMillis()}",
-                                userName = ""
+                                userId = "user_$timestamp",
+                                userName = "사용자${timestamp % 10000}"
                             )
                         )
                     },

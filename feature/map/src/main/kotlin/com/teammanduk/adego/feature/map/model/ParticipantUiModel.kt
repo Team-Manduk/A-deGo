@@ -36,10 +36,11 @@ fun Participant.toUiModel(destination: Place? = null): ParticipantUiModel {
     val formattedDistance = route?.distanceInMeters?.let { EtaFormatter.formatDistance(it) }
 
     // 목적지와 현재 위치가 모두 있으면 직선거리 계산
-    val distanceToDestination = if (destination != null && location != null) {
+    val currentLocation = this.location
+    val distanceToDestination = if (destination != null && currentLocation != null) {
         calculateDistance(
-            lat1 = location.latitude,
-            lon1 = location.longitude,
+            lat1 = currentLocation.latitude,
+            lon1 = currentLocation.longitude,
             lat2 = destination.latitude,
             lon2 = destination.longitude
         )

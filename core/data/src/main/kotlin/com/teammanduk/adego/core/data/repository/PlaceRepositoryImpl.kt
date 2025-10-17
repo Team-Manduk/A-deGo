@@ -4,11 +4,10 @@ import android.util.Log
 import com.teammanduk.adego.core.data.mapper.toModel
 import com.teammanduk.adego.core.data_api.datasource.PoiSearchDataSource
 import com.teammanduk.adego.core.data_api.datasource.ReverseGeocodingDataSource
+import com.teammanduk.adego.core.data_api.di.AndroidGeocoder
+import com.teammanduk.adego.core.data_api.di.TmapReverseGeocoding
 import com.teammanduk.adego.core.domain.repository.PlaceRepository
 import com.teammanduk.adego.core.model.Place
-import com.teammanduk.adego.core.remote.datasource.AndroidGeocoderDataSource
-import com.teammanduk.adego.core.remote.datasource.TmapPoiDataSource
-import com.teammanduk.adego.core.remote.datasource.TmapReverseGeocodingDataSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,9 +24,9 @@ import javax.inject.Singleton
  */
 @Singleton
 class PlaceRepositoryImpl @Inject constructor(
-    private val tmapReverseGeocodingDataSource: TmapReverseGeocodingDataSource,
-    private val tmapPoiDataSource: TmapPoiDataSource,
-    private val androidGeocoderDataSource: AndroidGeocoderDataSource
+    @TmapReverseGeocoding private val tmapReverseGeocodingDataSource: ReverseGeocodingDataSource,
+    private val tmapPoiDataSource: PoiSearchDataSource,
+    @AndroidGeocoder private val androidGeocoderDataSource: ReverseGeocodingDataSource
 ) : PlaceRepository {
 
     private val _selectedPlace = MutableStateFlow<Place?>(null)

@@ -6,6 +6,8 @@ import com.teammanduk.adego.core.data_api.datasource.PoiSearchDataSource
 import com.teammanduk.adego.core.data_api.datasource.ReverseGeocodingDataSource
 import com.teammanduk.adego.core.data_api.datasource.RoomDataSource
 import com.teammanduk.adego.core.data_api.datasource.RouteDataSource
+import com.teammanduk.adego.core.data_api.di.AndroidGeocoder
+import com.teammanduk.adego.core.data_api.di.TmapReverseGeocoding
 import com.teammanduk.adego.core.remote.datasource.AndroidGeocoderDataSource
 import com.teammanduk.adego.core.remote.datasource.FirebaseRoomDataSource
 import com.teammanduk.adego.core.remote.datasource.FusedLocationDataSource
@@ -73,8 +75,16 @@ abstract class RemoteModule {
 
     @Binds
     @Singleton
+    @TmapReverseGeocoding
     abstract fun bindTmapReverseGeocodingDataSource(
         tmapReverseGeocodingDataSource: TmapReverseGeocodingDataSource
+    ): ReverseGeocodingDataSource
+
+    @Binds
+    @Singleton
+    @AndroidGeocoder
+    abstract fun bindAndroidGeocoderDataSource(
+        androidGeocoderDataSource: AndroidGeocoderDataSource
     ): ReverseGeocodingDataSource
 
     @Binds
