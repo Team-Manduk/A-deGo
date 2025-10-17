@@ -3,12 +3,12 @@ package com.teammanduk.adego.feature.map
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.teammanduk.adego.core.domain.repository.LocationRepository
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
+import com.teammanduk.adego.core.domain.usecase.BroadcastLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
+import com.teammanduk.adego.core.domain.usecase.LeaveRoomSessionUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
-import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapIntent.ClearError
 import com.teammanduk.adego.feature.map.model.MapIntent.ConfirmUserName
@@ -46,10 +46,10 @@ import javax.inject.Inject
 class MapViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val joinRoom: JoinRoomUseCase,
-    private val trackAndUpdateLocation: TrackAndUpdateLocationUseCase,
+    private val broadcastLocation: BroadcastLocationUseCase,
+    private val leaveRoomSession: LeaveRoomSessionUseCase,
     private val userRepository: UserRepository,
     private val roomRepository: RoomRepository,
-    private val locationRepository: LocationRepository,
     private val searchRouteUseCase: SearchRouteUseCase
 ) : ViewModel() {
 
@@ -100,54 +100,20 @@ class MapViewModel @Inject constructor(
         }
     }
 
-    fun startLocationTracking() {
+    private fun startLocationTracking() {
         viewModelScope.launch {
-            try {
-                // 1. 현재 위치를 가져올 때까지 재시도 (최대 10회, 2초 간격)
-                var retryCount = 0
-                var locationObtained = false
-
-                while (!locationObtained && retryCount < 10) {
-                    locationRepository.getCurrentLocation()
-                        .onSuccess { location ->
-                            // 초기 위치를 Firebase에 즉시 업데이트 (participants에 자동 반영됨)
-                            roomRepository.updateMyLocation(userId, location)
-                            locationObtained = true
-                        }
-                        .onFailure { e ->
-                            retryCount++
-                            if (retryCount < 10) {
-                                kotlinx.coroutines.delay(2000) // 2초 대기 후 재시도
-                            }
-                        }
-                }
-
-                // 위치를 가져오지 못한 경우 에러 표시
-                if (!locationObtained) {
+            broadcastLocation()
+                .catch { e ->
                     _uiState.update {
-                        it.copy(error = "위치를 가져올 수 없습니다. 위치 서비스를 확인해주세요.")
+                        it.copy(
+                            error = e.message ?: "위치 추적 실패",
+                            isLocationTrackingActive = false
+                        )
                     }
-                    return@launch
                 }
-
-                // 2. 위치를 성공적으로 가져온 후 실시간 위치 업데이트 구독
-                trackAndUpdateLocation()
-                    .catch { e ->
-                        _uiState.update {
-                            it.copy(
-                                error = "위치 추적 실패: ${e.message}",
-                                isLocationTrackingActive = false
-                            )
-                        }
-                    }
-                    .collect { location ->
-                        _uiState.update { currentState ->
-                            currentState.copy(isLocationTrackingActive = true)
-                        }
-                    }
-            } catch (e: Exception) {
-                _uiState.update { it.copy(error = "위치 추적 시작 실패: ${e.message}") }
-            }
+                .collect { location ->
+                    _uiState.update { it.copy(isLocationTrackingActive = true) }
+                }
         }
     }
 
@@ -265,6 +231,7 @@ class MapViewModel @Inject constructor(
 
     private fun confirmUserName() {
         val userName = _uiState.value.userName
+
         if (userName.isBlank()) {
             _uiState.update { it.copy(error = "이름을 입력해주세요") }
             return
@@ -300,9 +267,7 @@ class MapViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         viewModelScope.launch {
-            locationRepository.stopLocationTracking()
-            roomRepository.clearCurrentRoom()
-            userRepository.clearCurrentUser()
+            leaveRoomSession()
         }
     }
 }
