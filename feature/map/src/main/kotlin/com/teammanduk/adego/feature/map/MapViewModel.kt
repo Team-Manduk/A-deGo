@@ -6,11 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.repository.LocationRepository
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
-import com.teammanduk.adego.core.domain.usecase.CalculateEtaUseCase
+import com.teammanduk.adego.core.domain.usecase.DebugSetLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.domain.usecase.TrackAndUpdateLocationUseCase
-import com.teammanduk.adego.core.model.ParticipantRoute
+import com.teammanduk.adego.core.domain.usecase.UpdateLocationAndEtaUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapIntent.ClearError
 import com.teammanduk.adego.feature.map.model.MapIntent.ConfirmUserName
@@ -35,9 +35,7 @@ import com.teammanduk.adego.feature.map.model.MapUiState
 import com.teammanduk.adego.feature.map.model.toUiModel
 import com.teammanduk.adego.feature.map.model.toUiModels
 import com.teammanduk.adego.feature.map.util.NicknameGenerator
-import com.teammanduk.adego.core.model.ParticipantLocation
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -47,7 +45,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
@@ -59,7 +56,8 @@ class MapViewModel @Inject constructor(
     private val roomRepository: RoomRepository,
     private val locationRepository: LocationRepository,
     private val searchRouteUseCase: SearchRouteUseCase,
-    private val calculateEtaUseCase: CalculateEtaUseCase
+    private val updateLocationAndEtaUseCase: UpdateLocationAndEtaUseCase,
+    private val debugSetLocationUseCase: DebugSetLocationUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -329,14 +327,14 @@ class MapViewModel @Inject constructor(
 
     /**
      * 위치 업데이트 시 ETA 계산 및 Firebase 업데이트
-     * - 디바운싱: 10초마다만 계산
-     * - 백그라운드 스레드에서 계산 (메인 스레드 블로킹 방지)
+     * - 디바운싱: 30초마다만 계산
      * - 중복 계산 방지
+     * - 비즈니스 로직은 UpdateLocationAndEtaUseCase에 위임
      */
     private fun calculateAndUpdateEta(currentLocation: com.teammanduk.adego.core.model.ParticipantLocation) {
         val currentTime = System.currentTimeMillis()
 
-        // 마지막 계산으로부터 10초가 지나지 않았으면 스킵
+        // 마지막 계산으로부터 30초가 지나지 않았으면 스킵 (디바운싱)
         if (currentTime - lastEtaCalculationTime < ETA_CALCULATION_INTERVAL_MS) {
             return
         }
@@ -347,136 +345,40 @@ class MapViewModel @Inject constructor(
         }
 
         etaCalculationJob = viewModelScope.launch {
-            try {
-                val currentState = _uiState.value
-                val selectedRoute = currentState.searchedRoutes.getOrNull(currentState.selectedRouteIndex ?: -1)
+            val selectedRoute = _uiState.value.searchedRoutes.getOrNull(
+                _uiState.value.selectedRouteIndex ?: -1
+            )
 
-                // 선택된 경로가 없으면 계산하지 않음
-                if (selectedRoute == null) return@launch
-
-                // 백그라운드 스레드에서 ETA 계산 (무거운 연산)
-                val etaResult = withContext(Dispatchers.Default) {
-                    calculateEtaUseCase(selectedRoute, currentLocation)
-                }
-
-                if (etaResult != null) {
-                    // ParticipantRoute 생성
-                    val participantRoute = ParticipantRoute(
-                        eta = formatEtaString(etaResult.remainingTimeInSeconds),
-                        distance = formatDistanceString(etaResult.remainingDistanceInMeters),
-                        polyline = "", // 필요시 polyline 인코딩 구현
-                        durationInSeconds = etaResult.remainingTimeInSeconds,
-                        distanceInMeters = etaResult.remainingDistanceInMeters.toInt(),
-                        updatedAt = System.currentTimeMillis(),
-                        currentSubPathIndex = etaResult.currentSubPathIndex,
-                        progressInCurrentSubPath = etaResult.progressInCurrentSubPath
-                    )
-
-                    // Firebase에 업데이트
-                    roomRepository.updateMyRoute(userId, participantRoute)
-
-                    // 계산 시간 업데이트
+            // UseCase에 위임
+            updateLocationAndEtaUseCase(userId, currentLocation, selectedRoute)
+                .onSuccess {
                     lastEtaCalculationTime = currentTime
                 }
-            } catch (e: Exception) {
-                // ETA 계산 실패는 무시 (위치 추적은 계속)
-                android.util.Log.e("MapViewModel", "ETA 계산 실패: ${e.message}", e)
-            }
+                .onFailure { e ->
+                    android.util.Log.e("MapViewModel", "위치/ETA 업데이트 실패: ${e.message}", e)
+                }
         }
     }
 
     /**
      * 디버그: 지도 클릭으로 위치 설정
+     * - 비즈니스 로직은 DebugSetLocationUseCase에 위임
+     * - 디바운싱 없이 즉시 실행
      */
     private fun handleDebugSetLocation(latitude: Double, longitude: Double) {
         viewModelScope.launch {
-            val debugLocation = ParticipantLocation(
-                latitude = latitude,
-                longitude = longitude,
-                updatedAt = System.currentTimeMillis(),
-                accuracy = 1.0f
+            val selectedRoute = _uiState.value.searchedRoutes.getOrNull(
+                _uiState.value.selectedRouteIndex ?: -1
             )
 
-            // Firebase에 디버그 위치 업데이트
-            roomRepository.updateMyLocation(userId, debugLocation)
-
-            // 디버그 모드에서는 디바운싱 무시하고 강제로 ETA 계산
-            calculateEtaImmediately(debugLocation)
-
-            android.util.Log.d("MapViewModel", "🔧 DEBUG: 위치 설정됨 - lat: $latitude, lng: $longitude")
-        }
-    }
-
-    /**
-     * 디바운싱 없이 즉시 ETA 계산 (디버그 전용)
-     */
-    private suspend fun calculateEtaImmediately(currentLocation: com.teammanduk.adego.core.model.ParticipantLocation) {
-        try {
-            val currentState = _uiState.value
-            val selectedRoute = currentState.searchedRoutes.getOrNull(currentState.selectedRouteIndex ?: -1)
-
-            if (selectedRoute == null) {
-                android.util.Log.d("MapViewModel", "🔧 DEBUG: 선택된 경로가 없어 ETA 계산 불가")
-                return
-            }
-
-            // 백그라운드 스레드에서 ETA 계산
-            val etaResult = withContext(Dispatchers.Default) {
-                calculateEtaUseCase(selectedRoute, currentLocation)
-            }
-
-            if (etaResult != null) {
-                android.util.Log.d("MapViewModel", "🔧 DEBUG: ETA 계산 완료 - 남은시간: ${etaResult.remainingTimeInSeconds}초, 남은거리: ${etaResult.remainingDistanceInMeters}m, 현재구간: ${etaResult.currentSubPathIndex}")
-
-                // ParticipantRoute 생성
-                val participantRoute = ParticipantRoute(
-                    eta = formatEtaString(etaResult.remainingTimeInSeconds),
-                    distance = formatDistanceString(etaResult.remainingDistanceInMeters),
-                    polyline = "",
-                    durationInSeconds = etaResult.remainingTimeInSeconds,
-                    distanceInMeters = etaResult.remainingDistanceInMeters.toInt(),
-                    updatedAt = System.currentTimeMillis(),
-                    currentSubPathIndex = etaResult.currentSubPathIndex,
-                    progressInCurrentSubPath = etaResult.progressInCurrentSubPath
-                )
-
-                // Firebase에 업데이트
-                roomRepository.updateMyRoute(userId, participantRoute)
-                android.util.Log.d("MapViewModel", "🔧 DEBUG: Firebase에 ETA 업데이트 완료")
-            } else {
-                android.util.Log.d("MapViewModel", "🔧 DEBUG: ETA 계산 결과가 null")
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("MapViewModel", "🔧 DEBUG: ETA 계산 실패: ${e.message}", e)
-        }
-    }
-
-    /**
-     * 남은 시간을 문자열로 포맷 (예: "15분", "1시간 30분")
-     */
-    private fun formatEtaString(seconds: Int): String {
-        val minutes = (seconds / 60).coerceAtLeast(1)
-        return when {
-            minutes < 60 -> "${minutes}분"
-            else -> {
-                val hours = minutes / 60
-                val remainingMinutes = minutes % 60
-                if (remainingMinutes == 0) {
-                    "${hours}시간"
-                } else {
-                    "${hours}시간 ${remainingMinutes}분"
+            // UseCase에 위임
+            debugSetLocationUseCase(userId, latitude, longitude, selectedRoute)
+                .onSuccess {
+                    android.util.Log.d("MapViewModel", "🔧 DEBUG: 위치 설정 완료 - lat: $latitude, lng: $longitude")
                 }
-            }
-        }
-    }
-
-    /**
-     * 남은 거리를 문자열로 포맷 (예: "3.2km", "850m")
-     */
-    private fun formatDistanceString(meters: Double): String {
-        return when {
-            meters >= 1000 -> String.format("%.1fkm", meters / 1000)
-            else -> String.format("%.0fm", meters)
+                .onFailure { e ->
+                    android.util.Log.e("MapViewModel", "🔧 DEBUG: 위치 설정 실패: ${e.message}", e)
+                }
         }
     }
 
