@@ -4,6 +4,7 @@ import android.util.Log
 import com.teammanduk.adego.core.data.mapper.toDto
 import com.teammanduk.adego.core.data.mapper.toModel
 import com.teammanduk.adego.core.data_api.datasource.RoomDataSource
+import com.teammanduk.adego.core.data_api.datasource.SessionDataSource
 import com.teammanduk.adego.core.data_api.model.ParticipantDto
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.model.Participant
@@ -13,12 +14,14 @@ import com.teammanduk.adego.core.model.Place
 import com.teammanduk.adego.core.model.Room
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class RoomRepositoryImpl @Inject constructor(
-    private val roomDataSource: RoomDataSource
+    private val roomDataSource: RoomDataSource,
+    private val sessionDataSource: SessionDataSource
 ) : RoomRepository {
 
     // 현재 참여 중인 방 ID (세션 정보)
@@ -27,6 +30,10 @@ class RoomRepositoryImpl @Inject constructor(
     // ===== 세션 관리 =====
     override fun setCurrentRoom(roomId: String) {
         currentRoomId = roomId
+        runBlocking {
+            sessionDataSource.saveRoomId(roomId)
+            // roomName은 joinRoom이나 createRoom에서 저장
+        }
         Log.d(TAG, "[Repository] 현재 방 세션 설정: $roomId")
     }
 
@@ -35,6 +42,9 @@ class RoomRepositoryImpl @Inject constructor(
     override fun clearCurrentRoom() {
         Log.d(TAG, "[Repository] 현재 방 세션 종료: $currentRoomId")
         currentRoomId = null
+        runBlocking {
+            sessionDataSource.clearSession()
+        }
     }
 
     // ===== 현재 방 기준 작업 (세션 기반) =====
@@ -146,6 +156,10 @@ class RoomRepositoryImpl @Inject constructor(
             roomDataSource.addParticipant(roomId, creatorParticipant).getOrThrow()
             Log.d(TAG, "[Repository] 참여자 추가 완료")
 
+            // 세션에 사용자 정보 및 방 정보 저장
+            sessionDataSource.saveUserName(userName)
+            sessionDataSource.saveRoomName(roomName)
+
             Log.d(TAG, "[Repository] 방 생성 완료! roomId=$roomId")
             Result.success(roomId)
         } catch (e: Exception) {
@@ -183,7 +197,13 @@ class RoomRepositoryImpl @Inject constructor(
                 route = null
             )
 
-            roomDataSource.addParticipant(roomId, participant)
+            roomDataSource.addParticipant(roomId, participant).getOrThrow()
+
+            // 세션에 사용자 정보 및 방 정보 저장
+            sessionDataSource.saveUserName(userName)
+            sessionDataSource.saveRoomName(room.roomName)
+
+            Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "[Repository] 방 참여 실패", e)
             Result.failure(e)
