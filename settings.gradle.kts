@@ -36,6 +36,7 @@ include(
     ":core:ui",
     ":core:navigation",
     ":core:data-api",
+    ":core:local",
     ":core:remote",
     ":core:data",
     ":core:domain",

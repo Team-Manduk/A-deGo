@@ -13,5 +13,6 @@ dependencies {
     implementation(projects.feature.place)
     implementation(projects.feature.route)
     implementation(projects.core.data)
+    implementation(projects.core.local)
     implementation(projects.core.remote)
 }
