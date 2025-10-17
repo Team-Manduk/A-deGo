@@ -5,7 +5,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
-import com.teammanduk.adego.core.domain.repository.RouteRepository
+import com.teammanduk.adego.core.domain.usecase.GetRouteDetailsUseCase
+import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.navigation.Route as NavigationRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,7 +26,8 @@ data class SelectRouteUiState(
 
 @HiltViewModel
 class SelectRouteViewModel @Inject constructor(
-    private val routeRepository: RouteRepository,
+    private val searchRouteUseCase: SearchRouteUseCase,
+    private val getRouteDetailsUseCase: GetRouteDetailsUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -66,7 +68,7 @@ class SelectRouteViewModel @Inject constructor(
             )
 
             try {
-                val detailedRoute = routeRepository.getRouteDetails(
+                val detailedRoute = getRouteDetailsUseCase(
                     route = route,
                     startLat = startLat,
                     startLng = startLng,
@@ -103,7 +105,7 @@ class SelectRouteViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = SelectRouteUiState(isLoading = true)
             try {
-                val routes = routeRepository.searchRoute(
+                val routes = searchRouteUseCase(
                     startLat = startLat,
                     startLng = startLng,
                     endLat = destLat,
