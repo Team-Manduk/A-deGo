@@ -64,7 +64,8 @@ interface RoomRepository {
         destination: com.teammanduk.adego.core.model.Place,
         dateTime: String,
         userId: String,
-        userName: String
+        userName: String,
+        profileColor: String
     ): Result<String> // roomId 반환
 
     /**
@@ -73,7 +74,8 @@ interface RoomRepository {
     suspend fun joinRoom(
         roomId: String,
         userId: String,
-        userName: String
+        userName: String,
+        profileColor: String
     ): Result<Unit>
 
     /**

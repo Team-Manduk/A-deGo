@@ -1,11 +1,11 @@
 package com.teammanduk.adego.core.domain.usecase
 
+import com.teammanduk.adego.core.domain.service.DistanceCalculator
 import com.teammanduk.adego.core.model.GraphicCoordinate
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.model.SubPath
 import javax.inject.Inject
-import kotlin.math.*
 
 /**
  * 경로 기반 ETA 계산 UseCase
@@ -16,7 +16,9 @@ import kotlin.math.*
  * 3. 구간 내 진행률 계산
  * 4. 남은 시간 = (현재 구간 남은 시간) + (이후 구간들의 총 시간)
  */
-class CalculateEtaUseCase @Inject constructor() {
+class CalculateEtaUseCase @Inject constructor(
+    private val distanceCalculator: DistanceCalculator
+) {
 
     /**
      * ETA 계산 결과
@@ -272,23 +274,12 @@ class CalculateEtaUseCase @Inject constructor() {
     }
 
     /**
-     * Haversine 공식을 사용한 두 좌표 간 거리 계산 (미터)
+     * 두 좌표 간 거리 계산 (DistanceCalculator 위임)
      */
     private fun calculateDistance(
         lat1: Double, lon1: Double,
         lat2: Double, lon2: Double
     ): Double {
-        val earthRadius = 6371000.0 // 지구 반지름 (미터)
-
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(dLon / 2) * sin(dLon / 2)
-
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-        return earthRadius * c
+        return distanceCalculator.calculateDistanceInMeters(lat1, lon1, lat2, lon2)
     }
 }

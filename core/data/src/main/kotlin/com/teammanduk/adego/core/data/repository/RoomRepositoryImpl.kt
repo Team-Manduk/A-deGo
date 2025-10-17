@@ -6,6 +6,7 @@ import com.teammanduk.adego.core.data.mapper.toModel
 import com.teammanduk.adego.core.data_api.datasource.RoomDataSource
 import com.teammanduk.adego.core.data_api.model.ParticipantDto
 import com.teammanduk.adego.core.domain.repository.RoomRepository
+import com.teammanduk.adego.core.domain.service.DistanceCalculator
 import com.teammanduk.adego.core.model.Participant
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
@@ -18,7 +19,8 @@ import javax.inject.Singleton
 
 @Singleton
 class RoomRepositoryImpl @Inject constructor(
-    private val roomDataSource: RoomDataSource
+    private val roomDataSource: RoomDataSource,
+    private val distanceCalculator: DistanceCalculator
 ) : RoomRepository {
 
     // 현재 참여 중인 방 ID (세션 정보)
@@ -78,35 +80,14 @@ class RoomRepositoryImpl @Inject constructor(
         return result
     }
 
-    /**
-     * userId를 기반으로 고유한 색상을 생성
-     * 같은 userId는 항상 같은 색상을 반환
-     */
-    private fun generateColorFromUserId(userId: String): String {
-        // userId의 해시코드 생성
-        val hash = userId.hashCode()
-
-        // HSV 색상 공간 사용 (Hue, Saturation, Value)
-        // Hue: 0-360 범위로 매핑하여 다양한 색상 생성
-        val hue = (hash.toFloat().rem(360f) + 360f).rem(360f)
-
-        // 채도와 명도를 고정하여 선명하고 보기 좋은 색상 생성
-        val saturation = 0.7f  // 70% 채도
-        val value = 0.9f       // 90% 명도
-
-        // HSV를 RGB로 변환
-        val rgb = android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, value))
-
-        // #RRGGBB 형식으로 반환
-        return String.format("#%06X", 0xFFFFFF and rgb)
-    }
 
     override suspend fun createRoom(
         roomName: String,
         destination: Place,
         dateTime: String,
         userId: String,
-        userName: String
+        userName: String,
+        profileColor: String
     ): Result<String> {
         return try {
             Log.d(TAG, "[Repository] 방 생성 시작")
@@ -130,7 +111,6 @@ class RoomRepositoryImpl @Inject constructor(
             Log.d(TAG, "[Repository] Room 데이터 저장 완료")
 
             // 생성자를 첫 번째 참여자로 추가
-            val profileColor = generateColorFromUserId(userId)
             Log.d(TAG, "[Repository] userId=$userId -> profileColor=$profileColor")
 
             val creatorParticipant = ParticipantDto(
@@ -160,7 +140,8 @@ class RoomRepositoryImpl @Inject constructor(
     override suspend fun joinRoom(
         roomId: String,
         userId: String,
-        userName: String
+        userName: String,
+        profileColor: String
     ): Result<Unit> {
         return try {
             Log.d(TAG, "[Repository] 방 참여 시작 - roomId: $roomId, userId: $userId")
@@ -169,8 +150,6 @@ class RoomRepositoryImpl @Inject constructor(
             val room = roomDataSource.getRoom(roomId).getOrNull()
                 ?: return Result.failure(Exception("Room not found"))
 
-            // 참여자 색상 생성
-            val profileColor = generateColorFromUserId(userId)
             Log.d(TAG, "[Repository] joinRoom - userId=$userId -> profileColor=$profileColor")
 
             // 참여자 추가
@@ -223,7 +202,7 @@ class RoomRepositoryImpl @Inject constructor(
                 // 목적지와 참가자 위치가 모두 있으면 거리 계산
                 val location = participant.location
                 val distance = if (destination != null && location != null) {
-                    calculateHaversineDistance(
+                    distanceCalculator.calculateDistanceInMetersInt(
                         lat1 = location.latitude,
                         lon1 = location.longitude,
                         lat2 = destination.latitude,
@@ -238,28 +217,6 @@ class RoomRepositoryImpl @Inject constructor(
         }
     }
 
-    /**
-     * Haversine 공식을 사용한 두 지점 간 직선 거리 계산 (미터)
-     */
-    private fun calculateHaversineDistance(
-        lat1: Double,
-        lon1: Double,
-        lat2: Double,
-        lon2: Double
-    ): Int {
-        val earthRadiusMeters = 6371000.0 // 지구 반지름 (미터)
-
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLon = Math.toRadians(lon2 - lon1)
-
-        val a = kotlin.math.sin(dLat / 2) * kotlin.math.sin(dLat / 2) +
-                kotlin.math.cos(Math.toRadians(lat1)) * kotlin.math.cos(Math.toRadians(lat2)) *
-                kotlin.math.sin(dLon / 2) * kotlin.math.sin(dLon / 2)
-
-        val c = 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-
-        return (earthRadiusMeters * c).toInt()
-    }
 
     override suspend fun updateMyLocation(
         roomId: String,
