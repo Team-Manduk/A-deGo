@@ -30,4 +30,12 @@ class UserRepositoryImpl @Inject constructor(
             sessionDataSource.clearSession()
         }
     }
+
+    override suspend fun restoreUserSession(): String? {
+        val userId = sessionDataSource.getUserId()
+        if (userId != null) {
+            currentUserId = userId
+        }
+        return userId
+    }
 }

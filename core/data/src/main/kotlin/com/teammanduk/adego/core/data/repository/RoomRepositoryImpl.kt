@@ -47,6 +47,15 @@ class RoomRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun restoreRoomSession(): String? {
+        val roomId = sessionDataSource.getRoomId()
+        if (roomId != null) {
+            currentRoomId = roomId
+            Log.d(TAG, "[Repository] 방 세션 복구: $roomId")
+        }
+        return roomId
+    }
+
     // ===== 현재 방 기준 작업 (세션 기반) =====
     override fun observeCurrentRoom(): Flow<Room?> {
         val roomId = currentRoomId

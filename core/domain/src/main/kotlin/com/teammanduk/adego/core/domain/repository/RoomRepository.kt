@@ -23,6 +23,12 @@ interface RoomRepository {
      */
     fun clearCurrentRoom()
 
+    /**
+     * DataStore에서 저장된 방 정보 복구
+     * @return 저장된 roomId (없으면 null)
+     */
+    suspend fun restoreRoomSession(): String?
+
     // ===== 현재 방 기준 작업 (세션 기반) =====
     /**
      * 현재 방 정보 실시간 구독
