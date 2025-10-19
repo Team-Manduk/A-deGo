@@ -31,4 +31,7 @@ sealed interface MapIntent {
 
     data class UpdateUserName(val userName: String) : MapIntent
     data object ConfirmUserName : MapIntent
+
+    // 방 나가기
+    data object LeaveRoom : MapIntent
 }
