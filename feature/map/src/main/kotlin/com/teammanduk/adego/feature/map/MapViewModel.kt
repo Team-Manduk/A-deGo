@@ -8,6 +8,7 @@ import com.teammanduk.adego.core.domain.repository.UserRepository
 import com.teammanduk.adego.core.domain.usecase.BroadcastLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.LeaveRoomSessionUseCase
+import com.teammanduk.adego.core.domain.usecase.LeaveRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
 import com.teammanduk.adego.feature.map.model.MapIntent.ClearError
@@ -17,6 +18,7 @@ import com.teammanduk.adego.feature.map.model.MapIntent.DismissRouteDialog
 import com.teammanduk.adego.feature.map.model.MapIntent.DismissSearchPlace
 import com.teammanduk.adego.feature.map.model.MapIntent.DismissSelectStartPlace
 import com.teammanduk.adego.feature.map.model.MapIntent.GenerateRandomName
+import com.teammanduk.adego.feature.map.model.MapIntent.LeaveRoom
 import com.teammanduk.adego.feature.map.model.MapIntent.NavigateToHome
 import com.teammanduk.adego.feature.map.model.MapIntent.SearchRoute
 import com.teammanduk.adego.feature.map.model.MapIntent.SelectParticipant
@@ -48,6 +50,7 @@ class MapViewModel @Inject constructor(
     private val joinRoom: JoinRoomUseCase,
     private val broadcastLocation: BroadcastLocationUseCase,
     private val leaveRoomSession: LeaveRoomSessionUseCase,
+    private val leaveRoom: LeaveRoomUseCase,
     private val userRepository: UserRepository,
     private val roomRepository: RoomRepository,
     private val searchRouteUseCase: SearchRouteUseCase
@@ -122,6 +125,7 @@ class MapViewModel @Inject constructor(
             is SelectParticipant -> {}
             ClearError -> {}
             NavigateToHome -> navigateToHome()
+            LeaveRoom -> leaveRoomAndNavigateHome()
             ShowInviteDialog -> {}
             DismissInviteDialog -> {}
             ShowRouteDialog -> {}
@@ -144,6 +148,20 @@ class MapViewModel @Inject constructor(
     private fun navigateToHome() {
         viewModelScope.launch {
             _sideEffect.send(MapSideEffect.NavigateToHome)
+        }
+    }
+
+    private fun leaveRoomAndNavigateHome() {
+        viewModelScope.launch {
+            leaveRoom()
+                .onSuccess {
+                    _sideEffect.send(MapSideEffect.NavigateToHome)
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(error = "방 나가기 실패: ${e.message}")
+                    }
+                }
         }
     }
 
@@ -188,6 +206,7 @@ class MapViewModel @Inject constructor(
             }
 
             NavigateToHome -> state
+            LeaveRoom -> state
         }
     }
 

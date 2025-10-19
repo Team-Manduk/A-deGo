@@ -5,14 +5,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -390,6 +394,24 @@ private fun MapScreen(
             },
             modifier = Modifier.align(Alignment.TopCenter)
         )
+
+        // 방 나가기 버튼 (우측 상단)
+        IconButton(
+            onClick = { onAction(MapIntent.LeaveRoom) },
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 16.dp, end = 16.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = Color.White,
+                contentColor = Color.Red
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "방 나가기",
+                modifier = Modifier.size(24.dp)
+            )
+        }
 
         // 하단 영역: 경로 선택 버튼 + 참가자 카드
         Column(
