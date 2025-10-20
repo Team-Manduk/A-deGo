@@ -3,20 +3,24 @@ package com.teammanduk.adego.feature.map
 import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -454,34 +458,68 @@ private fun MapScreen(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
         ) {
-            // 경로 선택 버튼
-            Button(
-                onClick = {
-                    val destination = uiState.room?.destination
-                    if (destination != null) {
-                        onNavigateToSelectStartPlace(
-                            uiState.roomId,
-                            uiState.userId,
-                            destination.latitude,
-                            destination.longitude
+            // 경로 선택 버튼 - 경로 선택 여부에 따라 다른 UI
+            if (uiState.selectedRouteIndex != null) {
+                // 경로 선택 후: 아이콘 버튼으로 최소화 (오른쪽 배치)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp)
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    FloatingActionButton(
+                        onClick = {
+                            val destination = uiState.room?.destination
+                            if (destination != null) {
+                                onNavigateToSelectStartPlace(
+                                    uiState.roomId,
+                                    uiState.userId,
+                                    destination.latitude,
+                                    destination.longitude
+                                )
+                            }
+                        },
+                        containerColor = Color(0xFF6200EE),
+                        contentColor = Color.White,
+                        shape = CircleShape
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = "경로 변경"
                         )
                     }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF6200EE)
-                )
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocationOn,
-                    contentDescription = null,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                Text(text = "경로 선택")
+                }
+            } else {
+                // 경로 선택 전: 전체 너비 버튼 (카드뷰와 너비 맞춤)
+                Button(
+                    onClick = {
+                        val destination = uiState.room?.destination
+                        if (destination != null) {
+                            onNavigateToSelectStartPlace(
+                                uiState.roomId,
+                                uiState.userId,
+                                destination.latitude,
+                                destination.longitude
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp)
+                        .padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6200EE)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text(text = "경로 선택")
+                }
             }
 
             // 참가자 카드
