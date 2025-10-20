@@ -191,11 +191,22 @@ private fun ParticipantTrackingBar(
                 participantsWithDistance.maxOfOrNull { it.distanceToDestination!! } ?: 1000
 
             var maxRecordedDistance by remember { mutableStateOf(1000) }
+
+            // 현재 최대 거리가 기록된 거리보다 크면 증가
             if (currentMaxDistance > maxRecordedDistance) {
                 maxRecordedDistance = currentMaxDistance
             }
+            // 마지막 참가자가 나가서 거리가 줄어들면 현재 거리로 축소
+            else if (currentMaxDistance < maxRecordedDistance) {
+                maxRecordedDistance = currentMaxDistance
+            }
 
-            val trackerMaxDistance = maxRecordedDistance.coerceAtLeast(1000)
+            // 1km 이내에서는 스케일 고정, 그 이상은 동적 스케일
+            val trackerMaxDistance = if (maxRecordedDistance <= 1000) {
+                1000
+            } else {
+                maxRecordedDistance
+            }
 
             participantsWithDistance.forEach { participant ->
                 val index = participants.indexOf(participant)
