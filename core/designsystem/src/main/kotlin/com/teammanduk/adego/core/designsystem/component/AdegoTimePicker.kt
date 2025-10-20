@@ -3,7 +3,6 @@ package com.teammanduk.adego.core.designsystem.component
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -205,6 +204,7 @@ private fun ScrollableTimePickerColumn(
     // 이전 값 추적
     var previousValue by remember { mutableIntStateOf(currentIndex) }
 
+
     // 애니메이션 Job 추적
     var animationJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
@@ -214,7 +214,8 @@ private fun ScrollableTimePickerColumn(
         // 스크롤 중이면 업데이트 안 함
         if (listState.isScrollInProgress) return@LaunchedEffect
 
-        val currentScrollIndex = ((listState.firstVisibleItemIndex % itemCount) + itemCount) % itemCount
+        val currentScrollIndex =
+            ((listState.firstVisibleItemIndex % itemCount) + itemCount) % itemCount
         if (currentScrollIndex != currentIndex) {
             // 이전 애니메이션 취소
             animationJob?.cancel()

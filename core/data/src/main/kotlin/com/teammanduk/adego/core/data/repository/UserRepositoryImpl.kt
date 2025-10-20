@@ -38,4 +38,8 @@ class UserRepositoryImpl @Inject constructor(
         }
         return userId
     }
+
+    override suspend fun getUserName(): String? {
+        return sessionDataSource.getUserName()
+    }
 }

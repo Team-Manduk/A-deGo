@@ -10,9 +10,10 @@ import com.teammanduk.adego.feature.map.MapRoute
 fun NavController.navigateToMap(
     roomId: String,
     userId: String,
+    userName: String? = null,
     navOptions: NavOptions? = null
 ) {
-    navigate(Route.Map(roomId = roomId, userId = userId), navOptions)
+    navigate(Route.Map(roomId = roomId, userId = userId, userName = userName), navOptions)
 }
 
 fun NavGraphBuilder.mapNavGraph(

@@ -23,12 +23,14 @@ class RestoreSessionUseCase @Inject constructor(
         // Repository에서 세션 정보 복구
         val userId = userRepository.restoreUserSession()
         val roomId = roomRepository.restoreRoomSession()
+        val userName = userRepository.getUserName()
 
         // 필수 정보가 모두 있는지 확인
-        return if (userId != null && roomId != null) {
+        return if (userId != null && roomId != null && userName != null) {
             SessionInfo(
                 userId = userId,
-                roomId = roomId
+                roomId = roomId,
+                userName = userName
             )
         } else {
             null
@@ -41,5 +43,6 @@ class RestoreSessionUseCase @Inject constructor(
  */
 data class SessionInfo(
     val userId: String,
-    val roomId: String
+    val roomId: String,
+    val userName: String
 )
