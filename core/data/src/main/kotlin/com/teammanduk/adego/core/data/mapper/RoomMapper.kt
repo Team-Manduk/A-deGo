@@ -5,6 +5,7 @@ import com.teammanduk.adego.core.data_api.model.ParticipantLocationDto
 import com.teammanduk.adego.core.data_api.model.ParticipantRouteDto
 import com.teammanduk.adego.core.data_api.model.PlaceDto
 import com.teammanduk.adego.core.data_api.model.RoomDto
+import com.teammanduk.adego.core.model.MovementStatus
 import com.teammanduk.adego.core.model.Participant
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
@@ -41,7 +42,12 @@ fun ParticipantDto.toModel(): Participant {
         name = name,
         profileColor = profileColor,
         location = location?.toModel(),
-        route = route?.toModel()
+        route = route?.toModel(),
+        movementStatus = try {
+            MovementStatus.valueOf(movementStatus)
+        } catch (e: IllegalArgumentException) {
+            MovementStatus.NOT_STARTED
+        }
     )
 }
 
@@ -51,7 +57,8 @@ fun Participant.toDto(): ParticipantDto {
         name = name,
         profileColor = profileColor,
         location = location?.toDto(),
-        route = route?.toDto()
+        route = route?.toDto(),
+        movementStatus = movementStatus.name
     )
 }
 

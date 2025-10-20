@@ -123,18 +123,30 @@ private fun ParticipantCard(
                     color = AdegoTheme.colors.onBackground
                 )
 
-                if (participant.eta != null && participant.distance != null) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    // 이동 상태 표시
                     Text(
-                        text = "${participant.eta} · ${participant.distance}",
+                        text = participant.movementStatus,
                         style = AdegoTheme.typography.bodyLarge,
-                        color = AdegoTheme.colors.main500
+                        color = when (participant.movementStatus) {
+                            "도착" -> Color(0xFF4CAF50)
+                            "곧 도착" -> Color(0xFFFF9800)
+                            "이동 중" -> AdegoTheme.colors.main500
+                            "출발 전" -> Color(0xFFFFEB3B).copy(red = 0.8f)
+                            else -> Color(0xFF9E9E9E)
+                        }
                     )
-                } else {
-                    Text(
-                        text = participant.status,
-                        style = AdegoTheme.typography.bodyLarge,
-                        color = Color(0xFF9E9E9E)
-                    )
+
+                    // ETA와 거리 정보가 있으면 추가로 표시
+                    if (participant.eta != null && participant.distance != null) {
+                        Text(
+                            text = "${participant.eta} · ${participant.distance}",
+                            style = AdegoTheme.typography.bodySmall,
+                            color = Color(0xFF757575)
+                        )
+                    }
                 }
             }
         }

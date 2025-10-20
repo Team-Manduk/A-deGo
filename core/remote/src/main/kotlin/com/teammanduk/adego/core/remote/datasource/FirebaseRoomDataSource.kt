@@ -218,6 +218,27 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
         }
     }
 
+    override suspend fun updateParticipantMovementStatus(
+        roomId: String,
+        userId: String,
+        movementStatus: String
+    ): Result<Unit> {
+        return try {
+            database.child("participants")
+                .child(roomId)
+                .child(userId)
+                .child("movementStatus")
+                .setValue(movementStatus)
+                .await()
+
+            Log.d(TAG, "MovementStatus updated for user $userId in room $roomId: $movementStatus")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update movementStatus", e)
+            Result.failure(e)
+        }
+    }
+
     override suspend fun removeParticipant(roomId: String, userId: String): Result<Unit> {
         return try {
             database.child("participants")

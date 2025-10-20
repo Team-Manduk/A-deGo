@@ -5,7 +5,8 @@ data class ParticipantDto(
     val name: String = "",
     val profileColor: String = "",
     val location: ParticipantLocationDto? = null,
-    val route: ParticipantRouteDto? = null
+    val route: ParticipantRouteDto? = null,
+    val movementStatus: String = "NOT_STARTED"
 )
 
 data class ParticipantLocationDto(

@@ -2,6 +2,7 @@ package com.teammanduk.adego.feature.map.model
 
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.toColorInt
+import com.teammanduk.adego.core.model.MovementStatus
 import com.teammanduk.adego.core.model.Participant
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
@@ -12,6 +13,7 @@ data class ParticipantUiModel(
     val name: String,
     val color: Color,
     val status: String,
+    val movementStatus: String,
     val eta: String? = null,
     val distance: String? = null,
     val location: ParticipantLocation? = null,
@@ -24,12 +26,26 @@ fun Participant.toUiModel(): ParticipantUiModel = ParticipantUiModel(
     name = this.name,
     color = this.getParticipantColor(),
     status = if (route?.eta != null) "도착중" else "대기중",
+    movementStatus = this.movementStatus.toKoreanString(),
     eta = this.route?.eta,
     distance = this.route?.distance,
     location = this.location,
     route = this.route,
     distanceToDestination = this.distanceToDestination
 )
+
+/**
+ * MovementStatus를 한국어 문자열로 변환
+ */
+private fun MovementStatus.toKoreanString(): String {
+    return when (this) {
+        MovementStatus.NOT_STARTED -> "경로 선택 전"
+        MovementStatus.READY -> "출발 전"
+        MovementStatus.IN_PROGRESS -> "이동 중"
+        MovementStatus.ARRIVING_SOON -> "곧 도착"
+        MovementStatus.ARRIVED -> "도착"
+    }
+}
 
 private fun Participant.getParticipantColor(): Color {
     return if (profileColor.isNotEmpty()) {

@@ -57,6 +57,15 @@ interface RoomDataSource {
     ): Result<Unit>
 
     /**
+     * 참여자 이동 상태 업데이트
+     */
+    suspend fun updateParticipantMovementStatus(
+        roomId: String,
+        userId: String,
+        movementStatus: String
+    ): Result<Unit>
+
+    /**
      * 참여자 제거
      */
     suspend fun removeParticipant(roomId: String, userId: String): Result<Unit>

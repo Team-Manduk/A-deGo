@@ -22,7 +22,8 @@ class UpdateLocationAndEtaUseCase @Inject constructor(
     private val locationRepository: LocationRepository,
     private val roomRepository: RoomRepository,
     private val userRepository: UserRepository,
-    private val calculateRouteProgress: CalculateRouteProgressUseCase
+    private val calculateRouteProgress: CalculateRouteProgressUseCase,
+    private val calculateMovementStatus: CalculateMovementStatusUseCase
 ) {
 
     /**
@@ -71,6 +72,20 @@ class UpdateLocationAndEtaUseCase @Inject constructor(
                 )
 
                 roomRepository.updateMyRoute(userId, participantRoute)
+            }
+        }
+
+        // 이동 상태 계산 및 업데이트
+        val roomId = roomRepository.getCurrentRoomId()
+        if (roomId != null) {
+            val roomInfo = roomRepository.getRoomInfo(roomId).getOrNull()
+            if (roomInfo != null) {
+                val movementStatus = calculateMovementStatus(
+                    currentLocation = location,
+                    selectedRoute = selectedRoute,
+                    destination = roomInfo.destination
+                )
+                roomRepository.updateMyMovementStatus(userId, movementStatus)
             }
         }
 
