@@ -43,10 +43,9 @@ google-services.json
 
 # Firebase
 .firebase/
-.firebaserc
 firebase-debug.log
 firebase-debug.*.log
 
-# Firebase Hosting - root level generated files
-/firebase.json
-/public/
+# Firebase Functions
+functions/node_modules/
+functions/.eslintrc.js
