@@ -18,7 +18,8 @@ sealed interface Route {
     @Serializable
     data class Map(
         val roomId: String,
-        val userId: String
+        val userId: String,
+        val userName: String? = null  // 세션 복구 시 사용
     ) : Route
 
     @Serializable

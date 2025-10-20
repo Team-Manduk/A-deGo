@@ -7,7 +7,6 @@ import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
 import com.teammanduk.adego.core.domain.usecase.BroadcastLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
-import com.teammanduk.adego.core.domain.usecase.LeaveRoomSessionUseCase
 import com.teammanduk.adego.core.domain.usecase.LeaveRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
 import com.teammanduk.adego.feature.map.model.MapIntent
@@ -49,7 +48,6 @@ class MapViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val joinRoom: JoinRoomUseCase,
     private val broadcastLocation: BroadcastLocationUseCase,
-    private val leaveRoomSession: LeaveRoomSessionUseCase,
     private val leaveRoom: LeaveRoomUseCase,
     private val userRepository: UserRepository,
     private val roomRepository: RoomRepository,
@@ -64,11 +62,62 @@ class MapViewModel @Inject constructor(
 
     private val roomId: String = savedStateHandle.get<String>("roomId") ?: ""
     private val userId: String = savedStateHandle.get<String>("userId") ?: ""
+    private val userName: String? = savedStateHandle.get<String?>("userName")
 
     init {
         _uiState.update { it.copy(roomId = roomId, userId = userId) }
 
-        // 방 존재 여부 확인
+        // 세션 복구 모드 확인
+        if (userName != null) {
+            // 세션 복구: userName이 있으면 바로 방 참가 처리
+            restoreSession(userName)
+        } else {
+            // 신규 참여: 방 존재 여부 확인 후 userName 입력 다이얼로그 표시
+            checkRoomAndShowDialog()
+        }
+    }
+
+    /**
+     * 세션 복구 모드: 저장된 userName으로 바로 방 참가
+     */
+    private fun restoreSession(userName: String) {
+        _uiState.update {
+            it.copy(
+                userName = userName,
+                showUserNameDialog = false,
+                isCheckingRoom = false
+            )
+        }
+
+        // Repository 상태 설정
+        userRepository.setCurrentUser(userId)
+        roomRepository.setCurrentRoom(roomId)
+
+        // 위치 추적 시작
+        startLocationTracking()
+
+        // 방 정보 및 참가자 구독
+        viewModelScope.launch {
+            joinRoom(roomId, userId, userName)
+                .catch { e ->
+                    _uiState.update { it.copy(error = "세션 복구 실패: ${e.message}") }
+                }
+
+                .collect { (room, participants) ->
+                    _uiState.update {
+                        it.copy(
+                            room = room?.toUiModel(),
+                            participants = participants.toUiModels()
+                        )
+                    }
+                }
+        }
+    }
+
+    /**
+     * 신규 참여 모드: 방 존재 여부 확인 후 userName 입력 다이얼로그 표시
+     */
+    private fun checkRoomAndShowDialog() {
         viewModelScope.launch {
             roomRepository.getRoomInfo(roomId)
                 .onSuccess { room ->
@@ -285,8 +334,18 @@ class MapViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        viewModelScope.launch {
-            leaveRoomSession()
-        }
+        // 세션은 DataStore에 자동 유지됨
+        // 앱 재시작 시 MainActivity에서 RestoreSessionUseCase로 자동 복구
+
+        // TODO: 백그라운드 위치 추적 구현
+        //  현재는 MapScreen이 active일 때만 위치 추적이 동작함.
+        //  추후 Foreground Service를 구현하여 백그라운드에서도 추적 가능하도록 해야 함.
+        //
+        //  구현 방향:
+        //  1. BackgroundLocationService 생성 (Foreground Service)
+        //  2. 세션이 있을 때 자동으로 서비스 시작
+        //  3. LocationRepository의 현재 추적 로직을 서비스로 이동
+        //  4. Notification으로 "위치 공유 중" 표시
+        //  5. 배터리 최적화 고려 (위치 업데이트 간격 조절)
     }
 }

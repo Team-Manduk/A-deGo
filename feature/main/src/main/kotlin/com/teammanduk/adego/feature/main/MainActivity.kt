@@ -24,31 +24,47 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val navigator = rememberMainNavigator()
             val sessionState by viewModel.sessionState.collectAsState()
 
-            // 세션 복구 처리
-            LaunchedEffect(sessionState) {
+            AdegoTheme {
                 when (val state = sessionState) {
-                    is SessionState.Restored -> {
-                        // 세션이 있으면 Map 화면으로 자동 이동
-                        navigator.navigateToMap(state.sessionInfo.roomId, state.sessionInfo.userId)
+                    SessionState.Loading -> {
+                        // 세션 체크 중 로딩 화면
+                        com.teammanduk.adego.core.ui.component.LoadingScreen(
+                            text = "세션 확인 중..."
+                        )
                     }
-                    SessionState.None, SessionState.Loading -> {
-                        // 세션이 없거나 로딩 중이면 아무것도 안 함 (Home 화면에 머무름)
+
+                    is SessionState.Restored -> {
+                        // 세션 복구 성공 → Map 화면부터 시작
+                        val navigator = rememberMainNavigator(
+                            startDestination = com.teammanduk.adego.core.navigation.Route.Map(
+                                roomId = state.sessionInfo.roomId,
+                                userId = state.sessionInfo.userId,
+                                userName = state.sessionInfo.userName
+                            )
+                        )
+
+                        // 딥링크 처리
+                        LaunchedEffect(intent) {
+                            handleDeepLink(intent, navigator)
+                        }
+
+                        MainRoute(navigator = navigator)
+                    }
+
+                    SessionState.None -> {
+                        // 세션 없음 → Home 화면부터 시작
+                        val navigator = rememberMainNavigator()
+
+                        // 딥링크 처리
+                        LaunchedEffect(intent) {
+                            handleDeepLink(intent, navigator)
+                        }
+
+                        MainRoute(navigator = navigator)
                     }
                 }
-            }
-
-            // 딥링크 처리
-            LaunchedEffect(intent) {
-                handleDeepLink(intent, navigator)
-            }
-
-            AdegoTheme {
-                MainRoute(
-                    navigator = navigator
-                )
             }
         }
     }

@@ -1,5 +1,8 @@
 package com.teammanduk.adego.feature.map
 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +26,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -30,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -62,8 +67,33 @@ internal fun MapRoute(
     onNavigateToHome: () -> Unit = {},
     selectedRoute: com.teammanduk.adego.core.model.Route? = null
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var showInviteDialog by remember { mutableStateOf(false) }
+    var backPressedTime by remember { mutableLongStateOf(0L) }
+
+    // 백버튼 더블탭 종료 (세션 참가 중에는 앱 종료만 가능)
+    // TODO: 추후 "일시 나가기" 버튼 추가 시
+    //  - 위치: 상단 앱바 또는 메뉴
+    //  - 동작: 세션 유지하고 Home으로 이동
+    //  - 구현: onNavigateToHome() 호출
+    //  - 필요: Home 화면에 "진행 중인 방" 표시 + "돌아가기" 버튼
+    BackHandler {
+        val currentTime = System.currentTimeMillis()
+
+        if (currentTime - backPressedTime < 2000) {
+            // 2초 내 재입력 → 앱 종료
+            (context as? Activity)?.finish()
+        } else {
+            // 첫 번째 입력 → 토스트 표시
+            backPressedTime = currentTime
+            Toast.makeText(
+                context,
+                "한 번 더 누르면 종료됩니다",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     // SideEffect 처리
     LaunchedEffect(Unit) {
@@ -361,56 +391,61 @@ private fun MapScreen(
             }
         }
 
-        // 상단 정보 영역
-        TopInfoSection(
-            meetingTime = uiState.room?.meetingTime ?: "00시 00분",
-            participantCount = uiState.participants.size,
-            participants = uiState.participants,
-            destination = uiState.room?.destination,
-            pagerState = pagerState,
-            onInviteClick = onInviteClick,
-            onParticipantClick = { index ->
-                onAction(MapIntent.SelectParticipant(index))
-                coroutineScope.launch {
-                    uiState.participants.getOrNull(index)?.location?.let { location ->
-                        cameraPositionState.animate(
-                            CameraUpdateFactory.newLatLngZoom(
-                                LatLng(location.latitude, location.longitude), 15f
-                            ), durationMs = 500
-                        )
-                    }
-                }
-            },
-            onDestinationClick = {
-                coroutineScope.launch {
-                    uiState.room?.destination?.let { destination ->
-                        cameraPositionState.animate(
-                            CameraUpdateFactory.newLatLngZoom(
-                                LatLng(destination.latitude, destination.longitude), 15f
-                            ), durationMs = 500
-                        )
-                    }
-                }
-            },
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-
-        // 방 나가기 버튼 (우측 상단)
-        IconButton(
-            onClick = { onAction(MapIntent.LeaveRoom) },
+        // 상단 정보 영역 + 방 나가기 버튼
+        Column(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 16.dp, end = 16.dp),
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = Color.White,
-                contentColor = Color.Red
-            )
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
         ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "방 나가기",
-                modifier = Modifier.size(24.dp)
+            TopInfoSection(
+                meetingTime = uiState.room?.meetingTime ?: "00시 00분",
+                participantCount = uiState.participants.size,
+                participants = uiState.participants,
+                destination = uiState.room?.destination,
+                pagerState = pagerState,
+                onInviteClick = onInviteClick,
+                onParticipantClick = { index ->
+                    onAction(MapIntent.SelectParticipant(index))
+                    coroutineScope.launch {
+                        uiState.participants.getOrNull(index)?.location?.let { location ->
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(location.latitude, location.longitude), 15f
+                                ), durationMs = 500
+                            )
+                        }
+                    }
+                },
+                onDestinationClick = {
+                    coroutineScope.launch {
+                        uiState.room?.destination?.let { destination ->
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(destination.latitude, destination.longitude), 15f
+                                ), durationMs = 500
+                            )
+                        }
+                    }
+                }
             )
+
+            // 방 나가기 버튼 (TopInfoSection 바로 아래)
+            IconButton(
+                onClick = { onAction(MapIntent.LeaveRoom) },
+                modifier = Modifier
+                    .align(Alignment.End)
+                    .padding(top = 8.dp, end = 16.dp),
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = Color.White,
+                    contentColor = Color.Red
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "방 나가기",
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
         // 하단 영역: 경로 선택 버튼 + 참가자 카드
