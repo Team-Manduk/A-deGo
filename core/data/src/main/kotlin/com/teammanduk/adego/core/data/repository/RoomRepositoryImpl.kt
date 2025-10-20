@@ -7,6 +7,7 @@ import com.teammanduk.adego.core.data_api.datasource.RoomDataSource
 import com.teammanduk.adego.core.data_api.datasource.SessionDataSource
 import com.teammanduk.adego.core.data_api.model.ParticipantDto
 import com.teammanduk.adego.core.domain.repository.RoomRepository
+import com.teammanduk.adego.core.model.MovementStatus
 import com.teammanduk.adego.core.model.Participant
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
@@ -86,6 +87,15 @@ class RoomRepositoryImpl @Inject constructor(
         val roomId = currentRoomId
             ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
         return updateMyRoute(roomId, userId, route)
+    }
+
+    override suspend fun updateMyMovementStatus(
+        userId: String,
+        movementStatus: MovementStatus
+    ): Result<Unit> {
+        val roomId = currentRoomId
+            ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
+        return updateMyMovementStatus(roomId, userId, movementStatus)
     }
 
     override suspend fun leaveCurrentRoom(userId: String): Result<Unit> {
@@ -323,6 +333,18 @@ class RoomRepositoryImpl @Inject constructor(
             durationInSeconds = route.durationInSeconds,
             distanceInMeters = route.distanceInMeters,
             timestamp = route.updatedAt
+        )
+    }
+
+    override suspend fun updateMyMovementStatus(
+        roomId: String,
+        userId: String,
+        movementStatus: MovementStatus
+    ): Result<Unit> {
+        return roomDataSource.updateParticipantMovementStatus(
+            roomId = roomId,
+            userId = userId,
+            movementStatus = movementStatus.name
         )
     }
 

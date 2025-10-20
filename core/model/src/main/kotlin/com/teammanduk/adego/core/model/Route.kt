@@ -9,7 +9,11 @@ data class Route(
     val totalFare: Int, // 총 요금 (원)
     val transferCount: Int, // 환승 횟수
     val pathType: Int, // 경로 타입 (1: 지하철, 2: 버스, 3: 지하철+버스)
-    val subPaths: List<SubPath> = emptyList() // 세부 경로 정보
+    val subPaths: List<SubPath> = emptyList(), // 세부 경로 정보
+    val startLatitude: Double? = null, // 출발지 위도
+    val startLongitude: Double? = null, // 출발지 경도
+    val endLatitude: Double? = null, // 도착지 위도
+    val endLongitude: Double? = null // 도착지 경도
 )
 
 /**

@@ -1,5 +1,6 @@
 package com.teammanduk.adego.core.domain.repository
 
+import com.teammanduk.adego.core.model.MovementStatus
 import com.teammanduk.adego.core.model.Participant
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
@@ -54,6 +55,14 @@ interface RoomRepository {
     suspend fun updateMyRoute(
         userId: String,
         route: ParticipantRoute
+    ): Result<Unit>
+
+    /**
+     * 현재 방에 내 이동 상태 업데이트
+     */
+    suspend fun updateMyMovementStatus(
+        userId: String,
+        movementStatus: MovementStatus
     ): Result<Unit>
 
     /**
@@ -113,6 +122,15 @@ interface RoomRepository {
         roomId: String,
         userId: String,
         route: ParticipantRoute
+    ): Result<Unit>
+
+    /**
+     * 내 이동 상태 업데이트 (특정 roomId 지정)
+     */
+    suspend fun updateMyMovementStatus(
+        roomId: String,
+        userId: String,
+        movementStatus: MovementStatus
     ): Result<Unit>
 
     /**

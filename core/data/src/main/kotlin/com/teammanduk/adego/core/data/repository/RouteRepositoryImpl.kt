@@ -274,7 +274,7 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
 
             // 경로 변환
             val routes = itineraries.map { itinerary ->
-                mapTmapItineraryToRoute(itinerary)
+                mapTmapItineraryToRoute(itinerary, startLat, startLng, endLat, endLng)
             }
 
             Log.d("RouteRepository", "TMAP Transit API: ${routes.size}개 경로 발견")
@@ -341,7 +341,13 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
     /**
      * TMAP Transit API 응답을 도메인 모델로 변환합니다.
      */
-    private fun mapTmapItineraryToRoute(itinerary: TmapItinerary): Route {
+    private fun mapTmapItineraryToRoute(
+        itinerary: TmapItinerary,
+        startLat: Double,
+        startLng: Double,
+        endLat: Double,
+        endLng: Double
+    ): Route {
         var transferCount = 0
         var lastMode: String? = null
 
@@ -376,7 +382,11 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
             totalFare = itinerary.fare?.regular?.totalFare ?: 0,
             transferCount = transferCount,
             pathType = pathType,
-            subPaths = subPaths
+            subPaths = subPaths,
+            startLatitude = startLat,
+            startLongitude = startLng,
+            endLatitude = endLat,
+            endLongitude = endLng
         )
     }
 
