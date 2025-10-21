@@ -40,13 +40,16 @@ class CalculateRouteProgressUseCase @Inject constructor() {
         route: Route
     ): RouteProgress? {
         // 1. 사용자 위치에서 가장 가까운 SubPath 찾기
-        val (subPathIndex, subPath, minDistance) = findNearestSubPath(userLocation, route.subPaths)
+        val nearestSubPath = findNearestSubPath(userLocation, route.subPaths)
             ?: return null
 
         // 경로에서 너무 멀리 떨어진 경우 (100m 이상) null 반환
-        if (minDistance > 100.0) {
+        if (nearestSubPath.distance > 100.0) {
             return null
         }
+
+        val subPathIndex = nearestSubPath.index
+        val subPath = nearestSubPath.subPath
 
         // 2. 현재 SubPath 내에서 진행률 계산
         val progressData = calculateProgressInSubPath(userLocation, subPath)
@@ -92,13 +95,13 @@ class CalculateRouteProgressUseCase @Inject constructor() {
     private fun findNearestSubPath(
         userLocation: ParticipantLocation,
         subPaths: List<SubPath>
-    ): Triple<Int, SubPath, Double>? {
+    ): NearestSubPath? {
         return subPaths
             .mapIndexed { index, subPath ->
                 val minDistance = calculateMinDistanceToSubPath(userLocation, subPath)
-                Triple(index, subPath, minDistance)
+                NearestSubPath(index, subPath, minDistance)
             }
-            .minByOrNull { it.third }
+            .minByOrNull { it.distance }
     }
 
     /**
@@ -239,6 +242,15 @@ class CalculateRouteProgressUseCase @Inject constructor() {
 
         return earthRadiusMeters * c
     }
+
+    /**
+     * 가장 가까운 SubPath 정보
+     */
+    private data class NearestSubPath(
+        val index: Int, // SubPath 인덱스
+        val subPath: SubPath, // SubPath 객체
+        val distance: Double // 사용자 위치에서 SubPath까지의 거리 (미터)
+    )
 
     /**
      * 진행률 데이터
