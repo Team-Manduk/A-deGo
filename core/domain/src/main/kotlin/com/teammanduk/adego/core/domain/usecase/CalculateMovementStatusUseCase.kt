@@ -44,13 +44,13 @@ class CalculateMovementStatusUseCase @Inject constructor() {
             destination.longitude
         )
 
-        // 도착: 목적지로부터 100m 이내
-        if (distanceToDestination <= 100) {
+        // 도착: 목적지로부터 임계값 이내
+        if (distanceToDestination <= MovementStatus.ARRIVAL_THRESHOLD) {
             return MovementStatus.ARRIVED
         }
 
-        // 곧 도착: 목적지로부터 500m 이내
-        if (distanceToDestination <= 500) {
+        // 곧 도착: 목적지로부터 임계값 이내
+        if (distanceToDestination <= MovementStatus.ARRIVING_SOON_THRESHOLD) {
             return MovementStatus.ARRIVING_SOON
         }
 
@@ -66,8 +66,8 @@ class CalculateMovementStatusUseCase @Inject constructor() {
                 startLng
             )
 
-            // 출발 전: 출발지로부터 200m 이내
-            if (distanceFromStart <= 200) {
+            // 출발 전: 출발지로부터 임계값 이내
+            if (distanceFromStart <= MovementStatus.READY_THRESHOLD) {
                 return MovementStatus.READY
             }
         }
