@@ -66,11 +66,11 @@ class CalculateRouteProgressUseCase @Inject constructor() {
             .sumOf { it.distance }
         val totalRemainingDistance = remainingDistanceInCurrentSubPath + remainingSubPathsDistance
 
-        // 6. 남은 시간 계산 (분 → 초)
-        val remainingTimeInCurrentSubPath = subPath.sectionTime * (1 - progressData.progress) * 60
+        // 6. 남은 시간 계산 (초 단위)
+        val remainingTimeInCurrentSubPath = subPath.sectionTime * (1 - progressData.progress)
         val remainingSubPathsTime = route.subPaths
             .drop(subPathIndex + 1)
-            .sumOf { it.sectionTime * 60 }
+            .sumOf { it.sectionTime }
         val totalRemainingTimeInSeconds = (remainingTimeInCurrentSubPath + remainingSubPathsTime).toInt()
 
         // 7. ETA 계산

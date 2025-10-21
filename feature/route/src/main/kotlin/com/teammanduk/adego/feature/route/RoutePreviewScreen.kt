@@ -25,6 +25,7 @@ import com.teammanduk.adego.core.model.Lane
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.model.SubPath
 import com.teammanduk.adego.core.model.TrafficType
+import com.teammanduk.adego.core.ui.util.formatTime
 
 @Composable
 internal fun RoutePreviewScreen(
@@ -467,7 +468,7 @@ internal fun RoutePreviewScreen(
 // 프리뷰용 샘플 데이터
 private fun getSampleRouteForPreview(): Route {
     return Route(
-        totalTime = 43,
+        totalTime = 43 * 60, // 43분 → 2580초
         totalDistance = 15000,
         totalFare = 1500,
         transferCount = 1,
@@ -476,7 +477,7 @@ private fun getSampleRouteForPreview(): Route {
             SubPath(
                 trafficType = TrafficType.WALK,
                 distance = 150.0,
-                sectionTime = 2,
+                sectionTime = 2 * 60, // 2분 → 120초
                 startLatitude = 35.1795,
                 startLongitude = 129.0756,
                 endLatitude = 35.1800,
@@ -485,7 +486,7 @@ private fun getSampleRouteForPreview(): Route {
             SubPath(
                 trafficType = TrafficType.SUBWAY,
                 distance = 8000.0,
-                sectionTime = 25,
+                sectionTime = 25 * 60, // 25분 → 1500초
                 startName = "부산사상터미널역",
                 endName = "덕천역",
                 stationCount = 10,
@@ -501,7 +502,7 @@ private fun getSampleRouteForPreview(): Route {
             SubPath(
                 trafficType = TrafficType.WALK,
                 distance = 200.0,
-                sectionTime = 3,
+                sectionTime = 3 * 60, // 3분 → 180초
                 startLatitude = 35.2050,
                 startLongitude = 129.0850,
                 endLatitude = 35.2055,
@@ -510,7 +511,7 @@ private fun getSampleRouteForPreview(): Route {
             SubPath(
                 trafficType = TrafficType.BUS,
                 distance = 5000.0,
-                sectionTime = 15,
+                sectionTime = 15 * 60, // 15분 → 900초
                 startName = "덕천역",
                 endName = "만덕3동주민센터",
                 stationCount = 8,
@@ -527,7 +528,7 @@ private fun getSampleRouteForPreview(): Route {
             SubPath(
                 trafficType = TrafficType.WALK,
                 distance = 100.0,
-                sectionTime = 1,
+                sectionTime = 1 * 60, // 1분 → 60초
                 startLatitude = 35.2200,
                 startLongitude = 129.0900,
                 endLatitude = 35.2205,
