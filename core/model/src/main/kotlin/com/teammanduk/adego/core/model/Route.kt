@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class Route(
-    val totalTime: Int, // 총 소요 시간 (분)
+    val totalTime: Int, // 총 소요 시간 (초)
     val totalDistance: Int, // 총 거리 (미터)
     val totalFare: Int, // 총 요금 (원)
     val transferCount: Int, // 환승 횟수
@@ -26,7 +26,7 @@ data class Route(
 data class SubPath(
     val trafficType: TrafficType, // 이동 수단 유형
     val distance: Double, // 이동 거리 (미터)
-    val sectionTime: Int, // 이동 시간 (분)
+    val sectionTime: Int, // 이동 시간 (초)
 
     // 대중교통 정보 (trafficType이 SUBWAY 또는 BUS일 때)
     val startName: String? = null, // 승차 정류장/역 이름

@@ -48,16 +48,10 @@ interface RoomDataSource {
     suspend fun updateParticipantRoute(
         roomId: String,
         userId: String,
-        eta: String,
-        distance: String,
-        polyline: String,
-        durationInSeconds: Int,
+        etaInSeconds: Int,
         distanceInMeters: Int,
-        timestamp: Long,
-        currentSubPathIndex: Int? = null,
-        progressInCurrentSubPath: Double? = null,
-        traveledDistance: Double? = null,
-        remainingDistance: Double? = null
+        polyline: String,
+        timestamp: Long
     ): Result<Unit>
 
     /**

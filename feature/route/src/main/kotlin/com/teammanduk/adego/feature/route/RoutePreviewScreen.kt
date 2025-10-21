@@ -155,7 +155,7 @@ internal fun RoutePreviewScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "${route.totalTime}분",
+                            text = formatTime(route.totalTime),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF000000)
@@ -221,7 +221,7 @@ internal fun RoutePreviewScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${route.totalTime}분",
+                        text = formatTime(route.totalTime),
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF000000)
@@ -271,7 +271,7 @@ internal fun RoutePreviewScreen(
                                         color = Color(0xFF000000)
                                     )
                                     Text(
-                                        text = "${subPath.sectionTime}분",
+                                        text = formatTime(subPath.sectionTime),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color(0xFF999999)
                                     )
@@ -370,7 +370,7 @@ internal fun RoutePreviewScreen(
                                     }
 
                                     Text(
-                                        text = "${subPath.sectionTime}분 정류장 이동",
+                                        text = "${formatTime(subPath.sectionTime)} 정류장 이동",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color(0xFF999999)
                                     )

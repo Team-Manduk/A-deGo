@@ -40,11 +40,9 @@ class SaveSelectedRouteUseCase @Inject constructor(
                 ?: return Result.failure(IllegalStateException("User ID not found"))
 
             val initialRoute = ParticipantRoute(
-                eta = "${selectedRoute.totalTime}분",
-                distance = "${selectedRoute.totalDistance / 1000.0}km",
-                polyline = polyline,
-                durationInSeconds = selectedRoute.totalTime * 60,
+                etaInSeconds = selectedRoute.totalTime,
                 distanceInMeters = selectedRoute.totalDistance,
+                polyline = polyline,
                 updatedAt = System.currentTimeMillis()
             )
 

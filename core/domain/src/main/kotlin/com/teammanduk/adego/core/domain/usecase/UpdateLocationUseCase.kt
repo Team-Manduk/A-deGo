@@ -67,16 +67,10 @@ class UpdateLocationUseCase @Inject constructor(
                 val polyline = PolylineEncoder.encode(selectedRoute)
 
                 val participantRoute = ParticipantRoute(
-                    eta = formatEta(routeProgress.remainingTimeInSeconds),
-                    distance = formatDistance(routeProgress.remainingDistance),
-                    polyline = polyline,
-                    durationInSeconds = routeProgress.remainingTimeInSeconds,
+                    etaInSeconds = routeProgress.remainingTimeInSeconds,
                     distanceInMeters = routeProgress.remainingDistance.toInt(),
-                    updatedAt = System.currentTimeMillis(),
-                    currentSubPathIndex = routeProgress.currentSubPathIndex,
-                    progressInCurrentSubPath = routeProgress.progressInCurrentSubPath,
-                    traveledDistance = routeProgress.traveledDistance,
-                    remainingDistance = routeProgress.remainingDistance
+                    polyline = polyline,
+                    updatedAt = System.currentTimeMillis()
                 )
 
                 roomRepository.updateMyRoute(userId, participantRoute)
@@ -150,32 +144,4 @@ class UpdateLocationUseCase @Inject constructor(
         return kotlin.math.sqrt(latDiff * latDiff + lonDiff * lonDiff).toFloat()
     }
 
-    /**
-     * 남은 시간을 "15분" 형식으로 포맷
-     */
-    private fun formatEta(remainingTimeInSeconds: Int): String {
-        val minutes = remainingTimeInSeconds / 60
-        return if (minutes < 60) {
-            "${minutes}분"
-        } else {
-            val hours = minutes / 60
-            val mins = minutes % 60
-            if (mins > 0) {
-                "${hours}시간 ${mins}분"
-            } else {
-                "${hours}시간"
-            }
-        }
-    }
-
-    /**
-     * 거리를 "3.2km" 또는 "850m" 형식으로 포맷
-     */
-    private fun formatDistance(distanceInMeters: Double): String {
-        return if (distanceInMeters >= 1000) {
-            String.format("%.1fkm", distanceInMeters / 1000)
-        } else {
-            String.format("%.0fm", distanceInMeters)
-        }
-    }
 }

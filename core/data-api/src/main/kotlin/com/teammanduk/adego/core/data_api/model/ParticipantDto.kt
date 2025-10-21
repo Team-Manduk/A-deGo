@@ -23,14 +23,8 @@ data class ParticipantLocationDto(
  * 전체 경로 상세 정보는 Room DB에 저장됨.
  */
 data class ParticipantRouteDto(
-    val eta: String = "",
-    val distance: String = "",
-    val polyline: String = "",
-    val durationInSeconds: Int = 0,
-    val distanceInMeters: Int = 0,
-    val updatedAt: Long = 0L,
-    val currentSubPathIndex: Int? = null,
-    val progressInCurrentSubPath: Double? = null,
-    val traveledDistance: Double? = null,
-    val remainingDistance: Double? = null
+    val etaInSeconds: Int = 0,      // 남은 시간 (초)
+    val distanceInMeters: Int = 0,  // 남은 거리 (미터)
+    val polyline: String = "",       // 인코딩된 경로
+    val updatedAt: Long = 0L         // 업데이트 시간
 )

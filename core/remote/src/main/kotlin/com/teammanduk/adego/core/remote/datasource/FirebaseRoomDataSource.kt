@@ -203,32 +203,18 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
     override suspend fun updateParticipantRoute(
         roomId: String,
         userId: String,
-        eta: String,
-        distance: String,
-        polyline: String,
-        durationInSeconds: Int,
+        etaInSeconds: Int,
         distanceInMeters: Int,
-        timestamp: Long,
-        currentSubPathIndex: Int?,
-        progressInCurrentSubPath: Double?,
-        traveledDistance: Double?,
-        remainingDistance: Double?
+        polyline: String,
+        timestamp: Long
     ): Result<Unit> {
         return try {
-            val routeMap = mutableMapOf<String, Any>(
-                "eta" to eta,
-                "distance" to distance,
-                "polyline" to polyline,
-                "durationInSeconds" to durationInSeconds,
+            val routeMap = mapOf(
+                "etaInSeconds" to etaInSeconds,
                 "distanceInMeters" to distanceInMeters,
+                "polyline" to polyline,
                 "updatedAt" to timestamp
             )
-
-            // 경로 진행률 정보 추가
-            currentSubPathIndex?.let { routeMap["currentSubPathIndex"] = it }
-            progressInCurrentSubPath?.let { routeMap["progressInCurrentSubPath"] = it }
-            traveledDistance?.let { routeMap["traveledDistance"] = it }
-            remainingDistance?.let { routeMap["remainingDistance"] = it }
 
             database.child("participants")
                 .child(roomId)
@@ -237,7 +223,7 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
                 .setValue(routeMap)
                 .await()
 
-            Log.d(TAG, "Route updated for user $userId in room $roomId")
+            Log.d(TAG, "Route updated for user $userId in room $roomId (ETA: ${etaInSeconds}s, Distance: ${distanceInMeters}m)")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update route", e)
