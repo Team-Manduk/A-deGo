@@ -41,11 +41,16 @@ class LocationTrackingService : Service() {
         startForeground(NOTIFICATION_ID, notification)
 
         serviceScope.launch {
+            var firstLocation = true
             broadcastLocation()
                 .catch { e ->
                     Log.e(TAG, "Location tracking error", e)
                 }
                 .collect { location ->
+                    if (firstLocation) {
+                        Log.d("MapPerformance", "[3] First location received at ${System.currentTimeMillis()}")
+                        firstLocation = false
+                    }
                     Log.d(TAG, "Location updated: $location")
                 }
         }

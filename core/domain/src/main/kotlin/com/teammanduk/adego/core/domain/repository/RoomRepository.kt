@@ -102,6 +102,11 @@ interface RoomRepository {
     fun observeRoom(roomId: String): Flow<Room?>
 
     /**
+     * 참여자 목록 조회 (1회, 특정 roomId 지정)
+     */
+    suspend fun getParticipants(roomId: String): Result<List<Participant>>
+
+    /**
      * 참여자 목록 실시간 구독 (특정 roomId 지정)
      */
     fun observeParticipants(roomId: String): Flow<List<Participant>>

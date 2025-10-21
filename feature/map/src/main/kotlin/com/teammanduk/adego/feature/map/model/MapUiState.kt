@@ -22,6 +22,8 @@ data class MapUiState(
     val isSearchingRoute: Boolean = false,
     val userName: String = "",
     val showUserNameDialog: Boolean = true,
+    // GPS에서 직접 받은 내 현재 위치 (Firebase 거치지 않고 즉시 표시)
+    val myCurrentLocation: ParticipantLocation? = null,
 ) {
     val currentUser: ParticipantUiModel?
         get() = participants.find { it.userId == userId }

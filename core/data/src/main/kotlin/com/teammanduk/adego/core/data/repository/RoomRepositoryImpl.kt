@@ -74,10 +74,12 @@ class RoomRepositoryImpl @Inject constructor(
         userId: String,
         location: ParticipantLocation
     ): Result<Unit> {
-        Log.d("updateCheck", "update excuetion")
+        Log.d("MapPerformance", "[Repository] updateMyLocation 시작 at ${System.currentTimeMillis()}")
         val roomId = currentRoomId
             ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
-        return updateMyLocation(roomId, userId, location)
+        val result = updateMyLocation(roomId, userId, location)
+        Log.d("MapPerformance", "[Repository] updateMyLocation 완료 at ${System.currentTimeMillis()}")
+        return result
     }
 
     override suspend fun updateMyRoute(
@@ -250,6 +252,39 @@ class RoomRepositoryImpl @Inject constructor(
                 )
                 room
             }
+    }
+
+    override suspend fun getParticipants(roomId: String): Result<List<Participant>> {
+        return try {
+            val participantDtos = roomDataSource.getParticipants(roomId).getOrThrow()
+
+            // Room 정보 가져오기 (거리 계산용)
+            val roomDto = roomDataSource.getRoom(roomId).getOrNull()
+            val destination = roomDto?.destination
+
+            val participants = participantDtos.map { participantDto ->
+                val participant = participantDto.toModel()
+
+                // 목적지와 참가자 위치가 모두 있으면 거리 계산
+                val location = participant.location
+                val distance = if (destination != null && location != null) {
+                    calculateHaversineDistance(
+                        lat1 = location.latitude,
+                        lon1 = location.longitude,
+                        lat2 = destination.latitude,
+                        lon2 = destination.longitude
+                    )
+                } else {
+                    null
+                }
+
+                participant.copy(distanceToDestination = distance)
+            }
+            Result.success(participants)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get participants", e)
+            Result.failure(e)
+        }
     }
 
     override fun observeParticipants(roomId: String): Flow<List<Participant>> {

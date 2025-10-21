@@ -51,7 +51,8 @@ class MapViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val roomRepository: RoomRepository,
     private val searchRouteUseCase: SearchRouteUseCase,
-    private val locationTrackingManager: LocationTrackingManager
+    private val locationTrackingManager: LocationTrackingManager,
+    private val locationRepository: com.teammanduk.adego.core.domain.repository.LocationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -65,6 +66,7 @@ class MapViewModel @Inject constructor(
     private val userName: String? = savedStateHandle.get<String?>("userName")
 
     init {
+        android.util.Log.d("MapPerformance", "[1] MapViewModel init started at ${System.currentTimeMillis()}")
         _uiState.update { it.copy(roomId = roomId, userId = userId) }
 
         // 세션 복구 모드 확인
@@ -93,17 +95,39 @@ class MapViewModel @Inject constructor(
         userRepository.setCurrentUser(userId)
         roomRepository.setCurrentRoom(roomId)
 
+        // 위치 상태 초기화 (첫 위치를 즉시 업로드하기 위해)
+        locationRepository.clearLocationState()
+
         // 위치 추적 시작
         startLocationTracking()
 
         // 방 정보 및 참가자 구독
         viewModelScope.launch {
+            // 최초 1회 참가자 정보 즉시 로드
+            roomRepository.getParticipants(roomId).onSuccess { participants ->
+                android.util.Log.d("MapPerformance", "[Initial] 초기 참가자 로드 완료 at ${System.currentTimeMillis()}, count=${participants.size}")
+                _uiState.update {
+                    it.copy(participants = participants.toUiModels())
+                }
+            }
+
+            var firstParticipantsUpdate = true
             joinRoom(roomId, userId, userName)
                 .catch { e ->
                     _uiState.update { it.copy(error = "세션 복구 실패: ${e.message}") }
                 }
 
                 .collect { (room, participants) ->
+                    if (firstParticipantsUpdate) {
+                        android.util.Log.d("MapPerformance", "[4] First participants update at ${System.currentTimeMillis()}, count=${participants.size}")
+                        firstParticipantsUpdate = false
+                    }
+
+                    val currentUserLocation = participants.find { it.userId == userId }?.location
+                    if (currentUserLocation != null) {
+                        android.util.Log.d("MapPerformance", "[5] Current user location available at ${System.currentTimeMillis()}")
+                    }
+
                     _uiState.update {
                         it.copy(
                             room = room?.toUiModel(),
@@ -153,8 +177,22 @@ class MapViewModel @Inject constructor(
     }
 
     private fun startLocationTracking() {
+        android.util.Log.d("MapPerformance", "[2] Location tracking requested at ${System.currentTimeMillis()}")
         locationTrackingManager.startTracking()
         _uiState.update { it.copy(isLocationTrackingActive = true) }
+
+        // GPS에서 직접 위치 받아서 즉시 UI에 반영
+        viewModelScope.launch {
+            var firstLocation = true
+            locationRepository.observeLocationUpdates()
+                .collect { location ->
+                    if (firstLocation) {
+                        android.util.Log.d("MapPerformance", "[3-Direct] First location directly to UI at ${System.currentTimeMillis()}")
+                        firstLocation = false
+                    }
+                    _uiState.update { it.copy(myCurrentLocation = location) }
+                }
+        }
     }
 
     fun onAction(intent: MapIntent) {
@@ -314,6 +352,10 @@ class MapViewModel @Inject constructor(
                     if (room != null) {
                         userRepository.setCurrentUser(userId)
                         roomRepository.setCurrentRoom(roomId)
+
+                        // 위치 상태 초기화 (첫 위치를 즉시 업로드하기 위해)
+                        locationRepository.clearLocationState()
+
                         startLocationTracking()
                     }
                 }
