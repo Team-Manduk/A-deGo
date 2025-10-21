@@ -42,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
+import com.teammanduk.adego.core.ui.permission.PermissionRequester
+import com.teammanduk.adego.core.ui.permission.PermissionType
 
 @Composable
 internal fun HomeRoute(
@@ -76,12 +78,16 @@ internal fun HomeRoute(
         )
     }
 
-    HomeScreen(
-        onNavigateToCreate = onNavigateToCreate,
-        onNavigateToSettings = onNavigateToSettings,
-        onJoinWithCode = { code -> viewModel.joinRoomWithCode(code) },
-        isJoining = isJoining
-    )
+    PermissionRequester(
+        permissionTypes = listOf(PermissionType.Notification)
+    ) {
+        HomeScreen(
+            onNavigateToCreate = onNavigateToCreate,
+            onNavigateToSettings = onNavigateToSettings,
+            onJoinWithCode = { code -> viewModel.joinRoomWithCode(code) },
+            isJoining = isJoining
+        )
+    }
 }
 
 @Composable
