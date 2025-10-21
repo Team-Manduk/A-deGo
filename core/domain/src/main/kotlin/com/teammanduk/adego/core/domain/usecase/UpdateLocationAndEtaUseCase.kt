@@ -68,7 +68,8 @@ class UpdateLocationAndEtaUseCase @Inject constructor(
                     currentSubPathIndex = routeProgress.currentSubPathIndex,
                     progressInCurrentSubPath = routeProgress.progressInCurrentSubPath,
                     traveledDistance = routeProgress.traveledDistance,
-                    remainingDistance = routeProgress.remainingDistance
+                    remainingDistance = routeProgress.remainingDistance,
+                    selectedRoute = selectedRoute // ⭐ 선택한 경로 정보 포함
                 )
 
                 roomRepository.updateMyRoute(userId, participantRoute)

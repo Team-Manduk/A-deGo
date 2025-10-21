@@ -46,6 +46,10 @@ internal fun SelectRouteRoute(
             viewModel.selectRoute(index)
         },
         onConfirmRoute = {
+            // 서버에 경로 저장
+            viewModel.confirmAndSaveRoute()
+
+            // 선택한 경로 정보를 콜백으로 전달
             uiState.selectedRouteIndex?.let { index ->
                 uiState.routes.getOrNull(index)?.let { route ->
                     onRouteSelected(route)

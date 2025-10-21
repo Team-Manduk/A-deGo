@@ -332,7 +332,8 @@ class RoomRepositoryImpl @Inject constructor(
             polyline = route.polyline,
             durationInSeconds = route.durationInSeconds,
             distanceInMeters = route.distanceInMeters,
-            timestamp = route.updatedAt
+            timestamp = route.updatedAt,
+            selectedRoute = route.selectedRoute?.toDto()
         )
     }
 
