@@ -280,116 +280,113 @@ private fun MapScreen(
                 }
             }
 
-            // 선택한 경로 그리기 (TMAP Transit API 방식)
-            if (uiState.selectedRouteIndex != null) {
-                val selectedRoute = uiState.searchedRoutes.getOrNull(uiState.selectedRouteIndex)
+            // 선택된 참가자의 경로 그리기 (서버에서 받은 selectedRoute 우선 사용)
+            val selectedParticipant = uiState.participants.getOrNull(pagerState.currentPage)
+            selectedParticipant?.route?.selectedRoute?.let { route ->
+                // 모든 SubPath를 미리 처리하여 Polyline 데이터 생성 (remember로 메모이제이션)
+                val polylineDataList = remember(route) {
+                    val list = mutableListOf<PolylineData>()
+                    var lastPoint: LatLng? = null
 
-                selectedRoute?.let { route ->
-                    // 모든 SubPath를 미리 처리하여 Polyline 데이터 생성 (remember로 메모이제이션)
-                    val polylineDataList = remember(route) {
-                        val list = mutableListOf<PolylineData>()
-                        var lastPoint: LatLng? = null
+                    route.subPaths.forEachIndexed { index, subPath ->
+                        val points = mutableListOf<LatLng>()
+                        val graphicData = subPath.graphicData
 
-                        route.subPaths.forEachIndexed { index, subPath ->
-                            val points = mutableListOf<LatLng>()
-                            val graphicData = subPath.graphicData
+                        // TMAP graphicData 사용 (실제 경로)
+                        if (!graphicData.isNullOrEmpty()) {
+                            // 이전 SubPath와 연결이 끊긴 경우 연결선 추가
+                            if (lastPoint != null) {
+                                val firstPoint = LatLng(
+                                    graphicData.first().latitude, graphicData.first().longitude
+                                )
+                                val distance = calculateDistance(lastPoint!!, firstPoint)
 
-                            // TMAP graphicData 사용 (실제 경로)
-                            if (!graphicData.isNullOrEmpty()) {
-                                // 이전 SubPath와 연결이 끊긴 경우 연결선 추가
-                                if (lastPoint != null) {
-                                    val firstPoint = LatLng(
-                                        graphicData.first().latitude, graphicData.first().longitude
-                                    )
-                                    val distance = calculateDistance(lastPoint!!, firstPoint)
-
-                                    // 50미터 이상 떨어져 있으면 연결선 그리기 (반투명 회색)
-                                    if (distance > 50) {
-                                        list.add(
-                                            PolylineData(
-                                                points = listOf(lastPoint!!, firstPoint),
-                                                color = Color.Gray.copy(
-                                                    alpha = 0.4f
-                                                ),
-                                                width = 4f,
-                                                key = "connector_$index"
-                                            )
+                                // 50미터 이상 떨어져 있으면 연결선 그리기 (반투명 회색)
+                                if (distance > 50) {
+                                    list.add(
+                                        PolylineData(
+                                            points = listOf(lastPoint!!, firstPoint),
+                                            color = Color.Gray.copy(
+                                                alpha = 0.4f
+                                            ),
+                                            width = 4f,
+                                            key = "connector_$index"
                                         )
-                                    }
-                                }
-
-                                // graphicData의 모든 좌표를 points에 추가
-                                graphicData.forEach { coord ->
-                                    points.add(LatLng(coord.latitude, coord.longitude))
-                                }
-
-                                lastPoint = points.lastOrNull()
-                            } else {
-                                // graphicData가 없는 경우: 시작-끝 직선으로 대체
-                                val startLat = subPath.startLatitude
-                                val startLng = subPath.startLongitude
-                                val endLat = subPath.endLatitude
-                                val endLng = subPath.endLongitude
-
-                                if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                                    val startPoint = LatLng(startLat, startLng)
-                                    val endPoint = LatLng(endLat, endLng)
-
-                                    // 이전 SubPath와 연결
-                                    if (lastPoint != null && lastPoint != startPoint) {
-                                        points.add(lastPoint!!)
-                                    }
-
-                                    points.add(startPoint)
-                                    points.add(endPoint)
-                                    lastPoint = endPoint
+                                    )
                                 }
                             }
 
-                            // 포인트가 있으면 Polyline 데이터 추가
-                            if (points.size >= 2) {
-                                // 교통수단에 따라 다른 색상과 두께 사용
-                                val lineColor = when (subPath.trafficType) {
-                                    com.teammanduk.adego.core.model.TrafficType.SUBWAY -> Color(
-                                        0xFF0052A4
-                                    )
+                            // graphicData의 모든 좌표를 points에 추가
+                            graphicData.forEach { coord ->
+                                points.add(LatLng(coord.latitude, coord.longitude))
+                            }
 
-                                    com.teammanduk.adego.core.model.TrafficType.BUS -> Color(
-                                        0xFF53B332
-                                    )
+                            lastPoint = points.lastOrNull()
+                        } else {
+                            // graphicData가 없는 경우: 시작-끝 직선으로 대체
+                            val startLat = subPath.startLatitude
+                            val startLng = subPath.startLongitude
+                            val endLat = subPath.endLatitude
+                            val endLng = subPath.endLongitude
 
-                                    com.teammanduk.adego.core.model.TrafficType.WALK -> Color(
-                                        0xFF808080
-                                    )
+                            if (startLat != null && startLng != null && endLat != null && endLng != null) {
+                                val startPoint = LatLng(startLat, startLng)
+                                val endPoint = LatLng(endLat, endLng)
+
+                                // 이전 SubPath와 연결
+                                if (lastPoint != null && lastPoint != startPoint) {
+                                    points.add(lastPoint!!)
                                 }
 
-                                val lineWidth = when (subPath.trafficType) {
-                                    com.teammanduk.adego.core.model.TrafficType.SUBWAY -> 12f
-                                    com.teammanduk.adego.core.model.TrafficType.BUS -> 10f
-                                    com.teammanduk.adego.core.model.TrafficType.WALK -> 6f
-                                }
+                                points.add(startPoint)
+                                points.add(endPoint)
+                                lastPoint = endPoint
+                            }
+                        }
 
-                                list.add(
-                                    PolylineData(
-                                        points = points.toList(),
-                                        color = lineColor,
-                                        width = lineWidth,
-                                        key = "subpath_$index"
-                                    )
+                        // 포인트가 있으면 Polyline 데이터 추가
+                        if (points.size >= 2) {
+                            // 교통수단에 따라 다른 색상과 두께 사용
+                            val lineColor = when (subPath.trafficType) {
+                                com.teammanduk.adego.core.model.TrafficType.SUBWAY -> Color(
+                                    0xFF0052A4
+                                )
+
+                                com.teammanduk.adego.core.model.TrafficType.BUS -> Color(
+                                    0xFF53B332
+                                )
+
+                                com.teammanduk.adego.core.model.TrafficType.WALK -> Color(
+                                    0xFF808080
                                 )
                             }
-                        }
 
-                        list.toList()
-                    }
+                            val lineWidth = when (subPath.trafficType) {
+                                com.teammanduk.adego.core.model.TrafficType.SUBWAY -> 12f
+                                com.teammanduk.adego.core.model.TrafficType.BUS -> 10f
+                                com.teammanduk.adego.core.model.TrafficType.WALK -> 6f
+                            }
 
-                    // 생성된 Polyline 데이터를 기반으로 실제 Polyline 그리기
-                    polylineDataList.forEach { data ->
-                        key(data.key) {
-                            Polyline(
-                                points = data.points, color = data.color, width = data.width
+                            list.add(
+                                PolylineData(
+                                    points = points.toList(),
+                                    color = lineColor,
+                                    width = lineWidth,
+                                    key = "subpath_$index"
+                                )
                             )
                         }
+                    }
+
+                    list.toList()
+                }
+
+                // 생성된 Polyline 데이터를 기반으로 실제 Polyline 그리기
+                polylineDataList.forEach { data ->
+                    key(data.key) {
+                        Polyline(
+                            points = data.points, color = data.color, width = data.width
+                        )
                     }
                 }
             }

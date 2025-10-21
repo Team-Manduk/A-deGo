@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.teammanduk.adego.core.domain.repository.RouteRepository
+import com.teammanduk.adego.core.domain.usecase.SaveSelectedRouteUseCase
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.navigation.Route as NavigationRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,13 +27,16 @@ data class SelectRouteUiState(
 @HiltViewModel
 class SelectRouteViewModel @Inject constructor(
     private val routeRepository: RouteRepository,
+    private val saveSelectedRouteUseCase: SaveSelectedRouteUseCase,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SelectRouteUiState())
     val uiState: StateFlow<SelectRouteUiState> = _uiState.asStateFlow()
 
-    // 출발지/도착지 좌표 저장
+    // 출발지/도착지 좌표 및 사용자 정보 저장
+    private val roomId: String
+    private val userId: String
     private val startLat: Double
     private val startLng: Double
     private val destLat: Double
@@ -40,6 +44,8 @@ class SelectRouteViewModel @Inject constructor(
 
     init {
         val args = savedStateHandle.toRoute<NavigationRoute.SelectRoute>()
+        roomId = args.roomId
+        userId = args.userId
         startLat = args.startLat
         startLng = args.startLng
         destLat = args.destLat
@@ -92,6 +98,28 @@ class SelectRouteViewModel @Inject constructor(
 
     fun deselectRoute() {
         _uiState.value = _uiState.value.copy(selectedRouteIndex = null)
+    }
+
+    /**
+     * 선택한 경로를 서버에 저장
+     */
+    fun confirmAndSaveRoute() {
+        viewModelScope.launch {
+            val selectedIndex = _uiState.value.selectedRouteIndex ?: return@launch
+            val selectedRoute = _uiState.value.routes.getOrNull(selectedIndex) ?: return@launch
+
+            Log.d("SelectRouteViewModel", "선택한 경로를 서버에 저장 중...")
+            val result = saveSelectedRouteUseCase(
+                userId = userId,
+                selectedRoute = selectedRoute
+            )
+
+            result.onSuccess {
+                Log.d("SelectRouteViewModel", "경로 저장 성공")
+            }.onFailure { error ->
+                Log.e("SelectRouteViewModel", "경로 저장 실패", error)
+            }
+        }
     }
 
     private fun searchRoutes(

@@ -53,7 +53,8 @@ interface RoomDataSource {
         polyline: String,
         durationInSeconds: Int,
         distanceInMeters: Int,
-        timestamp: Long
+        timestamp: Long,
+        selectedRoute: com.teammanduk.adego.core.data_api.model.RouteDto? = null
     ): Result<Unit>
 
     /**
