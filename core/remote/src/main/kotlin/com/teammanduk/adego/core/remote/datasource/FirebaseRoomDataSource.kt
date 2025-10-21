@@ -110,11 +110,22 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
         return try {
             Log.d(TAG, "[Firebase] 참여자 추가 시작: ${participantDto.userId} -> room $roomId")
             Log.d(TAG, "[Firebase] 참여자 정보 - name: ${participantDto.name}, profileColor: ${participantDto.profileColor}")
-            database.child("participants")
+
+            val participantRef = database.child("participants")
                 .child(roomId)
                 .child(participantDto.userId)
-                .setValue(participantDto)
-                .await()
+
+            // 기존 참가자 데이터 확인
+            val existingData = participantRef.get().await()
+
+            if (existingData.exists()) {
+                // 기존 참가자: 아무것도 하지 않음 (기존 데이터 유지)
+                Log.d(TAG, "[Firebase] 기존 참여자 발견 - 데이터 유지 (덮어쓰지 않음)")
+            } else {
+                // 신규 참가자: 전체 데이터 저장
+                Log.d(TAG, "[Firebase] 신규 참여자 - 전체 데이터 저장")
+                participantRef.setValue(participantDto).await()
+            }
 
             Log.d(TAG, "[Firebase] 참여자 추가 완료: ${participantDto.userId}")
             Result.success(Unit)
