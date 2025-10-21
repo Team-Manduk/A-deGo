@@ -9,7 +9,7 @@ import com.teammanduk.adego.core.domain.usecase.GetCurrentLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchPlaceByCoordinatesUseCase
 import com.teammanduk.adego.core.domain.usecase.SetSelectedPlaceUseCase
-import com.teammanduk.adego.feature.place.util.LocationValidator
+import com.teammanduk.adego.core.domain.util.LocationUtils
 import com.teammanduk.adego.core.model.Place
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
@@ -29,8 +29,7 @@ class SelectPlaceViewModel @Inject constructor(
     private val getSelectedPlaceUseCase: GetSelectedPlaceUseCase,
     private val setSelectedPlaceUseCase: SetSelectedPlaceUseCase,
     private val clearSelectedPlaceUseCase: ClearSelectedPlaceUseCase,
-    private val getCurrentLocationUseCase: GetCurrentLocationUseCase,
-    private val locationValidator: LocationValidator
+    private val getCurrentLocationUseCase: GetCurrentLocationUseCase
 ) : ViewModel() {
 
     // Repository의 검색 결과를 구독
@@ -109,7 +108,12 @@ class SelectPlaceViewModel @Inject constructor(
                     val currentPosition = _currentCameraPosition.value
                     val shouldApplyResult = currentRequestId == geocodingRequestId &&
                         currentPosition != null &&
-                        locationValidator.isSameLocation(requestedLatLng, currentPosition) &&
+                        LocationUtils.isSameLocation(
+                            requestedLatLng.latitude,
+                            requestedLatLng.longitude,
+                            currentPosition.latitude,
+                            currentPosition.longitude
+                        ) &&
                         !_isUserDragging.value &&
                         !_isFromSearch.value
 
