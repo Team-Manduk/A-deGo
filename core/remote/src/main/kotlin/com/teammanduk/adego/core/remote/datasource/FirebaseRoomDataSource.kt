@@ -119,8 +119,14 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
             val existingData = participantRef.get().await()
 
             if (existingData.exists()) {
-                // 기존 참가자: 아무것도 하지 않음 (기존 데이터 유지)
-                Log.d(TAG, "[Firebase] 기존 참여자 발견 - 데이터 유지 (덮어쓰지 않음)")
+                // 기존 참가자: name과 profileColor만 업데이트 (location, route, movementStatus 유지)
+                Log.d(TAG, "[Firebase] 기존 참여자 발견 - name과 profileColor만 업데이트")
+                val updates = mapOf<String, Any>(
+                    "name" to participantDto.name,
+                    "profileColor" to participantDto.profileColor,
+                    "userId" to participantDto.userId
+                )
+                participantRef.updateChildren(updates).await()
             } else {
                 // 신규 참가자: 전체 데이터 저장
                 Log.d(TAG, "[Firebase] 신규 참여자 - 전체 데이터 저장")
