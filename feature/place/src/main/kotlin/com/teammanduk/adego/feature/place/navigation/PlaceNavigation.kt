@@ -109,6 +109,7 @@ fun NavGraphBuilder.selectStartPlaceScreen(
             title = "출발지 선택",
             buttonText = "출발지 선택하기",
             showTopBar = true,
+            clearPreviousResult = true,
             onBackClick = onBackClick,
             onPlaceSelected = { place ->
                 onPlaceSelected(

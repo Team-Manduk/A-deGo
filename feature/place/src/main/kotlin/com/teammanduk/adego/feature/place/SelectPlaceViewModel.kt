@@ -3,6 +3,7 @@ package com.teammanduk.adego.feature.place
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.maps.model.LatLng
+import com.teammanduk.adego.core.domain.usecase.ClearSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.GetCurrentLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchPlaceByCoordinatesUseCase
@@ -25,6 +26,7 @@ class SelectPlaceViewModel @Inject constructor(
     private val searchPlaceByCoordinatesUseCase: SearchPlaceByCoordinatesUseCase,
     private val getSelectedPlaceUseCase: GetSelectedPlaceUseCase,
     private val setSelectedPlaceUseCase: SetSelectedPlaceUseCase,
+    private val clearSelectedPlaceUseCase: ClearSelectedPlaceUseCase,
     private val getCurrentLocationUseCase: GetCurrentLocationUseCase
 ) : ViewModel() {
 
@@ -169,6 +171,13 @@ class SelectPlaceViewModel @Inject constructor(
             currentSearchResult.value?.let { place ->
                 setSelectedPlaceUseCase(place)
             }
+        }
+    }
+
+    // 이전 검색 결과 초기화 (출발지 선택 등 새로운 화면 진입 시)
+    fun clearSearchResult() {
+        viewModelScope.launch {
+            clearSelectedPlaceUseCase()
         }
     }
 }
