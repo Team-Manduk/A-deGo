@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
-import com.teammanduk.adego.core.domain.usecase.BroadcastLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.JoinRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.LeaveRoomUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchRouteUseCase
@@ -30,10 +29,10 @@ import com.teammanduk.adego.feature.map.model.MapIntent.StartPlaceSelected
 import com.teammanduk.adego.feature.map.model.MapIntent.UpdateUserName
 import com.teammanduk.adego.feature.map.model.MapSideEffect
 import com.teammanduk.adego.feature.map.model.MapUiState
-import com.teammanduk.adego.feature.map.model.toDomainModel
 import com.teammanduk.adego.feature.map.model.toUiModel
 import com.teammanduk.adego.feature.map.model.toUiModels
 import com.teammanduk.adego.feature.map.util.NicknameGenerator
+import com.teammanduk.adego.sync.location.manager.LocationTrackingManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,11 +47,11 @@ import javax.inject.Inject
 class MapViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val joinRoom: JoinRoomUseCase,
-    private val broadcastLocation: BroadcastLocationUseCase,
     private val leaveRoom: LeaveRoomUseCase,
     private val userRepository: UserRepository,
     private val roomRepository: RoomRepository,
-    private val searchRouteUseCase: SearchRouteUseCase
+    private val searchRouteUseCase: SearchRouteUseCase,
+    private val locationTrackingManager: LocationTrackingManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MapUiState())
@@ -154,21 +153,8 @@ class MapViewModel @Inject constructor(
     }
 
     private fun startLocationTracking() {
-        viewModelScope.launch {
-            // BroadcastLocationUseCase가 Room DB에서 자동으로 경로를 조회함
-            broadcastLocation()
-                .catch { e ->
-                    _uiState.update {
-                        it.copy(
-                            error = e.message ?: "위치 추적 실패",
-                            isLocationTrackingActive = false
-                        )
-                    }
-                }
-                .collect { location ->
-                    _uiState.update { it.copy(isLocationTrackingActive = true) }
-                }
-        }
+        locationTrackingManager.startTracking()
+        _uiState.update { it.copy(isLocationTrackingActive = true) }
     }
 
     fun onAction(intent: MapIntent) {
@@ -204,6 +190,7 @@ class MapViewModel @Inject constructor(
 
     private fun leaveRoomAndNavigateHome() {
         viewModelScope.launch {
+            locationTrackingManager.stopTracking()
             leaveRoom()
                 .onSuccess {
                     _sideEffect.send(MapSideEffect.NavigateToHome)

@@ -1,6 +1,7 @@
 package com.teammanduk.adego.core.ui.permission
 
 import android.Manifest
+import android.os.Build
 
 sealed class PermissionType {
     abstract val permissions: Array<String>
@@ -22,6 +23,22 @@ sealed class PermissionType {
         override val settingsTitle = "위치 권한 필요"
 
         override val settingsText = "앱 사용을 위해서는 위치 권한이 필요합니다. 설정에서 직접 권한을 허용해주세요."
+    }
+
+    data object Notification : PermissionType() {
+        override val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            emptyArray()
+        }
+
+        override val rationaleTitle = "알림 권한 필요"
+
+        override val rationaleText = "위치 공유 중임을 알리고 백그라운드에서도 위치를 추적하기 위해 알림 권한이 필요합니다."
+
+        override val settingsTitle = "알림 권한 필요"
+
+        override val settingsText = "앱 사용을 위해서는 알림 권한이 필요합니다. 설정에서 직접 권한을 허용해주세요."
     }
 }
 

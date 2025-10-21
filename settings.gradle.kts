@@ -41,4 +41,6 @@ include(
     ":core:data",
     ":core:domain",
     ":core:model",
+    ":core:notifications",
 )
+include(":sync:location")
