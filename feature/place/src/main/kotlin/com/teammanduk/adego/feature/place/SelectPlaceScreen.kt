@@ -30,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,7 @@ fun SelectPlaceRoute(
     title: String = "장소 선택",
     buttonText: String = "장소 선택하기",
     showTopBar: Boolean = true,
+    clearPreviousResult: Boolean = false,
     onBackClick: () -> Unit = {},
     onPlaceSelected: (Place) -> Unit = {},
     onSearchClick: () -> Unit = {},
@@ -64,6 +66,13 @@ fun SelectPlaceRoute(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isUserDragging by viewModel.isUserDragging.collectAsStateWithLifecycle()
     val initialPosition by viewModel.initialPosition.collectAsStateWithLifecycle()
+
+    // 이전 검색 결과 초기화 (출발지 선택 화면 등)
+    LaunchedEffect(clearPreviousResult) {
+        if (clearPreviousResult) {
+            viewModel.clearSearchResult()
+        }
+    }
 
     PermissionRequester(
         permissionTypes = listOf(PermissionType.Location)
