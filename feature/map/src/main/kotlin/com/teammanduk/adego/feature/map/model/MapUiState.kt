@@ -17,7 +17,7 @@ data class MapUiState(
     val showSelectStartPlace: Boolean = false,
     val showSearchPlace: Boolean = false,
     val startPlace: com.teammanduk.adego.core.model.Place? = null,
-    val searchedRoutes: List<com.teammanduk.adego.core.model.Route> = emptyList(),
+    val searchedRoutes: List<RouteUiModel> = emptyList(),
     val selectedRouteIndex: Int? = null,
     val isSearchingRoute: Boolean = false,
     val userName: String = "",

@@ -28,7 +28,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.teammanduk.adego.core.designsystem.ui.theme.AdegoTheme
+import com.teammanduk.adego.core.model.MovementStatus
 import com.teammanduk.adego.feature.map.model.ParticipantUiModel
+import com.teammanduk.adego.feature.map.model.toKoreanString
 import kotlinx.coroutines.launch
 
 @Composable
@@ -128,14 +130,14 @@ private fun ParticipantCard(
                 ) {
                     // 이동 상태 표시
                     Text(
-                        text = participant.movementStatus,
+                        text = participant.movementStatus.toKoreanString(),
                         style = AdegoTheme.typography.bodyLarge,
                         color = when (participant.movementStatus) {
-                            "도착" -> Color(0xFF4CAF50)
-                            "곧 도착" -> Color(0xFFFF9800)
-                            "이동 중" -> AdegoTheme.colors.main500
-                            "출발 전" -> Color(0xFFFFEB3B).copy(red = 0.8f)
-                            else -> Color(0xFF9E9E9E)
+                            MovementStatus.ARRIVED -> Color(0xFF4CAF50)
+                            MovementStatus.ARRIVING_SOON -> Color(0xFFFF9800)
+                            MovementStatus.IN_PROGRESS -> AdegoTheme.colors.main500
+                            MovementStatus.READY -> Color(0xFFFFEB3B).copy(red = 0.8f)
+                            MovementStatus.NOT_STARTED -> Color(0xFF9E9E9E)
                         }
                     )
 

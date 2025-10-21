@@ -14,7 +14,7 @@ data class ParticipantUiModel(
     val userId: String,
     val name: String,
     val color: Color,
-    val movementStatus: String,
+    val movementStatus: MovementStatus,
     val eta: String? = null,
     val distance: String? = null,
     val location: ParticipantLocation? = null,
@@ -26,7 +26,7 @@ fun Participant.toUiModel(): ParticipantUiModel = ParticipantUiModel(
     userId = this.userId,
     name = this.name,
     color = this.getParticipantColor(),
-    movementStatus = this.movementStatus.toKoreanString(),
+    movementStatus = this.movementStatus,
     eta = this.route?.etaInSeconds?.let { formatTime(it) },
     distance = this.route?.distanceInMeters?.let { formatDistance(it) },
     location = this.location,
@@ -37,7 +37,7 @@ fun Participant.toUiModel(): ParticipantUiModel = ParticipantUiModel(
 /**
  * MovementStatus를 한국어 문자열로 변환
  */
-private fun MovementStatus.toKoreanString(): String {
+fun MovementStatus.toKoreanString(): String {
     return when (this) {
         MovementStatus.NOT_STARTED -> "경로 선택 전"
         MovementStatus.READY -> "출발 전"
