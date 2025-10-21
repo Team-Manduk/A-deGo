@@ -141,12 +141,38 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
         }
     }
 
+    override suspend fun getParticipants(roomId: String): Result<List<ParticipantDto>> {
+        return try {
+            Log.d("MapPerformance", "[Firebase] getParticipants 시작 at ${System.currentTimeMillis()}")
+            val snapshot = database.child("participants")
+                .child(roomId)
+                .get()
+                .await()
+
+            val participants = mutableListOf<ParticipantDto>()
+            snapshot.children.forEach { child ->
+                child.getValue(ParticipantDto::class.java)?.let { participant ->
+                    val hasLocation = participant.location != null
+                    Log.d("MapPerformance", "[Firebase] 초기 참여자 - userId: ${participant.userId}, hasLocation: $hasLocation")
+                    participants.add(participant)
+                }
+            }
+            Log.d("MapPerformance", "[Firebase] getParticipants 완료 at ${System.currentTimeMillis()}, count=${participants.size}")
+            Result.success(participants)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get participants", e)
+            Result.failure(e)
+        }
+    }
+
     override fun observeParticipants(roomId: String): Flow<List<ParticipantDto>> = callbackFlow {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val participants = mutableListOf<ParticipantDto>()
                 snapshot.children.forEach { child ->
                     child.getValue(ParticipantDto::class.java)?.let { participant ->
+                        val hasLocation = participant.location != null
+                        Log.d("MapPerformance", "[Firebase] 참여자 불러옴 - userId: ${participant.userId}, hasLocation: $hasLocation at ${System.currentTimeMillis()}")
                         Log.d(TAG, "[Firebase] 참여자 불러옴 - userId: ${participant.userId}, name: ${participant.name}, profileColor: ${participant.profileColor}")
                         participants.add(participant)
                     }
@@ -185,16 +211,27 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
                 "updatedAt" to timestamp
             )
 
-            database.child("participants")
+            val path = "participants/$roomId/$userId/location"
+            Log.d("MapPerformance", "[Firebase] setValue 호출 직전 at ${System.currentTimeMillis()}, path=$path")
+
+            val ref = database.child("participants")
                 .child(roomId)
                 .child(userId)
                 .child("location")
-                .setValue(locationMap)
-                .await()
+
+            ref.setValue(locationMap).await()
+
+            Log.d("MapPerformance", "[Firebase] setValue 완료 at ${System.currentTimeMillis()}")
+
+            // 실제로 저장되었는지 즉시 확인
+            val verification = ref.get().await()
+            val verified = verification.exists()
+            Log.d("MapPerformance", "[Firebase] 저장 확인: exists=$verified at ${System.currentTimeMillis()}")
 
             Log.d(TAG, "Location updated for user $userId in room $roomId")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("MapPerformance", "[Firebase] setValue 실패!", e)
             Log.e(TAG, "Failed to update location", e)
             Result.failure(e)
         }

@@ -111,6 +111,13 @@ internal fun MapRoute(
 
     // selectedRoute 파라미터 제거됨 - Room DB에서 자동 조회
 
+    // 최소 로딩 시간 보장 (자연스러운 UX)
+    var isMinimumLoadingTimePassed by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(400) // 0.4초 최소 로딩 시간
+        isMinimumLoadingTimePassed = true
+    }
+
     PermissionRequester(
         permissionTypes = listOf(PermissionType.Location)
     ) {
@@ -137,11 +144,12 @@ internal fun MapRoute(
                 )
             }
 
-            uiState.currentUser?.location == null -> {
+            !isMinimumLoadingTimePassed || uiState.myCurrentLocation == null -> {
                 LoadingScreen(text = "현재 위치를 가져오는 중...")
             }
 
             else -> {
+                android.util.Log.d("MapPerformance", "[6] MapScreen composing at ${System.currentTimeMillis()}")
                 MapScreen(
                     uiState = uiState,
                     onAction = viewModel::onAction,
@@ -177,8 +185,8 @@ private fun MapScreen(
     var isCameraInitialized by remember { mutableStateOf(false) }
 
     val cameraPositionState = rememberCameraPositionState {
-        // currentUser 위치를 우선적으로 사용하고, 없으면 선택된 참가자 위치 사용
-        val initialLocation = uiState.currentUser?.location
+        // 내 현재 위치(GPS 직접)를 우선 사용하고, 없으면 선택된 참가자 위치 사용
+        val initialLocation = uiState.myCurrentLocation
             ?: uiState.participants.getOrNull(uiState.selectedParticipantIndex)?.location
         if (initialLocation != null) {
             position = CameraPosition.fromLatLngZoom(
@@ -224,6 +232,10 @@ private fun MapScreen(
             .systemBarsPadding()
     ) {
         // 지도
+        LaunchedEffect(Unit) {
+            android.util.Log.d("MapPerformance", "[7] GoogleMap composing at ${System.currentTimeMillis()}")
+        }
+
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
@@ -244,8 +256,39 @@ private fun MapScreen(
                 )
             }
 
-            // 참가자 마커들
-            uiState.participants.forEach { participant ->
+            // 내 위치 마커 (GPS에서 직접 받은 위치 사용)
+            uiState.myCurrentLocation?.let { myLocation ->
+                val currentUser = uiState.currentUser
+                if (currentUser != null) {
+                    key("my_location") {
+                        val isSelected =
+                            uiState.participants.getOrNull(pagerState.currentPage)?.userId == uiState.userId
+
+                        val markerIcon = createParticipantMarkerIcon(currentUser.color, isSelected)
+
+                        val markerState = rememberMarkerState(
+                            key = "my_${myLocation.latitude}_${myLocation.longitude}",
+                            position = LatLng(myLocation.latitude, myLocation.longitude)
+                        )
+
+                        // 위치가 변경되면 MarkerState 업데이트
+                        LaunchedEffect(myLocation.latitude, myLocation.longitude) {
+                            markerState.position = LatLng(myLocation.latitude, myLocation.longitude)
+                        }
+
+                        Marker(
+                            state = markerState,
+                            title = currentUser.name,
+                            icon = markerIcon,
+                            anchor = androidx.compose.ui.geometry.Offset(0.5f, 0.5f),
+                            zIndex = if (isSelected) 1f else 0f
+                        )
+                    }
+                }
+            }
+
+            // 다른 참가자 마커들 (Firebase에서 받은 위치 사용)
+            uiState.participants.filter { it.userId != uiState.userId }.forEach { participant ->
                 key(participant.userId) {
                     participant.location?.let { location ->
                         val isSelected =

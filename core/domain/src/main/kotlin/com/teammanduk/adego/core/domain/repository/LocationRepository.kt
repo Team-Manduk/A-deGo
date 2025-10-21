@@ -69,4 +69,11 @@ interface LocationRepository {
      * Firebase 업로드 시간 간격 판단에 사용
      */
     fun getLastUploadTimestamp(): Long?
+
+    /**
+     * 위치 상태 초기화
+     * 세션 복구 시 또는 새로운 방 참가 시 호출하여
+     * 첫 위치를 즉시 업로드하도록 함
+     */
+    fun clearLocationState()
 }

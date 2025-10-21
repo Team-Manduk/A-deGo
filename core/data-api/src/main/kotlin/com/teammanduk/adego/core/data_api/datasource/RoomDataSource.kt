@@ -26,6 +26,11 @@ interface RoomDataSource {
     suspend fun addParticipant(roomId: String, participantDto: ParticipantDto): Result<Unit>
 
     /**
+     * 참여자 목록 조회 (1회)
+     */
+    suspend fun getParticipants(roomId: String): Result<List<ParticipantDto>>
+
+    /**
      * 참여자 목록 실시간 구독
      */
     fun observeParticipants(roomId: String): Flow<List<ParticipantDto>>
