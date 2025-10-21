@@ -66,6 +66,7 @@ fun SelectPlaceRoute(
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isUserDragging by viewModel.isUserDragging.collectAsStateWithLifecycle()
     val initialPosition by viewModel.initialPosition.collectAsStateWithLifecycle()
+    val selectedPosition by viewModel.selectedPosition.collectAsStateWithLifecycle()
 
     // 이전 검색 결과 초기화 (출발지 선택 화면 등)
     LaunchedEffect(clearPreviousResult) {
@@ -105,7 +106,7 @@ fun SelectPlaceRoute(
                 ) { paddingValues ->
                     SelectPlaceScreen(
                         searchResult = searchResult,
-                        initialPosition = initialPosition,
+                        selectedPosition = selectedPosition,
                         isLoading = isLoading,
                         isUserDragging = isUserDragging,
                         buttonText = buttonText,
@@ -130,7 +131,7 @@ fun SelectPlaceRoute(
                 // TopBar 없이 사용 (다이얼로그 등에서)
                 SelectPlaceScreen(
                     searchResult = searchResult,
-                    initialPosition = initialPosition,
+                    selectedPosition = selectedPosition,
                     isLoading = isLoading,
                     isUserDragging = isUserDragging,
                     buttonText = buttonText,
@@ -155,7 +156,7 @@ fun SelectPlaceRoute(
 @Composable
 private fun SelectPlaceScreen(
     searchResult: Place?,
-    initialPosition: LatLng?,
+    selectedPosition: LatLng,
     isLoading: Boolean,
     isUserDragging: Boolean,
     buttonText: String = "장소 선택하기",
@@ -166,16 +167,6 @@ private fun SelectPlaceScreen(
     modifier: Modifier = Modifier
 ) {
     var hasClicked by remember { mutableStateOf(false) }
-    // searchResult에서 위치 정보를 가져오거나 기본값 사용
-    val selectedPosition = remember(searchResult, initialPosition) {
-        if (searchResult != null) {
-            LatLng(searchResult.latitude, searchResult.longitude)
-        } else if (initialPosition != null) {
-            initialPosition
-        } else {
-            LatLng(35.1979, 129.0758) // 기본 위치 (백업)
-        }
-    }
 
     Box(
         modifier = modifier.fillMaxSize()
