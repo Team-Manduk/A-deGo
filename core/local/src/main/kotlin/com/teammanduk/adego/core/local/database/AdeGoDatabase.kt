@@ -2,8 +2,6 @@ package com.teammanduk.adego.core.local.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import androidx.room.TypeConverters
-import com.teammanduk.adego.core.local.converter.RouteTypeConverters
 import com.teammanduk.adego.core.local.dao.SelectedRouteDao
 import com.teammanduk.adego.core.local.model.SelectedRouteEntity
 
@@ -15,7 +13,6 @@ import com.teammanduk.adego.core.local.model.SelectedRouteEntity
     version = 1,
     exportSchema = false
 )
-@TypeConverters(RouteTypeConverters::class)
 abstract class AdeGoDatabase : RoomDatabase() {
     abstract fun selectedRouteDao(): SelectedRouteDao
 
