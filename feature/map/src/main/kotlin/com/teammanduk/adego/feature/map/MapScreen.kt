@@ -68,8 +68,7 @@ import kotlinx.coroutines.launch
 internal fun MapRoute(
     viewModel: MapViewModel = hiltViewModel(),
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
-    onNavigateToHome: () -> Unit = {},
-    selectedRoute: com.teammanduk.adego.core.model.Route? = null
+    onNavigateToHome: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -110,12 +109,7 @@ internal fun MapRoute(
         }
     }
 
-    // 선택된 경로가 있으면 ViewModel에 설정
-    LaunchedEffect(selectedRoute) {
-        selectedRoute?.let {
-            viewModel.setSelectedRoute(it)
-        }
-    }
+    // selectedRoute 파라미터 제거됨 - Room DB에서 자동 조회
 
     PermissionRequester(
         permissionTypes = listOf(PermissionType.Location)
@@ -280,112 +274,26 @@ private fun MapScreen(
                 }
             }
 
-            // 선택된 참가자의 경로 그리기 (서버에서 받은 selectedRoute 우선 사용)
+            // 선택된 참가자의 경로 그리기 (polyline 디코딩)
             val selectedParticipant = uiState.participants.getOrNull(pagerState.currentPage)
-            selectedParticipant?.route?.selectedRoute?.let { route ->
-                // 모든 SubPath를 미리 처리하여 Polyline 데이터 생성 (remember로 메모이제이션)
-                val polylineDataList = remember(route) {
-                    val list = mutableListOf<PolylineData>()
-                    var lastPoint: LatLng? = null
-
-                    route.subPaths.forEachIndexed { index, subPath ->
-                        val points = mutableListOf<LatLng>()
-                        val graphicData = subPath.graphicData
-
-                        // TMAP graphicData 사용 (실제 경로)
-                        if (!graphicData.isNullOrEmpty()) {
-                            // 이전 SubPath와 연결이 끊긴 경우 연결선 추가
-                            if (lastPoint != null) {
-                                val firstPoint = LatLng(
-                                    graphicData.first().latitude, graphicData.first().longitude
-                                )
-                                val distance = calculateDistance(lastPoint!!, firstPoint)
-
-                                // 50미터 이상 떨어져 있으면 연결선 그리기 (반투명 회색)
-                                if (distance > 50) {
-                                    list.add(
-                                        PolylineData(
-                                            points = listOf(lastPoint!!, firstPoint),
-                                            color = Color.Gray.copy(
-                                                alpha = 0.4f
-                                            ),
-                                            width = 4f,
-                                            key = "connector_$index"
-                                        )
-                                    )
-                                }
-                            }
-
-                            // graphicData의 모든 좌표를 points에 추가
-                            graphicData.forEach { coord ->
-                                points.add(LatLng(coord.latitude, coord.longitude))
-                            }
-
-                            lastPoint = points.lastOrNull()
-                        } else {
-                            // graphicData가 없는 경우: 시작-끝 직선으로 대체
-                            val startLat = subPath.startLatitude
-                            val startLng = subPath.startLongitude
-                            val endLat = subPath.endLatitude
-                            val endLng = subPath.endLongitude
-
-                            if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                                val startPoint = LatLng(startLat, startLng)
-                                val endPoint = LatLng(endLat, endLng)
-
-                                // 이전 SubPath와 연결
-                                if (lastPoint != null && lastPoint != startPoint) {
-                                    points.add(lastPoint!!)
-                                }
-
-                                points.add(startPoint)
-                                points.add(endPoint)
-                                lastPoint = endPoint
-                            }
-                        }
-
-                        // 포인트가 있으면 Polyline 데이터 추가
-                        if (points.size >= 2) {
-                            // 교통수단에 따라 다른 색상과 두께 사용
-                            val lineColor = when (subPath.trafficType) {
-                                com.teammanduk.adego.core.model.TrafficType.SUBWAY -> Color(
-                                    0xFF0052A4
-                                )
-
-                                com.teammanduk.adego.core.model.TrafficType.BUS -> Color(
-                                    0xFF53B332
-                                )
-
-                                com.teammanduk.adego.core.model.TrafficType.WALK -> Color(
-                                    0xFF808080
-                                )
-                            }
-
-                            val lineWidth = when (subPath.trafficType) {
-                                com.teammanduk.adego.core.model.TrafficType.SUBWAY -> 12f
-                                com.teammanduk.adego.core.model.TrafficType.BUS -> 10f
-                                com.teammanduk.adego.core.model.TrafficType.WALK -> 6f
-                            }
-
-                            list.add(
-                                PolylineData(
-                                    points = points.toList(),
-                                    color = lineColor,
-                                    width = lineWidth,
-                                    key = "subpath_$index"
-                                )
-                            )
+            selectedParticipant?.route?.polyline?.let { polylineString ->
+                if (polylineString.isNotEmpty()) {
+                    // polyline 디코딩하여 좌표 리스트 생성
+                    val points = remember(polylineString) {
+                        try {
+                            com.teammanduk.adego.core.domain.util.PolylineEncoder.decode(polylineString)
+                                .map { (lat, lng) -> LatLng(lat, lng) }
+                        } catch (e: Exception) {
+                            emptyList()
                         }
                     }
 
-                    list.toList()
-                }
-
-                // 생성된 Polyline 데이터를 기반으로 실제 Polyline 그리기
-                polylineDataList.forEach { data ->
-                    key(data.key) {
+                    // Polyline 그리기
+                    if (points.size >= 2) {
                         Polyline(
-                            points = data.points, color = data.color, width = data.width
+                            points = points,
+                            color = Color(0xFF4285F4), // 구글 블루
+                            width = 10f
                         )
                     }
                 }
@@ -456,9 +364,9 @@ private fun MapScreen(
                 .fillMaxWidth()
         ) {
             // 경로 선택 버튼 - 경로 선택 여부에 따라 다른 UI
-            // 로컬 경로가 있거나, 서버에서 받아온 내 경로가 있으면 축소
+            // 로컬 경로가 있거나, 서버에서 받아온 내 경로(polyline)가 있으면 축소
             val hasRoute = uiState.selectedRouteIndex != null ||
-                           uiState.currentUser?.route?.selectedRoute != null
+                           uiState.currentUser?.route?.polyline?.isNotEmpty() == true
 
             if (hasRoute) {
                 // 경로 선택 후: 아이콘 버튼으로 최소화 (오른쪽 배치)

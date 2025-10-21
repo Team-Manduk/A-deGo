@@ -23,7 +23,7 @@ import com.teammanduk.adego.feature.route.navigation.selectRouteNavGraph
 internal fun MainNavHost(
     navigator: MainNavigator,
 ) {
-    var selectedRoute by remember { mutableStateOf<com.teammanduk.adego.core.model.Route?>(null) }
+    // selectedRoute는 Room DB에 저장되므로 상태 관리 불필요
 
     Box(
         modifier = Modifier
@@ -51,13 +51,12 @@ internal fun MainNavHost(
             )
             mapNavGraph(
                 onNavigateToSelectStartPlace = navigator::navigateToSelectStartPlace,
-                onNavigateToHome = navigator::navigateHome,
-                getSelectedRoute = { selectedRoute }
+                onNavigateToHome = navigator::navigateHome
             )
             selectRouteNavGraph(
                 onNavigateBack = navigator::navigateBack,
-                onRouteSelected = { route ->
-                    selectedRoute = route
+                onRouteSelected = {
+                    // 경로는 SaveSelectedRouteUseCase에서 Room DB에 저장됨
                     // 경로 선택 화면과 출발지 선택 화면을 모두 pop하고 MapScreen으로 돌아가기
                     navigator.navController.popBackStack(
                         route = Route.Map::class,

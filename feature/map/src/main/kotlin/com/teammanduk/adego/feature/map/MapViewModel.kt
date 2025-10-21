@@ -154,10 +154,8 @@ class MapViewModel @Inject constructor(
 
     private fun startLocationTracking() {
         viewModelScope.launch {
-            val selectedRoute = _uiState.value.searchedRoutes
-                .getOrNull(_uiState.value.selectedRouteIndex ?: -1)
-
-            broadcastLocation(selectedRoute)
+            // BroadcastLocationUseCase가 Room DB에서 자동으로 경로를 조회함
+            broadcastLocation()
                 .catch { e ->
                     _uiState.update {
                         it.copy(

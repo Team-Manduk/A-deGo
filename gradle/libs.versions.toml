@@ -73,6 +73,10 @@ constraintlayout = "2.1.4"
 # https://developer.android.com/jetpack/androidx/releases/datastore
 androidxDataStore = "1.1.1"
 
+## Room
+# https://developer.android.com/jetpack/androidx/releases/room
+androidxRoom = "2.6.1"
+
 [libraries]
 ## Gradle Plugin
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
@@ -147,6 +151,11 @@ androidx-constraintlayout = { group = "androidx.constraintlayout", name = "const
 
 ## DataStore
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidxDataStore" }
+
+## Room
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "androidxRoom" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "androidxRoom" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "androidxRoom" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -4,7 +4,12 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.room.Room
+import com.teammanduk.adego.core.data_api.datasource.SelectedRouteDataSource
 import com.teammanduk.adego.core.data_api.datasource.SessionDataSource
+import com.teammanduk.adego.core.local.dao.SelectedRouteDao
+import com.teammanduk.adego.core.local.database.AdeGoDatabase
+import com.teammanduk.adego.core.local.datasource.SelectedRouteDataSourceImpl
 import com.teammanduk.adego.core.local.datasource.SessionDataSourceImpl
 import dagger.Binds
 import dagger.Module
@@ -27,6 +32,26 @@ object LocalModule {
     ): DataStore<Preferences> {
         return context.dataStore
     }
+
+    @Provides
+    @Singleton
+    fun provideAdeGoDatabase(
+        @ApplicationContext context: Context
+    ): AdeGoDatabase {
+        return Room.databaseBuilder(
+            context,
+            AdeGoDatabase::class.java,
+            AdeGoDatabase.DATABASE_NAME
+        ).build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSelectedRouteDao(
+        database: AdeGoDatabase
+    ): SelectedRouteDao {
+        return database.selectedRouteDao()
+    }
 }
 
 @Module
@@ -38,4 +63,10 @@ interface LocalBindModule {
     fun bindSessionDataSource(
         impl: SessionDataSourceImpl
     ): SessionDataSource
+
+    @Binds
+    @Singleton
+    fun bindSelectedRouteDataSource(
+        impl: SelectedRouteDataSourceImpl
+    ): SelectedRouteDataSource
 }
