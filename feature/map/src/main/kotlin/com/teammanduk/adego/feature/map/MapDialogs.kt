@@ -371,7 +371,7 @@ internal fun InviteDialog(
  */
 @Composable
 internal fun RouteListDialog(
-    routes: List<com.teammanduk.adego.core.model.Route>,
+    routes: List<com.teammanduk.adego.feature.map.model.RouteUiModel>,
     selectedRouteIndex: Int?,
     onRouteSelect: (Int) -> Unit,
     onDismiss: () -> Unit
@@ -428,7 +428,7 @@ internal fun RouteListDialog(
  */
 @Composable
 private fun RouteCard(
-    route: com.teammanduk.adego.core.model.Route,
+    route: com.teammanduk.adego.feature.map.model.RouteUiModel,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {

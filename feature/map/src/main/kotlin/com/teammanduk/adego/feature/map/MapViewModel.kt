@@ -30,6 +30,7 @@ import com.teammanduk.adego.feature.map.model.MapIntent.StartPlaceSelected
 import com.teammanduk.adego.feature.map.model.MapIntent.UpdateUserName
 import com.teammanduk.adego.feature.map.model.MapSideEffect
 import com.teammanduk.adego.feature.map.model.MapUiState
+import com.teammanduk.adego.feature.map.model.toDomainModel
 import com.teammanduk.adego.feature.map.model.toUiModel
 import com.teammanduk.adego.feature.map.model.toUiModels
 import com.teammanduk.adego.feature.map.util.NicknameGenerator
@@ -146,7 +147,7 @@ class MapViewModel @Inject constructor(
     fun setSelectedRoute(route: com.teammanduk.adego.core.model.Route) {
         _uiState.update {
             it.copy(
-                searchedRoutes = listOf(route),
+                searchedRoutes = listOf(route.toUiModel()),
                 selectedRouteIndex = 0
             )
         }
@@ -283,7 +284,7 @@ class MapViewModel @Inject constructor(
 
                 _uiState.update {
                     it.copy(
-                        searchedRoutes = routes,
+                        searchedRoutes = routes.toUiModels(),
                         isSearchingRoute = false
                     )
                 }
