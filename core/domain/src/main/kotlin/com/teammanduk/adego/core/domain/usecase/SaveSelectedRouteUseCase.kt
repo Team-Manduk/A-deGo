@@ -29,7 +29,7 @@ class SaveSelectedRouteUseCase @Inject constructor(
         val updatedRoute = currentRoute?.copy(selectedRoute = selectedRoute) ?:ParticipantRoute(
             eta = "${selectedRoute.totalTime}분",
             distance = "${selectedRoute.totalDistance / 1000.0}km",
-            polyline = "", // 실제 polyline은 UpdateLocationAndEtaUseCase에서 업데이트
+            polyline = "", // 실제 polyline은 UpdateLocationUseCase에서 업데이트
             durationInSeconds = selectedRoute.totalTime * 60,
             distanceInMeters = selectedRoute.totalDistance,
             updatedAt = System.currentTimeMillis(),
