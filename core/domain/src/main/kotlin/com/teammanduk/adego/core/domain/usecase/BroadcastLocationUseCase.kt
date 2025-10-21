@@ -22,7 +22,7 @@ import javax.inject.Inject
  */
 class BroadcastLocationUseCase @Inject constructor(
     private val locationRepository: LocationRepository,
-    private val updateLocationAndEta: UpdateLocationAndEtaUseCase
+    private val updateLocation: UpdateLocationUseCase
 ) {
     /**
      * 경로 없이 위치만 방송
@@ -38,7 +38,7 @@ class BroadcastLocationUseCase @Inject constructor(
         return locationRepository.observeLocationUpdates()
             .onEach { location ->
                 // 위치 수집 시마다 업데이트 (경로가 있으면 ETA도 함께 계산)
-                updateLocationAndEta(location, selectedRoute)
+                updateLocation(location, selectedRoute)
             }
     }
 }
