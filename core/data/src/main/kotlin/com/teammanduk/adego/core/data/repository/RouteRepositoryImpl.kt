@@ -377,7 +377,7 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
         }
 
         return Route(
-            totalTime = (itinerary.totalTime ?: 0) / 60, // 초 -> 분
+            totalTime = itinerary.totalTime ?: 0, // 초
             totalDistance = (itinerary.totalDistance ?: 0.0).toInt(),
             totalFare = itinerary.fare?.regular?.totalFare ?: 0,
             transferCount = transferCount,
@@ -410,7 +410,7 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
         return SubPath(
             trafficType = trafficType,
             distance = leg.distance ?: 0.0,
-            sectionTime = (leg.sectionTime ?: 0) / 60, // 초 -> 분
+            sectionTime = leg.sectionTime ?: 0, // 초
             startName = leg.start?.name,
             endName = leg.end?.name,
             stationCount = leg.passStopList?.stations?.size,

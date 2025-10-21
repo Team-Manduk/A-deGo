@@ -1,0 +1,19 @@
+package com.teammanduk.adego.feature.route
+
+/**
+ * 초 단위 시간을 "15분" 또는 "1시간 30분" 형식으로 포맷
+ */
+internal fun formatTime(seconds: Int): String {
+    val minutes = seconds / 60
+    return if (minutes < 60) {
+        "${minutes}분"
+    } else {
+        val hours = minutes / 60
+        val mins = minutes % 60
+        if (mins > 0) {
+            "${hours}시간 ${mins}분"
+        } else {
+            "${hours}시간"
+        }
+    }
+}

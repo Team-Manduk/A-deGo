@@ -169,7 +169,7 @@ private fun RouteCard(
             ) {
                 // 소요 시간 (크고 굵게)
                 Text(
-                    text = "${route.totalTime}분",
+                    text = formatTime(route.totalTime),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF000000)
@@ -463,7 +463,7 @@ private fun RouteTimeline(subPaths: List<SubPath>) {
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "${(subPath.distance / 1000.0).let { if (it < 1) "${(subPath.distance).toInt()}m" else "%.1fkm".format(it) }} • 약 ${subPath.sectionTime}분",
+                                text = "${(subPath.distance / 1000.0).let { if (it < 1) "${(subPath.distance).toInt()}m" else "%.1fkm".format(it) }} • 약 ${formatTime(subPath.sectionTime)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -561,7 +561,7 @@ private fun RouteTimeline(subPaths: List<SubPath>) {
                                     )
                                 }
                                 Text(
-                                    text = "${subPath.sectionTime}분",
+                                    text = formatTime(subPath.sectionTime),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

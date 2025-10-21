@@ -84,30 +84,18 @@ fun ParticipantLocation.toDto(): ParticipantLocationDto {
 // ParticipantRoute
 fun ParticipantRouteDto.toModel(): ParticipantRoute {
     return ParticipantRoute(
-        eta = eta,
-        distance = distance,
-        polyline = polyline,
-        durationInSeconds = durationInSeconds,
+        etaInSeconds = etaInSeconds,
         distanceInMeters = distanceInMeters,
-        updatedAt = updatedAt,
-        currentSubPathIndex = currentSubPathIndex,
-        progressInCurrentSubPath = progressInCurrentSubPath,
-        traveledDistance = traveledDistance,
-        remainingDistance = remainingDistance
+        polyline = polyline,
+        updatedAt = updatedAt
     )
 }
 
 fun ParticipantRoute.toDto(): ParticipantRouteDto {
     return ParticipantRouteDto(
-        eta = eta,
-        distance = distance,
-        polyline = polyline,
-        durationInSeconds = durationInSeconds,
+        etaInSeconds = etaInSeconds,
         distanceInMeters = distanceInMeters,
-        updatedAt = updatedAt,
-        currentSubPathIndex = currentSubPathIndex,
-        progressInCurrentSubPath = progressInCurrentSubPath,
-        traveledDistance = traveledDistance,
-        remainingDistance = remainingDistance
+        polyline = polyline,
+        updatedAt = updatedAt
     )
 }
