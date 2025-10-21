@@ -54,7 +54,10 @@ interface RoomDataSource {
         durationInSeconds: Int,
         distanceInMeters: Int,
         timestamp: Long,
-        selectedRoute: com.teammanduk.adego.core.data_api.model.RouteDto? = null
+        currentSubPathIndex: Int? = null,
+        progressInCurrentSubPath: Double? = null,
+        traveledDistance: Double? = null,
+        remainingDistance: Double? = null
     ): Result<Unit>
 
     /**

@@ -2,7 +2,9 @@ package com.teammanduk.adego.core.domain.usecase
 
 import com.teammanduk.adego.core.domain.repository.LocationRepository
 import com.teammanduk.adego.core.domain.repository.RoomRepository
+import com.teammanduk.adego.core.domain.repository.SelectedRouteRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
+import com.teammanduk.adego.core.domain.util.PolylineEncoder
 import com.teammanduk.adego.core.model.ParticipantLocation
 import com.teammanduk.adego.core.model.ParticipantRoute
 import com.teammanduk.adego.core.model.Route
@@ -22,15 +24,18 @@ class UpdateLocationUseCase @Inject constructor(
     private val locationRepository: LocationRepository,
     private val roomRepository: RoomRepository,
     private val userRepository: UserRepository,
+    private val selectedRouteRepository: SelectedRouteRepository,
     private val calculateRouteProgress: CalculateRouteProgressUseCase,
     private val calculateMovementStatus: CalculateMovementStatusUseCase
 ) {
 
     /**
-     * 위치만 업데이트 (경로 정보 없음)
+     * 위치 업데이트 (Room DB에서 선택된 경로를 자동으로 조회)
      */
     suspend operator fun invoke(location: ParticipantLocation): Boolean {
-        return invoke(location, selectedRoute = null)
+        // Room DB에서 선택된 경로 조회
+        val selectedRoute = selectedRouteRepository.getSelectedRoute().getOrNull()
+        return invoke(location, selectedRoute)
     }
 
     /**
@@ -58,18 +63,20 @@ class UpdateLocationUseCase @Inject constructor(
             val routeProgress = calculateRouteProgress(location, selectedRoute)
 
             if (routeProgress != null) {
+                // polyline은 SaveSelectedRouteUseCase에서 이미 저장했으므로 재사용
+                val polyline = PolylineEncoder.encode(selectedRoute)
+
                 val participantRoute = ParticipantRoute(
                     eta = formatEta(routeProgress.remainingTimeInSeconds),
                     distance = formatDistance(routeProgress.remainingDistance),
-                    polyline = "", // polyline은 필요시 인코딩
+                    polyline = polyline,
                     durationInSeconds = routeProgress.remainingTimeInSeconds,
                     distanceInMeters = routeProgress.remainingDistance.toInt(),
                     updatedAt = System.currentTimeMillis(),
                     currentSubPathIndex = routeProgress.currentSubPathIndex,
                     progressInCurrentSubPath = routeProgress.progressInCurrentSubPath,
                     traveledDistance = routeProgress.traveledDistance,
-                    remainingDistance = routeProgress.remainingDistance,
-                    selectedRoute = selectedRoute // ⭐ 선택한 경로 정보 포함
+                    remainingDistance = routeProgress.remainingDistance
                 )
 
                 roomRepository.updateMyRoute(userId, participantRoute)

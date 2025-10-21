@@ -209,7 +209,10 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
         durationInSeconds: Int,
         distanceInMeters: Int,
         timestamp: Long,
-        selectedRoute: com.teammanduk.adego.core.data_api.model.RouteDto?
+        currentSubPathIndex: Int?,
+        progressInCurrentSubPath: Double?,
+        traveledDistance: Double?,
+        remainingDistance: Double?
     ): Result<Unit> {
         return try {
             val routeMap = mutableMapOf<String, Any>(
@@ -221,10 +224,11 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
                 "updatedAt" to timestamp
             )
 
-            // selectedRoute가 있으면 추가 (Firebase가 자동으로 직렬화)
-            if (selectedRoute != null) {
-                routeMap["selectedRoute"] = selectedRoute
-            }
+            // 경로 진행률 정보 추가
+            currentSubPathIndex?.let { routeMap["currentSubPathIndex"] = it }
+            progressInCurrentSubPath?.let { routeMap["progressInCurrentSubPath"] = it }
+            traveledDistance?.let { routeMap["traveledDistance"] = it }
+            remainingDistance?.let { routeMap["remainingDistance"] = it }
 
             database.child("participants")
                 .child(roomId)

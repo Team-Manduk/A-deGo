@@ -18,14 +18,12 @@ fun NavController.navigateToMap(
 
 fun NavGraphBuilder.mapNavGraph(
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
-    onNavigateToHome: () -> Unit = {},
-    getSelectedRoute: () -> com.teammanduk.adego.core.model.Route? = { null }
+    onNavigateToHome: () -> Unit = {}
 ) {
     composable<Route.Map> {
         MapRoute(
             onNavigateToSelectStartPlace = onNavigateToSelectStartPlace,
-            onNavigateToHome = onNavigateToHome,
-            selectedRoute = getSelectedRoute()
+            onNavigateToHome = onNavigateToHome
         )
     }
 }

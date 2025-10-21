@@ -4,11 +4,13 @@ import com.teammanduk.adego.core.data.repository.LocationRepositoryImpl
 import com.teammanduk.adego.core.data.repository.PlaceRepositoryImpl
 import com.teammanduk.adego.core.data.repository.RoomRepositoryImpl
 import com.teammanduk.adego.core.data.repository.RouteRepositoryImpl
+import com.teammanduk.adego.core.data.repository.SelectedRouteRepositoryImpl
 import com.teammanduk.adego.core.data.repository.UserRepositoryImpl
 import com.teammanduk.adego.core.domain.repository.LocationRepository
 import com.teammanduk.adego.core.domain.repository.PlaceRepository
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.RouteRepository
+import com.teammanduk.adego.core.domain.repository.SelectedRouteRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
 import dagger.Binds
 import dagger.Module
@@ -48,4 +50,10 @@ abstract class DataModule {
     abstract fun bindUserRepository(
         userRepositoryImpl: UserRepositoryImpl
     ): UserRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSelectedRouteRepository(
+        selectedRouteRepositoryImpl: SelectedRouteRepositoryImpl
+    ): SelectedRouteRepository
 }

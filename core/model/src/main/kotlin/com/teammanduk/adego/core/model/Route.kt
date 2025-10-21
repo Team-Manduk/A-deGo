@@ -1,8 +1,11 @@
 package com.teammanduk.adego.core.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * 대중교통 경로 정보
  */
+@Serializable
 data class Route(
     val totalTime: Int, // 총 소요 시간 (분)
     val totalDistance: Int, // 총 거리 (미터)
@@ -19,6 +22,7 @@ data class Route(
 /**
  * 세부 경로 정보
  */
+@Serializable
 data class SubPath(
     val trafficType: TrafficType, // 이동 수단 유형
     val distance: Double, // 이동 거리 (미터)
@@ -49,6 +53,7 @@ data class SubPath(
 /**
  * 그래픽 좌표 정보
  */
+@Serializable
 data class GraphicCoordinate(
     val latitude: Double, // 위도
     val longitude: Double // 경도
@@ -57,6 +62,7 @@ data class GraphicCoordinate(
 /**
  * 정류장/역 정보
  */
+@Serializable
 data class Station(
     val name: String, // 정류장/역 이름
     val latitude: Double, // 위도
@@ -66,6 +72,7 @@ data class Station(
 /**
  * 노선 정보
  */
+@Serializable
 data class Lane(
     val name: String, // 노선명 (예: "2호선", "360번")
     val busNo: String? = null, // 버스 번호
