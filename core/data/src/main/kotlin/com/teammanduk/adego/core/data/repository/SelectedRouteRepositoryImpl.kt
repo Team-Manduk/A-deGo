@@ -1,5 +1,7 @@
 package com.teammanduk.adego.core.data.repository
 
+import com.teammanduk.adego.core.data.mapper.toDto
+import com.teammanduk.adego.core.data.mapper.toModel
 import com.teammanduk.adego.core.data_api.datasource.SelectedRouteDataSource
 import com.teammanduk.adego.core.data_api.datasource.SessionDataSource
 import com.teammanduk.adego.core.domain.repository.SelectedRouteRepository
@@ -9,6 +11,7 @@ import javax.inject.Singleton
 
 /**
  * 선택된 경로 저장소 Repository 구현
+ * Domain Model (Route) ↔ Data DTO (RouteDto) 변환 담당
  */
 @Singleton
 class SelectedRouteRepositoryImpl @Inject constructor(
@@ -21,7 +24,8 @@ class SelectedRouteRepositoryImpl @Inject constructor(
             val roomId = sessionDataSource.getRoomId()
                 ?: return Result.failure(IllegalStateException("Room ID not found in session"))
 
-            selectedRouteDataSource.saveRoute(roomId, route)
+            // Domain Model → DTO 변환
+            selectedRouteDataSource.saveRoute(roomId, route.toDto())
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -33,7 +37,9 @@ class SelectedRouteRepositoryImpl @Inject constructor(
             val roomId = sessionDataSource.getRoomId()
                 ?: return Result.failure(IllegalStateException("Room ID not found in session"))
 
-            val route = selectedRouteDataSource.getRoute(roomId)
+            // DTO → Domain Model 변환
+            val routeDto = selectedRouteDataSource.getRoute(roomId)
+            val route = routeDto?.toModel()
             Result.success(route)
         } catch (e: Exception) {
             Result.failure(e)
