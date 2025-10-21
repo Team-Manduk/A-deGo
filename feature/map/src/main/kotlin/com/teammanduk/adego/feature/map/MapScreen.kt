@@ -456,7 +456,11 @@ private fun MapScreen(
                 .fillMaxWidth()
         ) {
             // 경로 선택 버튼 - 경로 선택 여부에 따라 다른 UI
-            if (uiState.selectedRouteIndex != null) {
+            // 로컬 경로가 있거나, 서버에서 받아온 내 경로가 있으면 축소
+            val hasRoute = uiState.selectedRouteIndex != null ||
+                           uiState.currentUser?.route?.selectedRoute != null
+
+            if (hasRoute) {
                 // 경로 선택 후: 아이콘 버튼으로 최소화 (오른쪽 배치)
                 Row(
                     modifier = Modifier
