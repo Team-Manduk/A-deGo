@@ -3,11 +3,13 @@ package com.teammanduk.adego.feature.place
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.android.gms.maps.model.LatLng
+import com.teammanduk.adego.core.common.constants.PlaceConstants
 import com.teammanduk.adego.core.domain.usecase.ClearSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.GetCurrentLocationUseCase
 import com.teammanduk.adego.core.domain.usecase.GetSelectedPlaceUseCase
 import com.teammanduk.adego.core.domain.usecase.SearchPlaceByCoordinatesUseCase
 import com.teammanduk.adego.core.domain.usecase.SetSelectedPlaceUseCase
+import com.teammanduk.adego.feature.place.util.LocationValidator
 import com.teammanduk.adego.core.model.Place
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
@@ -27,7 +29,8 @@ class SelectPlaceViewModel @Inject constructor(
     private val getSelectedPlaceUseCase: GetSelectedPlaceUseCase,
     private val setSelectedPlaceUseCase: SetSelectedPlaceUseCase,
     private val clearSelectedPlaceUseCase: ClearSelectedPlaceUseCase,
-    private val getCurrentLocationUseCase: GetCurrentLocationUseCase
+    private val getCurrentLocationUseCase: GetCurrentLocationUseCase,
+    private val locationValidator: LocationValidator
 ) : ViewModel() {
 
     // Repository의 검색 결과를 구독
@@ -42,6 +45,12 @@ class SelectPlaceViewModel @Inject constructor(
     // 초기 위치 (현재 위치 또는 기본값)
     private val _initialPosition = MutableStateFlow<LatLng?>(null)
     val initialPosition: StateFlow<LatLng?> = _initialPosition
+
+    // 선택된 위치 (검색 결과 또는 초기 위치) - UI에서 사용
+    private val _selectedPosition = MutableStateFlow(
+        LatLng(PlaceConstants.DEFAULT_LATITUDE, PlaceConstants.DEFAULT_LONGITUDE)
+    )
+    val selectedPosition: StateFlow<LatLng> = _selectedPosition
 
     // 로딩 상태 관리
     private val _isLoading = MutableStateFlow(false)
@@ -70,15 +79,18 @@ class SelectPlaceViewModel @Inject constructor(
             if (currentLocation != null) {
                 _initialPosition.value = LatLng(currentLocation.latitude, currentLocation.longitude)
             } else {
-                // 현재 위치를 가져올 수 없으면 기본 위치 사용 (부산 만덕동)
-                _initialPosition.value = LatLng(35.1979, 129.0758)
+                // 현재 위치를 가져올 수 없으면 기본 위치 사용
+                _initialPosition.value = LatLng(
+                    PlaceConstants.DEFAULT_LATITUDE,
+                    PlaceConstants.DEFAULT_LONGITUDE
+                )
             }
         }
 
-        // Debouncing: 카메라가 멈춘 후 500ms 대기 후 지오코딩 실행
+        // Debouncing: 카메라가 멈춘 후 대기 후 지오코딩 실행
         viewModelScope.launch {
             cameraPositionFlow
-                .debounce(500L) // 500ms 대기
+                .debounce(PlaceConstants.REVERSE_GEOCODING_DEBOUNCE_MS)
                 .collect { requestedLatLng ->
                     // 요청 ID를 캡처 (API 호출 전에)
                     val currentRequestId = geocodingRequestId
@@ -97,7 +109,7 @@ class SelectPlaceViewModel @Inject constructor(
                     val currentPosition = _currentCameraPosition.value
                     val shouldApplyResult = currentRequestId == geocodingRequestId &&
                         currentPosition != null &&
-                        isSameLocation(requestedLatLng, currentPosition) &&
+                        locationValidator.isSameLocation(requestedLatLng, currentPosition) &&
                         !_isUserDragging.value &&
                         !_isFromSearch.value
 
@@ -122,16 +134,20 @@ class SelectPlaceViewModel @Inject constructor(
                     _isFromSearch.value = true
                     // 모든 진행 중인 역지오코딩 요청 무효화
                     geocodingRequestId++
+                    // 선택된 위치 업데이트
+                    _selectedPosition.value = LatLng(place.latitude, place.longitude)
                 }
             }
         }
-    }
 
-    // 두 위치가 실질적으로 같은지 확인 (소수점 6자리까지 비교, 약 0.1m 오차)
-    private fun isSameLocation(pos1: LatLng, pos2: LatLng): Boolean {
-        val latDiff = kotlin.math.abs(pos1.latitude - pos2.latitude)
-        val lngDiff = kotlin.math.abs(pos1.longitude - pos2.longitude)
-        return latDiff < 0.000001 && lngDiff < 0.000001
+        // 초기 위치가 변경되면 선택된 위치도 업데이트 (검색 결과가 없을 때만)
+        viewModelScope.launch {
+            _initialPosition.collect { position ->
+                if (position != null && currentSearchResult.value == null) {
+                    _selectedPosition.value = position
+                }
+            }
+        }
     }
 
     // 카메라 이동 시작 (로딩 상태 활성화, 드래그 상태 추적)
