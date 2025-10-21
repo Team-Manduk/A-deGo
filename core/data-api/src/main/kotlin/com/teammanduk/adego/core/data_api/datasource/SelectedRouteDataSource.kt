@@ -1,6 +1,6 @@
 package com.teammanduk.adego.core.data_api.datasource
 
-import com.teammanduk.adego.core.model.Route
+import com.teammanduk.adego.core.data_api.model.RouteDto
 
 /**
  * 선택된 경로 로컬 저장소
@@ -12,17 +12,17 @@ interface SelectedRouteDataSource {
      * 방의 선택된 경로 저장
      *
      * @param roomId 방 ID
-     * @param route 저장할 경로
+     * @param route 저장할 경로 DTO
      */
-    suspend fun saveRoute(roomId: String, route: Route)
+    suspend fun saveRoute(roomId: String, route: RouteDto)
 
     /**
      * 방의 선택된 경로 조회
      *
      * @param roomId 방 ID
-     * @return 저장된 경로, 없으면 null
+     * @return 저장된 경로 DTO, 없으면 null
      */
-    suspend fun getRoute(roomId: String): Route?
+    suspend fun getRoute(roomId: String): RouteDto?
 
     /**
      * 방의 선택된 경로 삭제
