@@ -70,7 +70,7 @@ internal fun MapRoute(
     viewModel: MapViewModel = hiltViewModel(),
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
     onNavigateToHome: () -> Unit = {},
-    onNavigateToRouteGuidance: (String, String) -> Unit = { _, _ -> }
+    onNavigateToRouteGuidance: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -177,7 +177,7 @@ private fun MapScreen(
     onAction: (MapIntent) -> Unit,
     onInviteClick: () -> Unit,
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
-    onNavigateToRouteGuidance: (String, String) -> Unit = { _, _ -> }
+    onNavigateToRouteGuidance: () -> Unit = {}
 ) {
     // UI 상태
     val pagerState = rememberPagerState(
@@ -425,9 +425,7 @@ private fun MapScreen(
                 ) {
                     // 경로 안내 버튼 (왼쪽, 확장)
                     Button(
-                        onClick = {
-                            onNavigateToRouteGuidance(uiState.roomId, uiState.userId)
-                        },
+                        onClick = onNavigateToRouteGuidance,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(

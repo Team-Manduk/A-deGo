@@ -17,17 +17,15 @@ fun NavController.navigateToMap(
 }
 
 fun NavController.navigateToRouteGuidance(
-    roomId: String,
-    userId: String,
     navOptions: NavOptions? = null
 ) {
-    navigate(Route.RouteGuidance(roomId = roomId, userId = userId), navOptions)
+    navigate(Route.RouteGuidance, navOptions)
 }
 
 fun NavGraphBuilder.mapNavGraph(
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
     onNavigateToHome: () -> Unit = {},
-    onNavigateToRouteGuidance: (String, String) -> Unit = { _, _ -> }
+    onNavigateToRouteGuidance: () -> Unit = {}
 ) {
     composable<Route.Map> {
         MapRoute(

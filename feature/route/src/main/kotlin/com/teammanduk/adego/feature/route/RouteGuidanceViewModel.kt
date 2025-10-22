@@ -1,13 +1,10 @@
 package com.teammanduk.adego.feature.route
 
 import android.util.Log
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
 import com.teammanduk.adego.core.domain.usecase.GetSelectedRouteUseCase
 import com.teammanduk.adego.core.model.Route
-import com.teammanduk.adego.core.navigation.Route as NavigationRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,20 +20,13 @@ data class RouteGuidanceUiState(
 
 @HiltViewModel
 class RouteGuidanceViewModel @Inject constructor(
-    private val getSelectedRouteUseCase: GetSelectedRouteUseCase,
-    savedStateHandle: SavedStateHandle
+    private val getSelectedRouteUseCase: GetSelectedRouteUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RouteGuidanceUiState())
     val uiState: StateFlow<RouteGuidanceUiState> = _uiState.asStateFlow()
 
-    private val roomId: String
-    private val userId: String
-
     init {
-        val args = savedStateHandle.toRoute<NavigationRoute.RouteGuidance>()
-        roomId = args.roomId
-        userId = args.userId
         loadSelectedRoute()
     }
 
@@ -44,8 +34,8 @@ class RouteGuidanceViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = RouteGuidanceUiState(isLoading = true)
             try {
-                Log.d("RouteGuidanceViewModel", "Loading route for roomId=$roomId, userId=$userId")
-                val result = getSelectedRouteUseCase(roomId, userId)
+                Log.d("RouteGuidanceViewModel", "Loading selected route from session")
+                val result = getSelectedRouteUseCase()
 
                 result.onSuccess { route ->
                     if (route != null) {
