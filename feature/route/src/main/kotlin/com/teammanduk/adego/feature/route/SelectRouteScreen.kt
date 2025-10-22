@@ -245,63 +245,116 @@ private fun RouteProgressBar(subPaths: List<SubPath>) {
     // 전체 시간 계산
     val totalTime = subPaths.sumOf { it.sectionTime }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(24.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // 시작 아이콘 (도보)
-        Icon(
-            imageVector = Icons.Default.Person,
-            contentDescription = "출발",
-            modifier = Modifier.size(18.dp),
-            tint = Color(0xFF999999)
-        )
+        // 진행 바
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // 시작 아이콘
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = "출발",
+                modifier = Modifier.size(18.dp),
+                tint = Color(0xFF999999)
+            )
 
-        subPaths.forEach { subPath ->
-            val weight = (subPath.sectionTime.toFloat() / totalTime.toFloat()).coerceAtLeast(0.1f)
+            subPaths.forEach { subPath ->
+                val weight = (subPath.sectionTime.toFloat() / totalTime.toFloat()).coerceAtLeast(0.1f)
 
-            when (subPath.trafficType) {
-                TrafficType.WALK -> {
-                    // 도보 구간은 표시하지 않음 (네이버 스타일)
-                }
-                TrafficType.SUBWAY, TrafficType.BUS -> {
-                    // 노선 번호 표시
-                    Box(
-                        modifier = Modifier
-                            .weight(weight)
-                            .height(20.dp)
-                            .background(
-                                color = if (subPath.trafficType == TrafficType.SUBWAY) {
-                                    Color(0xFF0052A4)
-                                } else {
-                                    Color(0xFF00C73C)
-                                },
-                                shape = RoundedCornerShape(4.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
+                when (subPath.trafficType) {
+                    TrafficType.WALK -> {
+                        // 도보 구간 표시
+                        Box(
+                            modifier = Modifier
+                                .weight(weight)
+                                .height(20.dp)
+                                .background(
+                                    color = Color(0xFFE0E0E0),
+                                    shape = RoundedCornerShape(4.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                                contentDescription = "도보",
+                                modifier = Modifier.size(14.dp),
+                                tint = Color(0xFF757575)
+                            )
+                        }
+                    }
+                    TrafficType.SUBWAY, TrafficType.BUS -> {
+                        // 노선 번호 표시
+                        Box(
+                            modifier = Modifier
+                                .weight(weight)
+                                .height(20.dp)
+                                .background(
+                                    color = if (subPath.trafficType == TrafficType.SUBWAY) {
+                                        Color(0xFF0052A4)
+                                    } else {
+                                        Color(0xFF00C73C)
+                                    },
+                                    shape = RoundedCornerShape(4.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
+
+            // 종료 아이콘
+            Icon(
+                imageVector = Icons.Default.LocationOn,
+                contentDescription = "도착",
+                modifier = Modifier.size(18.dp),
+                tint = Color(0xFFFF5252)
+            )
         }
 
-        // 종료 아이콘
-        Icon(
-            imageVector = Icons.Default.LocationOn,
-            contentDescription = "도착",
-            modifier = Modifier.size(18.dp),
-            tint = Color(0xFFFF5252)
-        )
+        // 구간별 소요시간 표시
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Spacer(modifier = Modifier.width(18.dp)) // 시작 아이콘 공간
+
+            subPaths.forEach { subPath ->
+                val weight = (subPath.sectionTime.toFloat() / totalTime.toFloat()).coerceAtLeast(0.1f)
+
+                Box(
+                    modifier = Modifier.weight(weight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = formatTime(subPath.sectionTime),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (subPath.trafficType == TrafficType.WALK) {
+                            Color(0xFF757575)
+                        } else {
+                            Color(0xFF666666)
+                        },
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(18.dp)) // 종료 아이콘 공간
+        }
     }
 }
 
