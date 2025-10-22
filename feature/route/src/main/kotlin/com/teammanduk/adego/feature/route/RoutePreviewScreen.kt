@@ -40,7 +40,10 @@ internal fun RoutePreviewScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val bottomSheetState = rememberStandardBottomSheetState(
+        initialValue = SheetValue.PartiallyExpanded
+    )
+    val scaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = bottomSheetState)
     val scope = rememberCoroutineScope()
     // 경로의 중심 좌표 계산
     val allPoints = mutableListOf<LatLng>()
@@ -73,163 +76,30 @@ internal fun RoutePreviewScreen(
         position = CameraPosition.fromLatLngZoom(centerPosition, 14f)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        // 지도 (전체 화면)
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState
-        ) {
-                // 경로 그리기
-                route.subPaths.forEachIndexed { index, subPath ->
-                    val points = mutableListOf<LatLng>()
-                    val graphicData = subPath.graphicData
-
-                    if (!graphicData.isNullOrEmpty()) {
-                        graphicData.forEach { coord ->
-                            points.add(LatLng(coord.latitude, coord.longitude))
-                        }
-                    } else {
-                        var startLat = subPath.startLatitude
-                        var startLng = subPath.startLongitude
-                        var endLat = subPath.endLatitude
-                        var endLng = subPath.endLongitude
-
-                        if (startLat == null || startLng == null) {
-                            val prevSubPath = route.subPaths.getOrNull(index - 1)
-                            startLat = prevSubPath?.endLatitude
-                            startLng = prevSubPath?.endLongitude
-                        }
-                        if (endLat == null || endLng == null) {
-                            val nextSubPath = route.subPaths.getOrNull(index + 1)
-                            endLat = nextSubPath?.startLatitude
-                            endLng = nextSubPath?.startLongitude
-                        }
-
-                        if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                            points.add(LatLng(startLat, startLng))
-                            subPath.passStations?.forEach { station ->
-                                points.add(LatLng(station.latitude, station.longitude))
-                            }
-                            points.add(LatLng(endLat, endLng))
-                        }
-                    }
-
-                    if (points.isNotEmpty()) {
-                        val lineColor = when (subPath.trafficType) {
-                            TrafficType.SUBWAY -> Color(0xFF0052A4)
-                            TrafficType.BUS -> Color(0xFF00C73C)
-                            TrafficType.WALK -> Color(0xFF999999)
-                        }
-
-                        Polyline(
-                            points = points,
-                            color = lineColor,
-                            width = 12f
-                        )
-                    }
-                }
-
-                // 시작점과 종점 마커
-                if (allPoints.isNotEmpty()) {
-                    Marker(
-                        state = rememberMarkerState(position = allPoints.first()),
-                        title = "출발"
-                    )
-                    Marker(
-                        state = rememberMarkerState(position = allPoints.last()),
-                        title = "도착"
-                    )
-                }
-            }
-
-        // 상단 경로 요약 칩
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 16.dp)
-                .systemBarsPadding(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White,
-                shadowElevation = 4.dp
+    BottomSheetScaffold(
+        modifier = modifier.fillMaxSize(),
+        scaffoldState = scaffoldState,
+        sheetPeekHeight = 80.dp,
+        sheetDragHandle = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = formatTime(route.totalTime),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF000000)
-                    )
-                    Text(
-                        text = "│",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFE0E0E0)
-                    )
-                    // 노선 번호들
-                    route.subPaths.filter { it.trafficType != TrafficType.WALK }.forEach { subPath ->
-                        Surface(
-                            shape = RoundedCornerShape(3.dp),
-                            color = if (subPath.trafficType == TrafficType.SUBWAY) {
-                                Color(0xFF0052A4)
-                            } else {
-                                Color(0xFF00C73C)
-                            }
-                        ) {
-                            Text(
-                                text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.White,
-                shadowElevation = 4.dp
-            ) {
-                Text(
-                    text = "${String.format("%,d", route.totalFare)}원",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF000000)
-                )
-            }
-        }
-
-        // 바텀시트
-        ModalBottomSheet(
-            onDismissRequest = { /* 바텀시트는 닫히지 않도록 */ },
-            sheetState = sheetState,
-            dragHandle = {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(32.dp)
-                            .height(4.dp)
-                            .background(Color(0xFFE0E0E0), RoundedCornerShape(2.dp))
-                    )
-                }
+                        .width(32.dp)
+                        .height(4.dp)
+                        .background(Color(0xFFE0E0E0), RoundedCornerShape(2.dp))
+                )
             }
-        ) {
+        },
+        sheetContent = {
             LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 80.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -568,6 +438,143 @@ internal fun RoutePreviewScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+    ) {
+        // BottomSheetScaffold의 content - 지도와 상단 칩
+        Box(modifier = Modifier.fillMaxSize()) {
+            // 지도 (전체 화면)
+            GoogleMap(
+                modifier = Modifier.fillMaxSize(),
+                cameraPositionState = cameraPositionState
+            ) {
+                // 경로 그리기
+                route.subPaths.forEachIndexed { index, subPath ->
+                    val points = mutableListOf<LatLng>()
+                    val graphicData = subPath.graphicData
+
+                    if (!graphicData.isNullOrEmpty()) {
+                        graphicData.forEach { coord ->
+                            points.add(LatLng(coord.latitude, coord.longitude))
+                        }
+                    } else {
+                        var startLat = subPath.startLatitude
+                        var startLng = subPath.startLongitude
+                        var endLat = subPath.endLatitude
+                        var endLng = subPath.endLongitude
+
+                        if (startLat == null || startLng == null) {
+                            val prevSubPath = route.subPaths.getOrNull(index - 1)
+                            startLat = prevSubPath?.endLatitude
+                            startLng = prevSubPath?.endLongitude
+                        }
+                        if (endLat == null || endLng == null) {
+                            val nextSubPath = route.subPaths.getOrNull(index + 1)
+                            endLat = nextSubPath?.startLatitude
+                            endLng = nextSubPath?.startLongitude
+                        }
+
+                        if (startLat != null && startLng != null && endLat != null && endLng != null) {
+                            points.add(LatLng(startLat, startLng))
+                            subPath.passStations?.forEach { station ->
+                                points.add(LatLng(station.latitude, station.longitude))
+                            }
+                            points.add(LatLng(endLat, endLng))
+                        }
+                    }
+
+                    if (points.isNotEmpty()) {
+                        val lineColor = when (subPath.trafficType) {
+                            TrafficType.SUBWAY -> Color(0xFF0052A4)
+                            TrafficType.BUS -> Color(0xFF00C73C)
+                            TrafficType.WALK -> Color(0xFF999999)
+                        }
+
+                        Polyline(
+                            points = points,
+                            color = lineColor,
+                            width = 12f
+                        )
+                    }
+                }
+
+                // 시작점과 종점 마커
+                if (allPoints.isNotEmpty()) {
+                    Marker(
+                        state = rememberMarkerState(position = allPoints.first()),
+                        title = "출발"
+                    )
+                    Marker(
+                        state = rememberMarkerState(position = allPoints.last()),
+                        title = "도착"
+                    )
+                }
+            }
+
+            // 상단 경로 요약 칩
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp)
+                    .systemBarsPadding(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 4.dp
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = formatTime(route.totalTime),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF000000)
+                        )
+                        Text(
+                            text = "│",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFE0E0E0)
+                        )
+                        // 노선 번호들
+                        route.subPaths.filter { it.trafficType != TrafficType.WALK }.forEach { subPath ->
+                            Surface(
+                                shape = RoundedCornerShape(3.dp),
+                                color = if (subPath.trafficType == TrafficType.SUBWAY) {
+                                    Color(0xFF0052A4)
+                                } else {
+                                    Color(0xFF00C73C)
+                                }
+                            ) {
+                                Text(
+                                    text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    shadowElevation = 4.dp
+                ) {
+                    Text(
+                        text = "${String.format("%,d", route.totalFare)}원",
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF000000)
+                    )
                 }
             }
         }
