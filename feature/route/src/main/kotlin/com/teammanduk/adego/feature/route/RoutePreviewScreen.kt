@@ -6,14 +6,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.DirectionsSubway
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
@@ -27,6 +31,7 @@ import com.teammanduk.adego.core.model.SubPath
 import com.teammanduk.adego.core.model.TrafficType
 import com.teammanduk.adego.core.ui.util.formatTime
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RoutePreviewScreen(
     route: Route,
@@ -35,6 +40,8 @@ internal fun RoutePreviewScreen(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val scope = rememberCoroutineScope()
     // 경로의 중심 좌표 계산
     val allPoints = mutableListOf<LatLng>()
     route.subPaths.forEach { subPath ->
@@ -67,14 +74,11 @@ internal fun RoutePreviewScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // 지도 (상단 40%)
-        Box(modifier = Modifier.fillMaxSize()) {
-            GoogleMap(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.4f),
-                cameraPositionState = cameraPositionState
-            ) {
+        // 지도 (전체 화면)
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState
+        ) {
                 // 경로 그리기
                 route.subPaths.forEachIndexed { index, subPath ->
                     val points = mutableListOf<LatLng>()
@@ -138,328 +142,433 @@ internal fun RoutePreviewScreen(
                 }
             }
 
-            // 상단 경로 요약 칩
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // 상단 경로 요약 칩
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+                .systemBarsPadding(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White,
+                shadowElevation = 4.dp
             ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
-                    shadowElevation = 4.dp
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Text(
+                        text = formatTime(route.totalTime),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF000000)
+                    )
+                    Text(
+                        text = "│",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFFE0E0E0)
+                    )
+                    // 노선 번호들
+                    route.subPaths.filter { it.trafficType != TrafficType.WALK }.forEach { subPath ->
+                        Surface(
+                            shape = RoundedCornerShape(3.dp),
+                            color = if (subPath.trafficType == TrafficType.SUBWAY) {
+                                Color(0xFF0052A4)
+                            } else {
+                                Color(0xFF00C73C)
+                            }
+                        ) {
+                            Text(
+                                text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.White,
+                shadowElevation = 4.dp
+            ) {
+                Text(
+                    text = "${String.format("%,d", route.totalFare)}원",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF000000)
+                )
+            }
+        }
+
+        // 바텀시트
+        ModalBottomSheet(
+            onDismissRequest = { /* 바텀시트는 닫히지 않도록 */ },
+            sheetState = sheetState,
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(32.dp)
+                            .height(4.dp)
+                            .background(Color(0xFFE0E0E0), RoundedCornerShape(2.dp))
+                    )
+                }
+            }
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 경로 요약 정보
+                item {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // 제목
                         Text(
-                            text = formatTime(route.totalTime),
+                            text = "경로 상세",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF000000)
+                        )
+
+                        // 요약 정보 카드
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceAround
+                            ) {
+                                // 총 소요시간
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "소요시간",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF666666)
+                                    )
+                                    Text(
+                                        text = formatTime(route.totalTime),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF000000)
+                                    )
+                                }
+
+                                // 환승 횟수
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "환승",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF666666)
+                                    )
+                                    Text(
+                                        text = "${route.transferCount}회",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF000000)
+                                    )
+                                }
+
+                                // 총 거리
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "거리",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF666666)
+                                    )
+                                    Text(
+                                        text = "%.1fkm".format(route.totalDistance / 1000.0),
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF000000)
+                                    )
+                                }
+
+                                // 요금
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "요금",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF666666)
+                                    )
+                                    Text(
+                                        text = "${String.format("%,d", route.totalFare)}원",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF000000)
+                                    )
+                                }
+                            }
+                        }
+
+                        Divider(color = Color(0xFFE0E0E0))
+
+                        Text(
+                            text = "이동 경로",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF000000)
                         )
-                        Text(
-                            text = "│",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFE0E0E0)
-                        )
-                        // 노선 번호들
-                        route.subPaths.filter { it.trafficType != TrafficType.WALK }.forEach { subPath ->
-                            Surface(
-                                shape = RoundedCornerShape(3.dp),
-                                color = if (subPath.trafficType == TrafficType.SUBWAY) {
-                                    Color(0xFF0052A4)
-                                } else {
-                                    Color(0xFF00C73C)
-                                }
+                    }
+                }
+
+                // 상세 타임라인
+                items(route.subPaths.size) { index ->
+                    val subPath = route.subPaths[index]
+
+                    when (subPath.trafficType) {
+                        TrafficType.WALK -> {
+                            // 도보 구간
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall,
+                                // 도보 아이콘
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                                    contentDescription = "도보",
+                                    modifier = Modifier.size(24.dp),
+                                    tint = Color(0xFF666666)
+                                )
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "도보 이동",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF000000)
+                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "${(subPath.distance).toInt()}m",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF999999)
+                                        )
+                                        Text(
+                                            text = "•",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF999999)
+                                        )
+                                        Text(
+                                            text = formatTime(subPath.sectionTime),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF999999)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        TrafficType.SUBWAY, TrafficType.BUS -> {
+                            // 대중교통 구간
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    // 노선 정보 헤더
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // 교통수단 아이콘
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (subPath.trafficType == TrafficType.SUBWAY) {
+                                                Color(0xFF0052A4)
+                                            } else {
+                                                Color(0xFF00C73C)
+                                            },
+                                            modifier = Modifier.size(40.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = if (subPath.trafficType == TrafficType.SUBWAY) {
+                                                        Icons.Default.DirectionsSubway
+                                                    } else {
+                                                        Icons.Default.DirectionsBus
+                                                    },
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(24.dp),
+                                                    tint = Color.White
+                                                )
+                                            }
+                                        }
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            // 노선명
+                                            Text(
+                                                text = subPath.lane?.name ?: subPath.lane?.busNo ?:
+                                                    if (subPath.trafficType == TrafficType.SUBWAY) "지하철" else "버스",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (subPath.trafficType == TrafficType.SUBWAY) {
+                                                    Color(0xFF0052A4)
+                                                } else {
+                                                    Color(0xFF00C73C)
+                                                }
+                                            )
+
+                                            // 소요시간 및 정류장 수
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = formatTime(subPath.sectionTime),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = Color(0xFF666666)
+                                                )
+                                                subPath.stationCount?.let { count ->
+                                                    Text(
+                                                        text = "•",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = Color(0xFF999999)
+                                                    )
+                                                    Text(
+                                                        text = "${count}개 정류장",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = Color(0xFF666666)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Divider(color = Color(0xFFE0E0E0))
+
+                                    // 승차역 → 하차역
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // 승차
+                                        Column {
+                                            Text(
+                                                text = "승차",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF999999)
+                                            )
+                                            Text(
+                                                text = subPath.startName ?: "출발지",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF000000)
+                                            )
+                                        }
+
+                                        // 화살표
+                                        Text(
+                                            text = "→",
+                                            style = MaterialTheme.typography.headlineSmall,
+                                            color = Color(0xFFCCCCCC)
+                                        )
+
+                                        // 하차
+                                        Column(
+                                            horizontalAlignment = Alignment.End
+                                        ) {
+                                            Text(
+                                                text = "하차",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF999999)
+                                            )
+                                            Text(
+                                                text = subPath.endName ?: "도착지",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF000000)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 하단 버튼들
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = Color(0xFF6200EE)
+                            )
+                        ) {
+                            Text(
+                                text = "다른 경로",
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        Button(
+                            onClick = onConfirm,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF6200EE)
+                            ),
+                            enabled = !isLoadingDetails
+                        ) {
+                            if (isLoadingDetails) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
                                     color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text(
+                                    text = "이 경로로 출발",
                                     fontWeight = FontWeight.Bold
                                 )
                             }
                         }
                     }
                 }
-
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White,
-                    shadowElevation = 4.dp
-                ) {
-                    Text(
-                        text = "${String.format("%,d", route.totalFare)}원",
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF000000)
-                    )
-                }
-            }
-        }
-
-        // 하단 스크롤 가능한 경로 상세 정보 (60%)
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.6f)
-                .align(Alignment.BottomCenter)
-                .background(Color.White, shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // 시간 정보
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = formatTime(route.totalTime),
-                        style = MaterialTheme.typography.headlineLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF000000)
-                    )
-                    Text(
-                        text = "오후 도착",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF666666)
-                    )
-                }
-            }
-
-            // 상세 타임라인
-            items(route.subPaths.size) { index ->
-                val subPath = route.subPaths[index]
-
-                when (subPath.trafficType) {
-                    TrafficType.WALK -> {
-                        // 도보 구간
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            // 타임라인 라인
-                            Box(
-                                modifier = Modifier
-                                    .width(4.dp)
-                                    .height(60.dp)
-                                    .background(Color(0xFFE0E0E0))
-                            )
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
-                                        contentDescription = "도보",
-                                        modifier = Modifier.size(20.dp),
-                                        tint = Color(0xFF666666)
-                                    )
-                                    Text(
-                                        text = "도보 ${(subPath.distance).toInt()}m",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF000000)
-                                    )
-                                    Text(
-                                        text = formatTime(subPath.sectionTime),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF999999)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    TrafficType.SUBWAY, TrafficType.BUS -> {
-                        // 대중교통 구간
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // 승차 정보
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                // 타임라인 원형 마커
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .background(
-                                            color = if (subPath.trafficType == TrafficType.SUBWAY) {
-                                                Color(0xFF0052A4)
-                                            } else {
-                                                Color(0xFF00C73C)
-                                            },
-                                            shape = RoundedCornerShape(50)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .background(Color.White, shape = RoundedCornerShape(50))
-                                    )
-                                }
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = subPath.startName ?: "출발지",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF000000)
-                                    )
-                                    Text(
-                                        text = "15:10",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF666666)
-                                    )
-                                }
-                            }
-
-                            // 노선 정보 카드
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 36.dp),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = Color(0xFFF8F9FA)
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = if (subPath.trafficType == TrafficType.SUBWAY) {
-                                                Color(0xFF0052A4)
-                                            } else {
-                                                Color(0xFF00C73C)
-                                            }
-                                        ) {
-                                            Text(
-                                                text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                color = Color.White,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-
-                                        subPath.stationCount?.let { count ->
-                                            Text(
-                                                text = "${count}개 정류장",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = Color(0xFF666666)
-                                            )
-                                        }
-                                    }
-
-                                    Text(
-                                        text = "${formatTime(subPath.sectionTime)} 정류장 이동",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFF999999)
-                                    )
-                                }
-                            }
-
-                            // 하차 정보
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .background(Color(0xFFFF5252), shape = RoundedCornerShape(50)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.LocationOn,
-                                        contentDescription = "하차",
-                                        modifier = Modifier.size(16.dp),
-                                        tint = Color.White
-                                    )
-                                }
-
-                                Text(
-                                    text = subPath.endName ?: "도착지",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF000000)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 하단 버튼들
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = onCancel,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFF00C73C)
-                        )
-                    ) {
-                        Text(
-                            text = "다른 경로 선택",
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Button(
-                        onClick = onConfirm,
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF00C73C)
-                        ),
-                        enabled = !isLoadingDetails
-                    ) {
-                        Text(
-                            text = "경로 확정",
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-        }
-
-        // 로딩 인디케이터
-        if (isLoadingDetails) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.3f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = Color(0xFF00C73C))
             }
         }
     }
