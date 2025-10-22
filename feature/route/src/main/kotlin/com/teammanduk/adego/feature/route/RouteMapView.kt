@@ -106,41 +106,13 @@ internal fun BoxScope.RouteTopChips(route: Route) {
             color = Color.White,
             shadowElevation = 4.dp
         ) {
-            Row(
+            Text(
+                text = formatTime(route.totalTime),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formatTime(route.totalTime),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF000000)
-                )
-                Text(
-                    text = "│",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFFE0E0E0)
-                )
-                route.subPaths.filter { it.trafficType != TrafficType.WALK }.forEach { subPath ->
-                    Surface(
-                        shape = RoundedCornerShape(3.dp),
-                        color = if (subPath.trafficType == TrafficType.SUBWAY) {
-                            Color(0xFF0052A4)
-                        } else {
-                            Color(0xFF00C73C)
-                        }
-                    ) {
-                        Text(
-                            text = subPath.lane?.name ?: subPath.lane?.busNo ?: "",
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF000000)
+            )
         }
 
         Surface(
