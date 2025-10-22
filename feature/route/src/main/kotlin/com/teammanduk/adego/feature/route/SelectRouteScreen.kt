@@ -111,7 +111,7 @@ private fun SelectRouteScreen(
             else -> {
                 if (uiState.selectedRouteIndex != null) {
                     // 경로 미리보기
-                    RoutePreviewScreen(
+                    RouteDetailScreen(
                         route = uiState.routes[uiState.selectedRouteIndex],
                         isLoadingDetails = uiState.isLoadingRouteDetails,
                         onConfirm = onConfirmRoute,

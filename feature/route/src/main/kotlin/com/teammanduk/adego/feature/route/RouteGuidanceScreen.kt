@@ -72,7 +72,7 @@ private fun RouteGuidanceScreen(
                 }
             }
             uiState.route != null -> {
-                RoutePreviewScreen(
+                RouteDetailScreen(
                     route = uiState.route!!,
                     isLoadingDetails = false,
                     onConfirm = { /* 경로 안내 중에는 확인 버튼 필요 없음 */ },
