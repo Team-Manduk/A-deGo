@@ -29,9 +29,7 @@ internal fun RoutePreviewScreen(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
-    mode: RouteScreenMode = RouteScreenMode.PREVIEW,
-    onMyLocationClick: (() -> Unit)? = null,
-    cameraPositionState: com.google.maps.android.compose.CameraPositionState? = null
+    mode: RouteScreenMode = RouteScreenMode.PREVIEW
 ) {
     val bottomSheetState = rememberStandardBottomSheetState(
         initialValue = SheetValue.PartiallyExpanded
@@ -40,10 +38,9 @@ internal fun RoutePreviewScreen(
     val scope = rememberCoroutineScope()
 
     val allPoints = route.calculateAllPoints()
-    val internalCameraPositionState = rememberCameraPositionState {
+    val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(allPoints.center(), 14f)
     }
-    val actualCameraPositionState = cameraPositionState ?: internalCameraPositionState
 
     val onSubPathClick: (Int) -> Unit = { index ->
         val subPath = route.subPaths[index]
@@ -51,7 +48,7 @@ internal fun RoutePreviewScreen(
         val targetLng = subPath.startLongitude
 
         if (targetLat != null && targetLng != null) {
-            actualCameraPositionState.position = CameraPosition.fromLatLngZoom(
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(
                 com.google.android.gms.maps.model.LatLng(targetLat, targetLng),
                 16f
             )
@@ -81,9 +78,8 @@ internal fun RoutePreviewScreen(
             RouteMapView(
                 route = route,
                 allPoints = allPoints,
-                cameraPositionState = actualCameraPositionState,
-                showMyLocationButton = mode == RouteScreenMode.GUIDANCE,
-                onMyLocationClick = onMyLocationClick
+                cameraPositionState = cameraPositionState,
+                showMyLocationButton = mode == RouteScreenMode.GUIDANCE
             )
         }
     }

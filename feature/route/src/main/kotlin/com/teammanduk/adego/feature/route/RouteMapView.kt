@@ -1,12 +1,7 @@
 package com.teammanduk.adego.feature.route
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -30,14 +25,19 @@ internal fun RouteMapView(
     route: Route,
     allPoints: List<LatLng>,
     cameraPositionState: com.google.maps.android.compose.CameraPositionState,
-    showMyLocationButton: Boolean = false,
-    onMyLocationClick: (() -> Unit)? = null
+    showMyLocationButton: Boolean = false
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        GoogleMap(
-            modifier = Modifier.fillMaxSize(),
-            cameraPositionState = cameraPositionState
-        ) {
+    GoogleMap(
+        modifier = Modifier.fillMaxSize(),
+        cameraPositionState = cameraPositionState,
+        properties = com.google.maps.android.compose.MapProperties(
+            isMyLocationEnabled = showMyLocationButton
+        ),
+        uiSettings = com.google.maps.android.compose.MapUiSettings(
+            myLocationButtonEnabled = showMyLocationButton,
+            zoomControlsEnabled = false
+        )
+    ) {
         route.subPaths.forEachIndexed { index, subPath ->
             val points = mutableListOf<LatLng>()
             val graphicData = subPath.graphicData
@@ -87,35 +87,15 @@ internal fun RouteMapView(
             }
         }
 
-            if (allPoints.isNotEmpty()) {
-                Marker(
-                    state = rememberMarkerState(position = allPoints.first()),
-                    title = "출발"
-                )
-                Marker(
-                    state = rememberMarkerState(position = allPoints.last()),
-                    title = "도착"
-                )
-            }
-        }
-
-        // 내 위치 추적 버튼
-        if (showMyLocationButton && onMyLocationClick != null) {
-            FloatingActionButton(
-                onClick = onMyLocationClick,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .systemBarsPadding(),
-                containerColor = Color.White,
-                contentColor = Color(0xFF6200EE),
-                shape = CircleShape
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MyLocation,
-                    contentDescription = "내 위치로 이동"
-                )
-            }
+        if (allPoints.isNotEmpty()) {
+            Marker(
+                state = rememberMarkerState(position = allPoints.first()),
+                title = "출발"
+            )
+            Marker(
+                state = rememberMarkerState(position = allPoints.last()),
+                title = "도착"
+            )
         }
     }
 }
