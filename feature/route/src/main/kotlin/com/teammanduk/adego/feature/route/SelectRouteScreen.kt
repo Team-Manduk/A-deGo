@@ -242,8 +242,13 @@ private fun RouteCard(
 
 @Composable
 private fun RouteProgressBar(subPaths: List<SubPath>) {
+    // 거리가 0이거나 시간이 0인 도보 구간은 제외
+    val filteredSubPaths = subPaths.filter { subPath ->
+        subPath.trafficType != TrafficType.WALK || (subPath.distance > 0 && subPath.sectionTime > 0)
+    }
+
     // 전체 시간 계산
-    val totalTime = subPaths.sumOf { it.sectionTime }
+    val totalTime = filteredSubPaths.sumOf { it.sectionTime }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -264,7 +269,7 @@ private fun RouteProgressBar(subPaths: List<SubPath>) {
                 tint = Color(0xFF999999)
             )
 
-            subPaths.forEach { subPath ->
+            filteredSubPaths.forEach { subPath ->
                 val weight = (subPath.sectionTime.toFloat() / totalTime.toFloat()).coerceAtLeast(0.1f)
 
                 when (subPath.trafficType) {
@@ -332,7 +337,7 @@ private fun RouteProgressBar(subPaths: List<SubPath>) {
         ) {
             Spacer(modifier = Modifier.width(18.dp)) // 시작 아이콘 공간
 
-            subPaths.forEach { subPath ->
+            filteredSubPaths.forEach { subPath ->
                 val weight = (subPath.sectionTime.toFloat() / totalTime.toFloat()).coerceAtLeast(0.1f)
 
                 Box(
@@ -497,30 +502,33 @@ private fun RouteTimeline(subPaths: List<SubPath>) {
         subPaths.forEachIndexed { index, subPath ->
             when (subPath.trafficType) {
                 TrafficType.WALK -> {
-                    // 도보 구간
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
-                            contentDescription = "도보",
-                            modifier = Modifier.size(24.dp),
-                            tint = Color(0xFF757575)
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "도보 이동",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
+                    // 거리가 0이거나 시간이 0인 도보 구간은 생략
+                    if (subPath.distance > 0 && subPath.sectionTime > 0) {
+                        // 도보 구간
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                                contentDescription = "도보",
+                                modifier = Modifier.size(24.dp),
+                                tint = Color(0xFF757575)
                             )
-                            Text(
-                                text = "${(subPath.distance / 1000.0).let { if (it < 1) "${(subPath.distance).toInt()}m" else "%.1fkm".format(it) }} • 약 ${formatTime(subPath.sectionTime)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "도보 이동",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "${(subPath.distance / 1000.0).let { if (it < 1) "${(subPath.distance).toInt()}m" else "%.1fkm".format(it) }} • 약 ${formatTime(subPath.sectionTime)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
