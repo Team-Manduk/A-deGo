@@ -16,14 +16,24 @@ fun NavController.navigateToMap(
     navigate(Route.Map(roomId = roomId, userId = userId, userName = userName), navOptions)
 }
 
+fun NavController.navigateToRouteGuidance(
+    roomId: String,
+    userId: String,
+    navOptions: NavOptions? = null
+) {
+    navigate(Route.RouteGuidance(roomId = roomId, userId = userId), navOptions)
+}
+
 fun NavGraphBuilder.mapNavGraph(
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
-    onNavigateToHome: () -> Unit = {}
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToRouteGuidance: (String, String) -> Unit = { _, _ -> }
 ) {
     composable<Route.Map> {
         MapRoute(
             onNavigateToSelectStartPlace = onNavigateToSelectStartPlace,
-            onNavigateToHome = onNavigateToHome
+            onNavigateToHome = onNavigateToHome,
+            onNavigateToRouteGuidance = onNavigateToRouteGuidance
         )
     }
 }

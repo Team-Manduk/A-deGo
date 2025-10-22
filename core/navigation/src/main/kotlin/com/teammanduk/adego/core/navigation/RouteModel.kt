@@ -39,4 +39,10 @@ sealed interface Route {
         val destLat: Double,
         val destLng: Double
     ) : Route
+
+    @Serializable
+    data class RouteGuidance(
+        val roomId: String,
+        val userId: String
+    ) : Route
 }

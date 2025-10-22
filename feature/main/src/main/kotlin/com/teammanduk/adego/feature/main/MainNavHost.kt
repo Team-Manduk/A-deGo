@@ -17,6 +17,7 @@ import com.teammanduk.adego.feature.home.navigation.homeNavGraph
 import com.teammanduk.adego.feature.main.navigation.MainNavigator
 import com.teammanduk.adego.feature.map.navigation.mapNavGraph
 import com.teammanduk.adego.feature.place.navigation.placeNavGraph
+import com.teammanduk.adego.feature.route.navigation.routeGuidanceNavGraph
 import com.teammanduk.adego.feature.route.navigation.selectRouteNavGraph
 
 @Composable
@@ -51,7 +52,8 @@ internal fun MainNavHost(
             )
             mapNavGraph(
                 onNavigateToSelectStartPlace = navigator::navigateToSelectStartPlace,
-                onNavigateToHome = navigator::navigateHome
+                onNavigateToHome = navigator::navigateHome,
+                onNavigateToRouteGuidance = navigator::navigateToRouteGuidance
             )
             selectRouteNavGraph(
                 onNavigateBack = navigator::navigateBack,
@@ -63,6 +65,9 @@ internal fun MainNavHost(
                         inclusive = false
                     )
                 }
+            )
+            routeGuidanceNavGraph(
+                onNavigateBack = navigator::navigateBack
             )
         }
     }
