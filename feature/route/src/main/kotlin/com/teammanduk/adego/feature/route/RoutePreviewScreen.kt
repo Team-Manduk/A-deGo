@@ -16,6 +16,11 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.teammanduk.adego.core.model.Route
 
+enum class RouteScreenMode {
+    PREVIEW,  // 경로 미리보기 (버튼 표시)
+    GUIDANCE  // 경로 안내 (버튼 숨김, 내 위치 추적 버튼 표시)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RoutePreviewScreen(
@@ -23,7 +28,10 @@ internal fun RoutePreviewScreen(
     isLoadingDetails: Boolean,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    mode: RouteScreenMode = RouteScreenMode.PREVIEW,
+    onMyLocationClick: (() -> Unit)? = null,
+    cameraPositionState: com.google.maps.android.compose.CameraPositionState? = null
 ) {
     val bottomSheetState = rememberStandardBottomSheetState(
         initialValue = SheetValue.PartiallyExpanded
@@ -32,9 +40,10 @@ internal fun RoutePreviewScreen(
     val scope = rememberCoroutineScope()
 
     val allPoints = route.calculateAllPoints()
-    val cameraPositionState = rememberCameraPositionState {
+    val internalCameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(allPoints.center(), 14f)
     }
+    val actualCameraPositionState = cameraPositionState ?: internalCameraPositionState
 
     val onSubPathClick: (Int) -> Unit = { index ->
         val subPath = route.subPaths[index]
@@ -42,7 +51,7 @@ internal fun RoutePreviewScreen(
         val targetLng = subPath.startLongitude
 
         if (targetLat != null && targetLng != null) {
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(
+            actualCameraPositionState.position = CameraPosition.fromLatLngZoom(
                 com.google.android.gms.maps.model.LatLng(targetLat, targetLng),
                 16f
             )
@@ -63,7 +72,8 @@ internal fun RoutePreviewScreen(
                 isLoadingDetails = isLoadingDetails,
                 onConfirm = onConfirm,
                 onCancel = onCancel,
-                onSubPathClick = onSubPathClick
+                onSubPathClick = onSubPathClick,
+                showButtons = mode == RouteScreenMode.PREVIEW
             )
         }
     ) {
@@ -71,7 +81,9 @@ internal fun RoutePreviewScreen(
             RouteMapView(
                 route = route,
                 allPoints = allPoints,
-                cameraPositionState = cameraPositionState
+                cameraPositionState = actualCameraPositionState,
+                showMyLocationButton = mode == RouteScreenMode.GUIDANCE,
+                onMyLocationClick = onMyLocationClick
             )
         }
     }
