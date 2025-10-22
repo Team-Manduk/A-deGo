@@ -49,8 +49,13 @@ internal fun RouteDetailContent(
     LazyColumn(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 80.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            .fillMaxHeight(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = 8.dp,
+            bottom = if (showButtons) 8.dp else 80.dp // 버튼 없을 때 제스처 영역 패딩
+        ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // 경로 요약 정보
