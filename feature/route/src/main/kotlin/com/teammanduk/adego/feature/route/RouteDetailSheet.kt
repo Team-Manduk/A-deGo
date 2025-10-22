@@ -69,7 +69,10 @@ internal fun RouteDetailContent(
 
             when (subPath.trafficType) {
                 TrafficType.WALK -> {
-                    WalkSection(subPath, onClick = { onSubPathClick(index) })
+                    // 거리가 0이거나 시간이 0인 도보 구간은 생략
+                    if (subPath.distance > 0 && subPath.sectionTime > 0) {
+                        WalkSection(subPath, onClick = { onSubPathClick(index) })
+                    }
                 }
                 TrafficType.SUBWAY, TrafficType.BUS -> {
                     TransitSection(subPath, onClick = { onSubPathClick(index) })
