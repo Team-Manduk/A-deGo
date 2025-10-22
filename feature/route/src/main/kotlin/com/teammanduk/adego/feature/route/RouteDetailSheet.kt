@@ -1,6 +1,7 @@
 package com.teammanduk.adego.feature.route
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,7 +42,8 @@ internal fun RouteDetailContent(
     route: Route,
     isLoadingDetails: Boolean,
     onConfirm: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onSubPathClick: (Int) -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier
@@ -61,10 +63,10 @@ internal fun RouteDetailContent(
 
             when (subPath.trafficType) {
                 TrafficType.WALK -> {
-                    WalkSection(subPath)
+                    WalkSection(subPath, onClick = { onSubPathClick(index) })
                 }
                 TrafficType.SUBWAY, TrafficType.BUS -> {
-                    TransitSection(subPath)
+                    TransitSection(subPath, onClick = { onSubPathClick(index) })
                 }
             }
         }
@@ -140,9 +142,11 @@ private fun SummaryItem(label: String, value: String) {
 }
 
 @Composable
-private fun WalkSection(subPath: com.teammanduk.adego.core.model.SubPath) {
+private fun WalkSection(subPath: com.teammanduk.adego.core.model.SubPath, onClick: () -> Unit = {}) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -184,9 +188,11 @@ private fun WalkSection(subPath: com.teammanduk.adego.core.model.SubPath) {
 }
 
 @Composable
-private fun TransitSection(subPath: com.teammanduk.adego.core.model.SubPath) {
+private fun TransitSection(subPath: com.teammanduk.adego.core.model.SubPath, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
         shape = RoundedCornerShape(12.dp)
     ) {
