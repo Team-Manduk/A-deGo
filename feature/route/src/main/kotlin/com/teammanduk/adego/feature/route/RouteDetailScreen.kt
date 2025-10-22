@@ -26,7 +26,7 @@ enum class RouteScreenMode {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun RoutePreviewScreen(
+internal fun RouteDetailScreen(
     route: Route,
     isLoadingDetails: Boolean,
     onConfirm: () -> Unit,
