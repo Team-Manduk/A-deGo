@@ -43,7 +43,8 @@ internal fun RouteDetailContent(
     isLoadingDetails: Boolean,
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
-    onSubPathClick: (Int) -> Unit = {}
+    onSubPathClick: (Int) -> Unit = {},
+    showButtons: Boolean = true
 ) {
     LazyColumn(
         modifier = Modifier
@@ -72,12 +73,14 @@ internal fun RouteDetailContent(
         }
 
         // 하단 버튼들
-        item {
-            RouteActionButtons(
-                isLoadingDetails = isLoadingDetails,
-                onConfirm = onConfirm,
-                onCancel = onCancel
-            )
+        if (showButtons) {
+            item {
+                RouteActionButtons(
+                    isLoadingDetails = isLoadingDetails,
+                    onConfirm = onConfirm,
+                    onCancel = onCancel
+                )
+            }
         }
     }
 }
