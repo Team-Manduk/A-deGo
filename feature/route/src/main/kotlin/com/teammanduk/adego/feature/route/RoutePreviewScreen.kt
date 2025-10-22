@@ -73,7 +73,6 @@ internal fun RoutePreviewScreen(
                 allPoints = allPoints,
                 cameraPositionState = cameraPositionState
             )
-            RouteTopChips(route = route)
         }
     }
 }
