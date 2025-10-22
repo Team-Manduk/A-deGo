@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -92,9 +93,7 @@ internal fun MapRoute(
             // 첫 번째 입력 → 토스트 표시
             backPressedTime = currentTime
             Toast.makeText(
-                context,
-                "한 번 더 누르면 종료됩니다",
-                Toast.LENGTH_SHORT
+                context, "한 번 더 누르면 종료됩니다", Toast.LENGTH_SHORT
             ).show()
         }
     }
@@ -131,8 +130,7 @@ internal fun MapRoute(
                 // 방 존재 여부 확인 실패 등의 치명적 에러
                 ErrorScreen(
                     message = uiState.error!!,
-                    onAction = { viewModel.onAction(MapIntent.NavigateToHome) }
-                )
+                    onAction = { viewModel.onAction(MapIntent.NavigateToHome) })
             }
 
             uiState.showUserNameDialog -> {
@@ -141,8 +139,7 @@ internal fun MapRoute(
                     onUserNameChange = { viewModel.onAction(MapIntent.UpdateUserName(it)) },
                     onConfirm = { viewModel.onAction(MapIntent.ConfirmUserName) },
                     error = uiState.error,
-                    onGenerateRandomName = { viewModel.onAction(MapIntent.GenerateRandomName) }
-                )
+                    onGenerateRandomName = { viewModel.onAction(MapIntent.GenerateRandomName) })
             }
 
             !isMinimumLoadingTimePassed || uiState.myCurrentLocation == null -> {
@@ -150,7 +147,9 @@ internal fun MapRoute(
             }
 
             else -> {
-                android.util.Log.d("MapPerformance", "[6] MapScreen composing at ${System.currentTimeMillis()}")
+                android.util.Log.d(
+                    "MapPerformance", "[6] MapScreen composing at ${System.currentTimeMillis()}"
+                )
                 MapScreen(
                     uiState = uiState,
                     onAction = viewModel::onAction,
@@ -236,7 +235,9 @@ private fun MapScreen(
     ) {
         // 지도
         LaunchedEffect(Unit) {
-            android.util.Log.d("MapPerformance", "[7] GoogleMap composing at ${System.currentTimeMillis()}")
+            android.util.Log.d(
+                "MapPerformance", "[7] GoogleMap composing at ${System.currentTimeMillis()}"
+            )
         }
 
         GoogleMap(
@@ -327,8 +328,9 @@ private fun MapScreen(
                     // polyline 디코딩하여 좌표 리스트 생성
                     val points = remember(polylineString) {
                         try {
-                            com.teammanduk.adego.core.domain.util.PolylineEncoder.decode(polylineString)
-                                .map { (lat, lng) -> LatLng(lat, lng) }
+                            com.teammanduk.adego.core.domain.util.PolylineEncoder.decode(
+                                polylineString
+                            ).map { (lat, lng) -> LatLng(lat, lng) }
                         } catch (e: Exception) {
                             emptyList()
                         }
@@ -337,8 +339,7 @@ private fun MapScreen(
                     // Polyline 그리기
                     if (points.size >= 2) {
                         Polyline(
-                            points = points,
-                            color = Color(0xFF4285F4), // 구글 블루
+                            points = points, color = Color(0xFF4285F4), // 구글 블루
                             width = 10f
                         )
                     }
@@ -381,8 +382,7 @@ private fun MapScreen(
                             )
                         }
                     }
-                }
-            )
+                })
 
             // 방 나가기 버튼 (TopInfoSection 바로 아래)
             IconButton(
@@ -391,8 +391,7 @@ private fun MapScreen(
                     .align(Alignment.End)
                     .padding(top = 8.dp, end = 16.dp),
                 colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Red
+                    containerColor = Color.White, contentColor = Color.Red
                 )
             ) {
                 Icon(
@@ -411,8 +410,8 @@ private fun MapScreen(
         ) {
             // 경로 선택 버튼 - 경로 선택 여부에 따라 다른 UI
             // 로컬 경로가 있거나, 서버에서 받아온 내 경로(polyline)가 있으면 축소
-            val hasRoute = uiState.selectedRouteIndex != null ||
-                           uiState.currentUser?.route?.polyline?.isNotEmpty() == true
+            val hasRoute =
+                uiState.selectedRouteIndex != null || uiState.currentUser?.route?.polyline?.isNotEmpty() == true
 
             if (hasRoute) {
                 // 경로 선택 후: 경로 안내 버튼 + 경로 변경 버튼
@@ -421,7 +420,8 @@ private fun MapScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 32.dp)
                         .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     // 경로 안내 버튼 (왼쪽, 확장)
                     Button(
@@ -432,7 +432,8 @@ private fun MapScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF6200EE)
-                        )
+                        ),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
                         Text(text = "경로 안내")
                     }
@@ -450,13 +451,13 @@ private fun MapScreen(
                                 )
                             }
                         },
+                        modifier = Modifier.size(48.dp),
                         containerColor = Color(0xFF6200EE),
                         contentColor = Color.White,
                         shape = CircleShape
                     ) {
                         Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = "경로 변경"
+                            imageVector = Icons.Default.LocationOn, contentDescription = "경로 변경"
                         )
                     }
                 }
