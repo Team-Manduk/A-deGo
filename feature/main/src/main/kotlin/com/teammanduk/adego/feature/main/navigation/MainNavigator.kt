@@ -12,9 +12,9 @@ import com.teammanduk.adego.core.navigation.Route
 import com.teammanduk.adego.feature.create.navigation.navigateToCreate
 import com.teammanduk.adego.feature.home.navigation.navigateToHome
 import com.teammanduk.adego.feature.map.navigation.navigateToMap
+import com.teammanduk.adego.feature.map.navigation.navigateToRouteGuidance
 import com.teammanduk.adego.feature.place.navigation.navigateToSelectPlace
 import com.teammanduk.adego.feature.place.navigation.navigateToSelectStartPlace
-import com.teammanduk.adego.feature.route.navigation.navigateToRouteGuidance
 import com.teammanduk.adego.feature.route.navigation.navigateToSelectRoute
 
 internal class MainNavigator(
@@ -97,8 +97,8 @@ internal class MainNavigator(
         navController.navigateToSelectRoute(roomId, userId, startLat, startLng, destLat, destLng)
     }
 
-    fun navigateToRouteGuidance(roomId: String, userId: String) {
-        navController.navigateToRouteGuidance(roomId, userId)
+    fun navigateToRouteGuidance() {
+        navController.navigateToRouteGuidance()
     }
 
     fun navigateBack() {

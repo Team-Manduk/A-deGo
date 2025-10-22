@@ -31,20 +31,6 @@ fun NavController.navigateToSelectRoute(
     )
 }
 
-fun NavController.navigateToRouteGuidance(
-    roomId: String,
-    userId: String,
-    navOptions: NavOptions? = null
-) {
-    navigate(
-        NavigationRoute.RouteGuidance(
-            roomId = roomId,
-            userId = userId
-        ),
-        navOptions
-    )
-}
-
 fun NavGraphBuilder.selectRouteNavGraph(
     onNavigateBack: () -> Unit,
     onRouteSelected: (Route) -> Unit

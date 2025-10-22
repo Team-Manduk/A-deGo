@@ -41,8 +41,5 @@ sealed interface Route {
     ) : Route
 
     @Serializable
-    data class RouteGuidance(
-        val roomId: String,
-        val userId: String
-    ) : Route
+    data object RouteGuidance : Route
 }
