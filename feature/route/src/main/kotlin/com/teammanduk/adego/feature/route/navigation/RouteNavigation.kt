@@ -6,6 +6,7 @@ import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.navigation.Route as NavigationRoute
+import com.teammanduk.adego.feature.route.RouteGuidanceRoute
 import com.teammanduk.adego.feature.route.SelectRouteRoute
 
 fun NavController.navigateToSelectRoute(
@@ -30,6 +31,20 @@ fun NavController.navigateToSelectRoute(
     )
 }
 
+fun NavController.navigateToRouteGuidance(
+    roomId: String,
+    userId: String,
+    navOptions: NavOptions? = null
+) {
+    navigate(
+        NavigationRoute.RouteGuidance(
+            roomId = roomId,
+            userId = userId
+        ),
+        navOptions
+    )
+}
+
 fun NavGraphBuilder.selectRouteNavGraph(
     onNavigateBack: () -> Unit,
     onRouteSelected: (Route) -> Unit
@@ -38,6 +53,16 @@ fun NavGraphBuilder.selectRouteNavGraph(
         SelectRouteRoute(
             onNavigateBack = onNavigateBack,
             onRouteSelected = onRouteSelected
+        )
+    }
+}
+
+fun NavGraphBuilder.routeGuidanceNavGraph(
+    onNavigateBack: () -> Unit
+) {
+    composable<NavigationRoute.RouteGuidance> {
+        RouteGuidanceRoute(
+            onNavigateBack = onNavigateBack
         )
     }
 }

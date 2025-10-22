@@ -68,7 +68,8 @@ import kotlinx.coroutines.launch
 internal fun MapRoute(
     viewModel: MapViewModel = hiltViewModel(),
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
-    onNavigateToHome: () -> Unit = {}
+    onNavigateToHome: () -> Unit = {},
+    onNavigateToRouteGuidance: (String, String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -154,7 +155,8 @@ internal fun MapRoute(
                     uiState = uiState,
                     onAction = viewModel::onAction,
                     onInviteClick = { showInviteDialog = true },
-                    onNavigateToSelectStartPlace = onNavigateToSelectStartPlace
+                    onNavigateToSelectStartPlace = onNavigateToSelectStartPlace,
+                    onNavigateToRouteGuidance = onNavigateToRouteGuidance
                 )
 
                 if (showInviteDialog) {
@@ -176,6 +178,7 @@ private fun MapScreen(
     onAction: (MapIntent) -> Unit,
     onInviteClick: () -> Unit,
     onNavigateToSelectStartPlace: (String, String, Double, Double) -> Unit = { _, _, _, _ -> },
+    onNavigateToRouteGuidance: (String, String) -> Unit = { _, _ -> }
 ) {
     // UI 상태
     val pagerState = rememberPagerState(
@@ -412,14 +415,29 @@ private fun MapScreen(
                            uiState.currentUser?.route?.polyline?.isNotEmpty() == true
 
             if (hasRoute) {
-                // 경로 선택 후: 아이콘 버튼으로 최소화 (오른쪽 배치)
+                // 경로 선택 후: 경로 안내 버튼 + 경로 변경 버튼
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 32.dp)
                         .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // 경로 안내 버튼 (왼쪽, 확장)
+                    Button(
+                        onClick = {
+                            onNavigateToRouteGuidance(uiState.roomId, uiState.userId)
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF6200EE)
+                        )
+                    ) {
+                        Text(text = "경로 안내")
+                    }
+
+                    // 경로 변경 버튼 (오른쪽, 고정 크기)
                     FloatingActionButton(
                         onClick = {
                             val destination = uiState.room?.destination
