@@ -1,6 +1,5 @@
 package com.teammanduk.adego.feature.route
 
-import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -50,64 +49,47 @@ internal fun RouteMapView(
             val points = mutableListOf<LatLng>()
             val graphicData = subPath.graphicData
 
-            // 시작/종료 좌표 가져오기
             var startLat = subPath.startLatitude
             var startLng = subPath.startLongitude
             var endLat = subPath.endLatitude
             var endLng = subPath.endLongitude
 
-            Log.d("RouteMapView", "━━━━━ SubPath[$index] ${subPath.trafficType} ━━━━━")
-            Log.d("RouteMapView", "원본 시작: ${subPath.startName} ($startLat, $startLng)")
-            Log.d("RouteMapView", "원본 종료: ${subPath.endName} ($endLat, $endLng)")
-
+            // 시작/종료 좌표 보정
             if (startLat == null || startLng == null) {
                 val prevSubPath = route.subPaths.getOrNull(index - 1)
                 startLat = prevSubPath?.endLatitude
                 startLng = prevSubPath?.endLongitude
-                Log.d("RouteMapView", "시작점 보정: 이전 구간 종료점 사용 ($startLat, $startLng)")
             }
             if (endLat == null || endLng == null) {
                 val nextSubPath = route.subPaths.getOrNull(index + 1)
                 endLat = nextSubPath?.startLatitude
                 endLng = nextSubPath?.startLongitude
-                Log.d("RouteMapView", "종료점 보정: 다음 구간 시작점 사용 ($endLat, $endLng)")
             }
 
             if (!graphicData.isNullOrEmpty()) {
-                // graphicData가 있는 경우
-                Log.d("RouteMapView", "SubPath[$index] graphicData: ${graphicData.size}개 좌표")
-
                 val firstCoord = graphicData.first()
                 val lastCoord = graphicData.last()
 
-                Log.d("RouteMapView", "graphicData 첫 좌표: (${firstCoord.latitude}, ${firstCoord.longitude})")
-                Log.d("RouteMapView", "graphicData 마지막 좌표: (${lastCoord.latitude}, ${lastCoord.longitude})")
-
-                // 이전 구간과의 연결 확인 및 보정
+                // 이전 구간과의 연결
                 if (previousEndPoint != null) {
                     val distance = Math.sqrt(
                         Math.pow(previousEndPoint.latitude - firstCoord.latitude, 2.0) +
                         Math.pow(previousEndPoint.longitude - firstCoord.longitude, 2.0)
                     ) * 111000
 
-                    Log.d("RouteMapView", "⚠️ 실제 좌표 간격: ${distance.toInt()}m")
-
-                    if (distance > 1) { // 1m 이상 차이나면 점선으로 연결
-                        Log.d("RouteMapView", "🔗 점선 연결: (${previousEndPoint.latitude}, ${previousEndPoint.longitude}) -> (${firstCoord.latitude}, ${firstCoord.longitude})")
-
-                        // 점선 연결선 그리기
+                    if (distance > 1) {
                         Polyline(
                             points = listOf(
                                 previousEndPoint,
                                 LatLng(firstCoord.latitude, firstCoord.longitude)
                             ),
-                            color = Color(0xFFCCCCCC), // 연한 회색
+                            color = Color(0xFFCCCCCC),
                             width = 8f,
                             pattern = dashedPattern
                         )
                     }
                 } else if (isFirstGraphicData) {
-                    // 첫 번째 graphicData 구간: Route 시작점과 비교
+                    // Route 시작점과 첫 graphicData 연결
                     val routeStartLat = route.startLatitude
                     val routeStartLng = route.startLongitude
 
@@ -118,15 +100,12 @@ internal fun RouteMapView(
                         ) * 111000
 
                         if (distance > 1) {
-                            Log.d("RouteMapView", "🏁 출발지 점선 연결: ($routeStartLat, $routeStartLng) -> (${firstCoord.latitude}, ${firstCoord.longitude})")
-
-                            // 점선 연결선 그리기
                             Polyline(
                                 points = listOf(
                                     LatLng(routeStartLat, routeStartLng),
                                     LatLng(firstCoord.latitude, firstCoord.longitude)
                                 ),
-                                color = Color(0xFFCCCCCC), // 연한 회색
+                                color = Color(0xFFCCCCCC),
                                 width = 8f,
                                 pattern = dashedPattern
                             )
@@ -135,19 +114,14 @@ internal fun RouteMapView(
                     isFirstGraphicData = false
                 }
 
-                // graphicData 추가
                 graphicData.forEach { coord ->
                     points.add(LatLng(coord.latitude, coord.longitude))
                 }
 
-                // previousEndPoint 업데이트
                 previousEndPoint = LatLng(lastCoord.latitude, lastCoord.longitude)
             } else {
-                // graphicData가 없는 경우 (fallback)
-                Log.d("RouteMapView", "SubPath[$index] graphicData 없음, 직선 경로 사용")
-
+                // graphicData가 없는 경우 fallback
                 if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                    // 이전 구간과 연결
                     if (previousEndPoint != null) {
                         val distance = Math.sqrt(
                             Math.pow(previousEndPoint.latitude - startLat, 2.0) +
@@ -155,15 +129,12 @@ internal fun RouteMapView(
                         ) * 111000
 
                         if (distance > 1) {
-                            Log.d("RouteMapView", "🔗 점선 연결 (fallback)")
-
-                            // 점선 연결선 그리기
                             Polyline(
                                 points = listOf(
                                     previousEndPoint,
                                     LatLng(startLat, startLng)
                                 ),
-                                color = Color(0xFFCCCCCC), // 연한 회색
+                                color = Color(0xFFCCCCCC),
                                 width = 8f,
                                 pattern = dashedPattern
                             )
@@ -192,12 +163,10 @@ internal fun RouteMapView(
                     color = lineColor,
                     width = 12f
                 )
-
-                Log.d("RouteMapView", "Polyline 그리기: ${points.size}개 포인트, 색상=${lineColor}")
             }
         }
 
-        // 마지막 SubPath 이후 Route 도착지와의 연결 확인
+        // Route 도착지와의 연결
         val routeEndLat = route.endLatitude
         val routeEndLng = route.endLongitude
 
@@ -208,15 +177,12 @@ internal fun RouteMapView(
             ) * 111000
 
             if (distance > 1) {
-                Log.d("RouteMapView", "🏁 최종 도착지 점선 연결: (${previousEndPoint.latitude}, ${previousEndPoint.longitude}) -> ($routeEndLat, $routeEndLng)")
-
-                // 점선 연결선 그리기
                 Polyline(
                     points = listOf(
                         previousEndPoint,
                         LatLng(routeEndLat, routeEndLng)
                     ),
-                    color = Color(0xFFCCCCCC), // 연한 회색
+                    color = Color(0xFFCCCCCC),
                     width = 8f,
                     pattern = dashedPattern
                 )
