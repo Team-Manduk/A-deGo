@@ -12,6 +12,7 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberMarkerState
+import com.teammanduk.adego.core.domain.util.LocationUtils.calculateDistance
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.model.TrafficType
 
@@ -64,10 +65,10 @@ internal fun RouteMapView(
 
                 // 이전 구간과의 연결
                 previousEndPoint?.let { prevPoint ->
-                    val distance = Math.sqrt(
-                        Math.pow(prevPoint.latitude - firstCoord.latitude, 2.0) +
-                                Math.pow(prevPoint.longitude - firstCoord.longitude, 2.0)
-                    ) * 111000
+                    val distance = calculateDistance(
+                        prevPoint.latitude, prevPoint.longitude,
+                        firstCoord.latitude, firstCoord.longitude
+                    )
 
                     if (distance > 1) {
                         Polyline(
@@ -88,10 +89,10 @@ internal fun RouteMapView(
                     val routeStartLng = route.startLongitude
 
                     if (routeStartLat != null && routeStartLng != null) {
-                        val distance = Math.sqrt(
-                            Math.pow(routeStartLat - firstCoord.latitude, 2.0) +
-                                    Math.pow(routeStartLng - firstCoord.longitude, 2.0)
-                        ) * 111000
+                        val distance = calculateDistance(
+                            routeStartLat, routeStartLng,
+                            firstCoord.latitude, firstCoord.longitude
+                        )
 
                         if (distance > 1) {
                             Polyline(
@@ -117,10 +118,10 @@ internal fun RouteMapView(
                 // graphicData가 없는 경우 fallback
                 if (startLat != null && startLng != null && endLat != null && endLng != null) {
                     previousEndPoint?.let { prevPoint ->
-                        val distance = Math.sqrt(
-                            Math.pow(prevPoint.latitude - startLat, 2.0) +
-                                    Math.pow(prevPoint.longitude - startLng, 2.0)
-                        ) * 111000
+                        val distance = calculateDistance(
+                            prevPoint.latitude, prevPoint.longitude,
+                            startLat, startLng
+                        )
 
                         if (distance > 1) {
                             Polyline(
@@ -166,10 +167,10 @@ internal fun RouteMapView(
 
         if (routeEndLat != null && routeEndLng != null) {
             previousEndPoint?.let { prevPoint ->
-                val distance = Math.sqrt(
-                    Math.pow(prevPoint.latitude - routeEndLat, 2.0) +
-                            Math.pow(prevPoint.longitude - routeEndLng, 2.0)
-                ) * 111000
+                val distance = calculateDistance(
+                    prevPoint.latitude, prevPoint.longitude,
+                    routeEndLat, routeEndLng
+                )
 
                 if (distance > 1) {
                     Polyline(

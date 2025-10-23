@@ -2,6 +2,8 @@ package com.teammanduk.adego.core.domain.util
 
 import com.teammanduk.adego.core.model.Place
 import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
  * 위치 관련 유틸리티
@@ -63,5 +65,22 @@ object LocationUtils {
         pos2Lng: Double
     ): Boolean {
         return isSameLocation(pos1Lat, pos1Lng, pos2Lat, pos2Lng, LOCATION_COMPARISON_PRECISION)
+    }
+
+    /**
+     * 두 좌표 간의 직선 거리를 계산합니다 (미터 단위)
+     *
+     * 간단한 유클리드 거리 공식을 사용하며, 짧은 거리에서 근사치로 사용됩니다.
+     *
+     * @param lat1 첫 번째 위치의 위도
+     * @param lng1 첫 번째 위치의 경도
+     * @param lat2 두 번째 위치의 위도
+     * @param lng2 두 번째 위치의 경도
+     * @return 거리 (미터)
+     */
+    fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        return sqrt(
+            (lat1 - lat2).pow(2.0) + (lng1 - lng2).pow(2.0)
+        ) * 111000 // 1도 ≈ 111km
     }
 }

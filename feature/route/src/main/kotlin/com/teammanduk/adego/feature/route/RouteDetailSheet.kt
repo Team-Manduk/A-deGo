@@ -116,7 +116,6 @@ private fun RouteSummary(route: Route) {
                 horizontalArrangement = Arrangement.SpaceAround
             ) {
                 SummaryItem("소요시간", formatTime(route.totalTime))
-                SummaryItem("환승", "${route.transferCount}회")
                 SummaryItem("거리", "%.1fkm".format(route.totalDistance / 1000.0))
                 SummaryItem("요금", "${String.format("%,d", route.totalFare)}원")
             }

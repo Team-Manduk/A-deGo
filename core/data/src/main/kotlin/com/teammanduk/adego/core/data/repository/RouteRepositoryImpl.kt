@@ -458,8 +458,6 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                 .removeSuffix(")")
                 .trim()
 
-            Log.d("RouteRepository", "WKT 파싱: 원본 길이=${wkt.length}, 처리 후 길이=${coordString.length}")
-
             // 좌표 쌍으로 분할
             // API 응답 형식: "경도,위도 경도,위도" (공백으로 좌표 쌍 구분, 쉼표로 경도/위도 구분)
             // 예: "129.08409,35.23032 129.0841,35.230377"
@@ -475,12 +473,6 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                         )
                     } else null
                 } else null
-            }
-
-            Log.d("RouteRepository", "WKT 파싱 결과: ${coordinates.size}개 좌표")
-            if (coordinates.isNotEmpty()) {
-                Log.d("RouteRepository", "첫 좌표: (${coordinates.first().latitude}, ${coordinates.first().longitude})")
-                Log.d("RouteRepository", "마지막 좌표: (${coordinates.last().latitude}, ${coordinates.last().longitude})")
             }
 
             coordinates
