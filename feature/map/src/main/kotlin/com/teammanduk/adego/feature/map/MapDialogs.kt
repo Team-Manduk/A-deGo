@@ -473,14 +473,6 @@ private fun RouteCard(
                     color = Color.White
                 )
             }
-
-            if (route.transferCount > 0) {
-                Text(
-                    text = "환승 ${route.transferCount}회",
-                    style = AdegoTheme.typography.bodySmall,
-                    color = Color(0xFF757575)
-                )
-            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

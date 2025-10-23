@@ -170,15 +170,6 @@ private fun RouteCard(
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF000000)
                 )
-
-                // 환승 횟수
-                if (route.transferCount > 0) {
-                    Text(
-                        text = "환승 ${route.transferCount}회",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF666666)
-                    )
-                }
             }
 
             // 요금 정보

@@ -1,6 +1,7 @@
 package com.teammanduk.adego.core.domain.util
 
 import com.teammanduk.adego.core.model.Route
+import com.teammanduk.adego.core.domain.util.LocationUtils.calculateDistance
 
 /**
  * Google Polyline 인코딩/디코딩 유틸리티
@@ -103,12 +104,6 @@ object PolylineEncoder {
         }
 
         return encodeCoordinates(coordinates)
-    }
-
-    private fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
-        return Math.sqrt(
-            Math.pow(lat1 - lat2, 2.0) + Math.pow(lng1 - lng2, 2.0)
-        ) * 111000
     }
 
     private fun encodeCoordinates(coordinates: List<Pair<Double, Double>>): String {
