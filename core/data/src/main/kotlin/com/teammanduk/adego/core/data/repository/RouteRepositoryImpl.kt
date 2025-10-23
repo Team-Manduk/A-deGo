@@ -25,6 +25,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
@@ -127,14 +128,16 @@ private data class TmapStep(
 
 @Serializable
 private data class TmapPassStopList(
+    @SerialName("stationList")
     val stations: List<TmapStation>? = null
 )
 
 @Serializable
 private data class TmapStation(
+    val index: Int? = null,
     val stationName: String? = null,
-    val lon: Double? = null,
-    val lat: Double? = null,
+    val lon: String? = null, // API에서 문자열로 옴
+    val lat: String? = null, // API에서 문자열로 옴
     val stationID: String? = null
 )
 
@@ -428,11 +431,13 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
             endLatitude = leg.end?.lat,
             endLongitude = leg.end?.lon,
             passStations = leg.passStopList?.stations?.mapNotNull { station ->
-                if (station.stationName != null && station.lat != null && station.lon != null) {
+                val lat = station.lat?.toDoubleOrNull()
+                val lon = station.lon?.toDoubleOrNull()
+                if (station.stationName != null && lat != null && lon != null) {
                     com.teammanduk.adego.core.model.Station(
                         name = station.stationName,
-                        latitude = station.lat,
-                        longitude = station.lon
+                        latitude = lat,
+                        longitude = lon
                     )
                 } else null
             },
@@ -453,10 +458,12 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                 .removeSuffix(")")
                 .trim()
 
+            Log.d("RouteRepository", "WKT 파싱: 원본 길이=${wkt.length}, 처리 후 길이=${coordString.length}")
+
             // 좌표 쌍으로 분할
             // API 응답 형식: "경도,위도 경도,위도" (공백으로 좌표 쌍 구분, 쉼표로 경도/위도 구분)
             // 예: "129.08409,35.23032 129.0841,35.230377"
-            coordString.split(" ").mapNotNull { pair ->
+            val coordinates = coordString.split(" ").mapNotNull { pair ->
                 val parts = pair.trim().split(",")
                 if (parts.size >= 2) {
                     val lon = parts[0].toDoubleOrNull()  // 첫 번째는 경도
@@ -469,6 +476,14 @@ class RouteRepositoryImpl @Inject constructor() : RouteRepository {
                     } else null
                 } else null
             }
+
+            Log.d("RouteRepository", "WKT 파싱 결과: ${coordinates.size}개 좌표")
+            if (coordinates.isNotEmpty()) {
+                Log.d("RouteRepository", "첫 좌표: (${coordinates.first().latitude}, ${coordinates.first().longitude})")
+                Log.d("RouteRepository", "마지막 좌표: (${coordinates.last().latitude}, ${coordinates.last().longitude})")
+            }
+
+            coordinates
         } catch (e: Exception) {
             Log.e("RouteRepository", "WKT LINESTRING 파싱 실패: $wkt", e)
             emptyList()
