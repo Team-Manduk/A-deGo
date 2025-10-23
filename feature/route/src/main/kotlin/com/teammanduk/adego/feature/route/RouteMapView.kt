@@ -71,16 +71,16 @@ internal fun RouteMapView(
                 val lastCoord = graphicData.last()
 
                 // 이전 구간과의 연결
-                if (previousEndPoint != null) {
+                previousEndPoint?.let { prevPoint ->
                     val distance = Math.sqrt(
-                        Math.pow(previousEndPoint.latitude - firstCoord.latitude, 2.0) +
-                        Math.pow(previousEndPoint.longitude - firstCoord.longitude, 2.0)
+                        Math.pow(prevPoint.latitude - firstCoord.latitude, 2.0) +
+                        Math.pow(prevPoint.longitude - firstCoord.longitude, 2.0)
                     ) * 111000
 
                     if (distance > 1) {
                         Polyline(
                             points = listOf(
-                                previousEndPoint,
+                                prevPoint,
                                 LatLng(firstCoord.latitude, firstCoord.longitude)
                             ),
                             color = Color(0xFFCCCCCC),
@@ -88,7 +88,9 @@ internal fun RouteMapView(
                             pattern = dashedPattern
                         )
                     }
-                } else if (isFirstGraphicData) {
+                }
+
+                if (previousEndPoint == null && isFirstGraphicData) {
                     // Route 시작점과 첫 graphicData 연결
                     val routeStartLat = route.startLatitude
                     val routeStartLng = route.startLongitude
@@ -122,16 +124,16 @@ internal fun RouteMapView(
             } else {
                 // graphicData가 없는 경우 fallback
                 if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                    if (previousEndPoint != null) {
+                    previousEndPoint?.let { prevPoint ->
                         val distance = Math.sqrt(
-                            Math.pow(previousEndPoint.latitude - startLat, 2.0) +
-                            Math.pow(previousEndPoint.longitude - startLng, 2.0)
+                            Math.pow(prevPoint.latitude - startLat, 2.0) +
+                            Math.pow(prevPoint.longitude - startLng, 2.0)
                         ) * 111000
 
                         if (distance > 1) {
                             Polyline(
                                 points = listOf(
-                                    previousEndPoint,
+                                    prevPoint,
                                     LatLng(startLat, startLng)
                                 ),
                                 color = Color(0xFFCCCCCC),
@@ -170,22 +172,24 @@ internal fun RouteMapView(
         val routeEndLat = route.endLatitude
         val routeEndLng = route.endLongitude
 
-        if (previousEndPoint != null && routeEndLat != null && routeEndLng != null) {
-            val distance = Math.sqrt(
-                Math.pow(previousEndPoint.latitude - routeEndLat, 2.0) +
-                Math.pow(previousEndPoint.longitude - routeEndLng, 2.0)
-            ) * 111000
+        if (routeEndLat != null && routeEndLng != null) {
+            previousEndPoint?.let { prevPoint ->
+                val distance = Math.sqrt(
+                    Math.pow(prevPoint.latitude - routeEndLat, 2.0) +
+                    Math.pow(prevPoint.longitude - routeEndLng, 2.0)
+                ) * 111000
 
-            if (distance > 1) {
-                Polyline(
-                    points = listOf(
-                        previousEndPoint,
-                        LatLng(routeEndLat, routeEndLng)
-                    ),
-                    color = Color(0xFFCCCCCC),
-                    width = 8f,
-                    pattern = dashedPattern
-                )
+                if (distance > 1) {
+                    Polyline(
+                        points = listOf(
+                            prevPoint,
+                            LatLng(routeEndLat, routeEndLng)
+                        ),
+                        color = Color(0xFFCCCCCC),
+                        width = 8f,
+                        pattern = dashedPattern
+                    )
+                }
             }
         }
 
