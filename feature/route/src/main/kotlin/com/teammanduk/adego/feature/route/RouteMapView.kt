@@ -1,16 +1,9 @@
 package com.teammanduk.adego.feature.route
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.google.android.gms.maps.model.Dash
 import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.LatLng
@@ -21,7 +14,6 @@ import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberMarkerState
 import com.teammanduk.adego.core.model.Route
 import com.teammanduk.adego.core.model.TrafficType
-import com.teammanduk.adego.core.ui.util.formatTime
 
 @Composable
 internal fun RouteMapView(
@@ -74,7 +66,7 @@ internal fun RouteMapView(
                 previousEndPoint?.let { prevPoint ->
                     val distance = Math.sqrt(
                         Math.pow(prevPoint.latitude - firstCoord.latitude, 2.0) +
-                        Math.pow(prevPoint.longitude - firstCoord.longitude, 2.0)
+                                Math.pow(prevPoint.longitude - firstCoord.longitude, 2.0)
                     ) * 111000
 
                     if (distance > 1) {
@@ -98,7 +90,7 @@ internal fun RouteMapView(
                     if (routeStartLat != null && routeStartLng != null) {
                         val distance = Math.sqrt(
                             Math.pow(routeStartLat - firstCoord.latitude, 2.0) +
-                            Math.pow(routeStartLng - firstCoord.longitude, 2.0)
+                                    Math.pow(routeStartLng - firstCoord.longitude, 2.0)
                         ) * 111000
 
                         if (distance > 1) {
@@ -127,7 +119,7 @@ internal fun RouteMapView(
                     previousEndPoint?.let { prevPoint ->
                         val distance = Math.sqrt(
                             Math.pow(prevPoint.latitude - startLat, 2.0) +
-                            Math.pow(prevPoint.longitude - startLng, 2.0)
+                                    Math.pow(prevPoint.longitude - startLng, 2.0)
                         ) * 111000
 
                         if (distance > 1) {
@@ -176,7 +168,7 @@ internal fun RouteMapView(
             previousEndPoint?.let { prevPoint ->
                 val distance = Math.sqrt(
                     Math.pow(prevPoint.latitude - routeEndLat, 2.0) +
-                    Math.pow(prevPoint.longitude - routeEndLng, 2.0)
+                            Math.pow(prevPoint.longitude - routeEndLng, 2.0)
                 ) * 111000
 
                 if (distance > 1) {
@@ -201,45 +193,6 @@ internal fun RouteMapView(
             Marker(
                 state = rememberMarkerState(position = allPoints.last()),
                 title = "도착"
-            )
-        }
-    }
-}
-
-@Composable
-internal fun BoxScope.RouteTopChips(route: Route) {
-    Row(
-        modifier = Modifier
-            .align(Alignment.TopCenter)
-            .padding(top = 16.dp)
-            .systemBarsPadding(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = Color.White,
-            shadowElevation = 4.dp
-        ) {
-            Text(
-                text = formatTime(route.totalTime),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF000000)
-            )
-        }
-
-        Surface(
-            shape = RoundedCornerShape(20.dp),
-            color = Color.White,
-            shadowElevation = 4.dp
-        ) {
-            Text(
-                text = "${String.format("%,d", route.totalFare)}원",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF000000)
             )
         }
     }
