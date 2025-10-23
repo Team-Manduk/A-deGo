@@ -16,23 +16,21 @@ object PolylineEncoder {
     fun encode(route: Route): String {
         val coordinates = mutableListOf<Pair<Double, Double>>()
         var previousEndPoint: Pair<Double, Double>? = null
+        var isFirstGraphicData = true
 
         route.subPaths.forEachIndexed { index, subPath ->
             val graphicData = subPath.graphicData
-
-            // 시작/종료 좌표 가져오기
             var startLat = subPath.startLatitude
             var startLng = subPath.startLongitude
             var endLat = subPath.endLatitude
             var endLng = subPath.endLongitude
 
-            // 시작점 보정
+            // 시작/종료 좌표 보정
             if (startLat == null || startLng == null) {
                 val prevSubPath = route.subPaths.getOrNull(index - 1)
                 startLat = prevSubPath?.endLatitude
                 startLng = prevSubPath?.endLongitude
             }
-            // 종료점 보정
             if (endLat == null || endLng == null) {
                 val nextSubPath = route.subPaths.getOrNull(index + 1)
                 endLat = nextSubPath?.startLatitude
@@ -40,53 +38,42 @@ object PolylineEncoder {
             }
 
             if (!graphicData.isNullOrEmpty()) {
-                // graphicData가 있는 경우
                 val firstCoord = graphicData.first()
                 val lastCoord = graphicData.last()
 
-                // 이전 구간과의 연결 확인 및 보정
                 if (previousEndPoint != null) {
-                    val distance = Math.sqrt(
-                        Math.pow(previousEndPoint.first - firstCoord.latitude, 2.0) +
-                        Math.pow(previousEndPoint.second - firstCoord.longitude, 2.0)
-                    ) * 111000
-
-                    if (distance > 1) { // 1m 이상 차이나면 연결 포인트 추가
+                    if (calculateDistance(
+                            previousEndPoint.first, previousEndPoint.second,
+                            firstCoord.latitude, firstCoord.longitude
+                        ) > 1) {
                         coordinates.add(previousEndPoint)
                     }
-                } else if (index == 0) {
-                    // 첫 번째 구간: 원본 시작점과 graphicData 첫 좌표 비교
-                    if (startLat != null && startLng != null) {
-                        val distance = Math.sqrt(
-                            Math.pow(startLat - firstCoord.latitude, 2.0) +
-                            Math.pow(startLng - firstCoord.longitude, 2.0)
-                        ) * 111000
-
-                        if (distance > 1) {
-                            // 첫 구간 연결 포인트 추가
-                            coordinates.add(startLat to startLng)
+                } else if (isFirstGraphicData) {
+                    val routeStartLat = route.startLatitude
+                    val routeStartLng = route.startLongitude
+                    if (routeStartLat != null && routeStartLng != null) {
+                        if (calculateDistance(
+                                routeStartLat, routeStartLng,
+                                firstCoord.latitude, firstCoord.longitude
+                            ) > 1) {
+                            coordinates.add(routeStartLat to routeStartLng)
                         }
                     }
+                    isFirstGraphicData = false
                 }
 
-                // graphicData 좌표들 추가
                 graphicData.forEach { coord ->
                     coordinates.add(coord.latitude to coord.longitude)
                 }
 
-                // previousEndPoint 업데이트
                 previousEndPoint = lastCoord.latitude to lastCoord.longitude
             } else {
-                // graphicData가 없는 경우 (fallback)
                 if (startLat != null && startLng != null && endLat != null && endLng != null) {
-                    // 이전 구간과 연결
                     if (previousEndPoint != null) {
-                        val distance = Math.sqrt(
-                            Math.pow(previousEndPoint.first - startLat, 2.0) +
-                            Math.pow(previousEndPoint.second - startLng, 2.0)
-                        ) * 111000
-
-                        if (distance > 1) {
+                        if (calculateDistance(
+                                previousEndPoint.first, previousEndPoint.second,
+                                startLat, startLng
+                            ) > 1) {
                             coordinates.add(previousEndPoint)
                         }
                     }
@@ -102,18 +89,15 @@ object PolylineEncoder {
             }
         }
 
-        // 마지막 SubPath 이후 Route 도착지와의 연결 확인
+        // Route 도착지 연결
         val routeEndLat = route.endLatitude
         val routeEndLng = route.endLongitude
 
         if (previousEndPoint != null && routeEndLat != null && routeEndLng != null) {
-            val distance = Math.sqrt(
-                Math.pow(previousEndPoint.first - routeEndLat, 2.0) +
-                Math.pow(previousEndPoint.second - routeEndLng, 2.0)
-            ) * 111000
-
-            if (distance > 1) {
-                // 마지막 graphicData 끝점과 실제 도착지 사이에 도착지 좌표 추가
+            if (calculateDistance(
+                    previousEndPoint.first, previousEndPoint.second,
+                    routeEndLat, routeEndLng
+                ) > 1) {
                 coordinates.add(routeEndLat to routeEndLng)
             }
         }
@@ -121,9 +105,12 @@ object PolylineEncoder {
         return encodeCoordinates(coordinates)
     }
 
-    /**
-     * 좌표 리스트를 절대값으로 인코딩 (델타 방식 대신)
-     */
+    private fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+        return Math.sqrt(
+            Math.pow(lat1 - lat2, 2.0) + Math.pow(lng1 - lng2, 2.0)
+        ) * 111000
+    }
+
     private fun encodeCoordinates(coordinates: List<Pair<Double, Double>>): String {
         if (coordinates.isEmpty()) return ""
 
@@ -133,7 +120,6 @@ object PolylineEncoder {
             val lat5 = (lat * 1e5).toInt()
             val lng5 = (lng * 1e5).toInt()
 
-            // 절대값 인코딩 (델타 없이)
             encodeValue(lat5, result)
             encodeValue(lng5, result)
         }
@@ -141,9 +127,6 @@ object PolylineEncoder {
         return result.toString()
     }
 
-    /**
-     * 단일 값을 인코딩
-     */
     private fun encodeValue(value: Int, result: StringBuilder) {
         var num = if (value < 0) ((-value) shl 1) or 1 else value shl 1
 
@@ -154,12 +137,6 @@ object PolylineEncoder {
         result.append((num + 63).toChar())
     }
 
-    /**
-     * polyline 문자열을 좌표 리스트로 디코딩 (절대값)
-     *
-     * @param encoded 인코딩된 polyline 문자열
-     * @return 위도/경도 좌표 리스트
-     */
     fun decode(encoded: String): List<Pair<Double, Double>> {
         if (encoded.isEmpty()) return emptyList()
 
@@ -171,7 +148,6 @@ object PolylineEncoder {
             var shift = 0
             var b: Int
 
-            // Latitude 디코딩 (절대값)
             do {
                 b = encoded[index++].code - 63 - 1
                 result += b shl shift
@@ -179,7 +155,6 @@ object PolylineEncoder {
             } while (b >= 0x1f)
             val lat = if (result and 1 != 0) (result shr 1).inv() else result shr 1
 
-            // Longitude 디코딩 (절대값)
             result = 1
             shift = 0
             do {
