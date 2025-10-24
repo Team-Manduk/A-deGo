@@ -102,21 +102,13 @@ class MapViewModel @Inject constructor(
         startLocationTracking()
 
         // 방 정보 및 참가자 구독
+        // 🚀 최적화: 중복 fetch 제거 - joinRoom()의 첫 emission이 초기 데이터를 포함
         viewModelScope.launch {
-            // 최초 1회 참가자 정보 즉시 로드
-            roomRepository.getParticipants(roomId).onSuccess { participants ->
-                android.util.Log.d("MapPerformance", "[Initial] 초기 참가자 로드 완료 at ${System.currentTimeMillis()}, count=${participants.size}")
-                _uiState.update {
-                    it.copy(participants = participants.toUiModels())
-                }
-            }
-
             var firstParticipantsUpdate = true
             joinRoom(roomId, userId, userName)
                 .catch { e ->
                     _uiState.update { it.copy(error = "세션 복구 실패: ${e.message}") }
                 }
-
                 .collect { (room, participants) ->
                     if (firstParticipantsUpdate) {
                         android.util.Log.d("MapPerformance", "[4] First participants update at ${System.currentTimeMillis()}, count=${participants.size}")
