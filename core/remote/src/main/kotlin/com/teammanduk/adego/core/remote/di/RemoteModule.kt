@@ -1,9 +1,11 @@
 package com.teammanduk.adego.core.remote.di
 
 import com.teammanduk.adego.core.data_api.datasource.LocationDataSource
+import com.teammanduk.adego.core.data_api.datasource.PlaceDataSource
 import com.teammanduk.adego.core.data_api.datasource.RoomDataSource
 import com.teammanduk.adego.core.remote.datasource.FirebaseRoomDataSource
 import com.teammanduk.adego.core.remote.datasource.FusedLocationDataSource
+import com.teammanduk.adego.core.remote.datasource.TmapPlaceDataSourceImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -24,4 +26,10 @@ abstract class RemoteModule {
     abstract fun bindLocationDataSource(
         fusedLocationDataSource: FusedLocationDataSource
     ): LocationDataSource
+
+    @Binds
+    @Singleton
+    abstract fun bindPlaceDataSource(
+        tmapPlaceDataSource: TmapPlaceDataSourceImpl
+    ): PlaceDataSource
 }
