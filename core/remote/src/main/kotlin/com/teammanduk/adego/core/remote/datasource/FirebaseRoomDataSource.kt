@@ -309,6 +309,51 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
         }
     }
 
+    /**
+     * 위치, ETA/거리, 이동 상태를 한 번에 업데이트
+     * UpdateLocationUseCase에서 사용 - 3번의 Firebase 호출을 1번으로 통합
+     */
+    override suspend fun updateParticipantLocationAndStatus(
+        roomId: String,
+        userId: String,
+        latitude: Double,
+        longitude: Double,
+        accuracy: Float,
+        timestamp: Long,
+        movementStatus: String,
+        etaInSeconds: Int?,
+        distanceInMeters: Int?
+    ): Result<Unit> {
+        return try {
+            val updates = mutableMapOf<String, Any>(
+                "location/latitude" to latitude,
+                "location/longitude" to longitude,
+                "location/accuracy" to accuracy,
+                "location/updatedAt" to timestamp,
+                "movementStatus" to movementStatus
+            )
+
+            // 경로 정보가 있으면 ETA/거리 추가 (polyline은 제외)
+            if (etaInSeconds != null && distanceInMeters != null) {
+                updates["route/etaInSeconds"] = etaInSeconds
+                updates["route/distanceInMeters"] = distanceInMeters
+                updates["route/updatedAt"] = timestamp
+            }
+
+            database.child("participants")
+                .child(roomId)
+                .child(userId)
+                .updateChildren(updates)
+                .await()
+
+            Log.d(TAG, "Participant updated (unified) for user $userId - location, status${if (etaInSeconds != null) ", ETA" else ""}")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update participant (unified)", e)
+            Result.failure(e)
+        }
+    }
+
     override suspend fun removeParticipant(roomId: String, userId: String): Result<Unit> {
         return try {
             database.child("participants")
