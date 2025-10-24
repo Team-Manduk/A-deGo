@@ -23,16 +23,19 @@ class LeaveRoomUseCase @Inject constructor(
             val userId = userRepository.getCurrentUserId()
                 ?: return Result.failure(Exception("사용자 정보가 없습니다."))
 
-            // 1. 위치 추적 중지
+            // 1. 먼저 위치 추적 중지 (새로운 업데이트 방지)
             locationRepository.stopLocationTracking()
 
-            // 2. Firebase에서 참가자 제거
+            // 2. 위치 상태 클리어 (마지막 위치 캐시 제거)
+            locationRepository.clearLocationState()
+
+            // 3. Firebase에서 참가자 제거 (leaveCurrentRoom 내부에서 clearCurrentRoom 호출됨)
             val result = roomRepository.leaveCurrentRoom(userId)
             if (result.isFailure) {
                 return result
             }
 
-            // 3. 현재 사용자 세션 클리어
+            // 4. 현재 사용자 세션 클리어
             userRepository.clearCurrentUser()
 
             Result.success(Unit)

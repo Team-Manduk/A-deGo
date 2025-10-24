@@ -132,10 +132,12 @@ class RoomRepositoryImpl @Inject constructor(
     override suspend fun leaveCurrentRoom(userId: String): Result<Unit> {
         val roomId = currentRoomId
             ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
+
+        // 🐛 Fix: Firebase 삭제 전에 먼저 세션 클리어
+        // 이유: 비동기로 실행 중인 UpdateLocationUseCase가 데이터를 다시 생성하는 것을 방지
+        clearCurrentRoom()
+
         val result = leaveRoom(roomId, userId)
-        if (result.isSuccess) {
-            clearCurrentRoom()
-        }
         return result
     }
 
