@@ -4,7 +4,7 @@ import android.content.Context
 import android.location.Geocoder
 import android.os.Build
 import android.util.Log
-import com.teammanduk.adego.core.data.model.TmapReverseGeocodingResponse
+import com.teammanduk.adego.core.remote.model.TmapReverseGeocodingResponse
 import com.teammanduk.adego.core.data_api.datasource.PlaceDataSource
 import com.teammanduk.adego.core.data_api.model.PlaceDto
 import dagger.hilt.android.qualifiers.ApplicationContext

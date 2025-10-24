@@ -1,4 +1,4 @@
-package com.teammanduk.adego.core.data.model
+package com.teammanduk.adego.core.remote.model
 
 import kotlinx.serialization.Serializable
 
