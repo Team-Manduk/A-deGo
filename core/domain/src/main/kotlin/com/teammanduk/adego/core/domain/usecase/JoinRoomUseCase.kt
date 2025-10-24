@@ -15,9 +15,10 @@ class JoinRoomUseCase @Inject constructor(
         userId: String,
         userName: String
     ): Flow<Pair<Room?, List<Participant>>> {
-        roomRepository.setCurrentRoom(roomId)
-
         return kotlinx.coroutines.flow.flow {
+            // 현재 방 세션 설정
+            roomRepository.setCurrentRoom(roomId)
+
             // 먼저 방에 참가 (참가자 생성)
             roomRepository.joinRoom(roomId, userId, userName)
                 .onFailure { error ->

@@ -12,7 +12,7 @@ interface RoomRepository {
     /**
      * 현재 참여 중인 방 설정 (세션 시작)
      */
-    fun setCurrentRoom(roomId: String)
+    suspend fun setCurrentRoom(roomId: String)
 
     /**
      * 현재 참여 중인 방 ID 조회
@@ -22,7 +22,7 @@ interface RoomRepository {
     /**
      * 현재 방 세션 종료
      */
-    fun clearCurrentRoom()
+    suspend fun clearCurrentRoom()
 
     /**
      * DataStore에서 저장된 방 정보 복구
