@@ -100,6 +100,29 @@ class RoomRepositoryImpl @Inject constructor(
         return updateMyMovementStatus(roomId, userId, movementStatus)
     }
 
+    override suspend fun updateMyLocationAndStatus(
+        userId: String,
+        location: ParticipantLocation,
+        movementStatus: MovementStatus,
+        etaInSeconds: Int?,
+        distanceInMeters: Int?
+    ): Result<Unit> {
+        val roomId = currentRoomId
+            ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))
+
+        return roomDataSource.updateParticipantLocationAndStatus(
+            roomId = roomId,
+            userId = userId,
+            latitude = location.latitude,
+            longitude = location.longitude,
+            accuracy = location.accuracy,
+            timestamp = location.updatedAt,
+            movementStatus = movementStatus.name,
+            etaInSeconds = etaInSeconds,
+            distanceInMeters = distanceInMeters
+        )
+    }
+
     override suspend fun leaveCurrentRoom(userId: String): Result<Unit> {
         val roomId = currentRoomId
             ?: return Result.failure(IllegalStateException("현재 방이 설정되지 않았습니다."))

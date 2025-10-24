@@ -66,6 +66,18 @@ interface RoomRepository {
     ): Result<Unit>
 
     /**
+     * 위치, ETA/거리, 이동 상태를 한 번에 업데이트 (최적화)
+     * UpdateLocationUseCase에서 사용
+     */
+    suspend fun updateMyLocationAndStatus(
+        userId: String,
+        location: ParticipantLocation,
+        movementStatus: MovementStatus,
+        etaInSeconds: Int? = null,
+        distanceInMeters: Int? = null
+    ): Result<Unit>
+
+    /**
      * 현재 방 나가기
      */
     suspend fun leaveCurrentRoom(userId: String): Result<Unit>

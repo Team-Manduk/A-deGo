@@ -54,41 +54,38 @@ class UpdateLocationUseCase @Inject constructor(
         }
 
         val userId = userRepository.getCurrentUserId()
+        val roomId = roomRepository.getCurrentRoomId()
 
-        // 위치 업데이트
-        roomRepository.updateMyLocation(userId, location)
+        // roomId가 없으면 업데이트 스킵
+        if (roomId == null) {
+            return false
+        }
 
-        // 경로가 있으면 ETA 계산 및 업데이트
-        val participantRoute = if (selectedRoute != null) {
-            val routeProgress = calculateRouteProgress(location, selectedRoute)
-            if (routeProgress != null) {
-                // polyline은 빈 문자열로 (SaveSelectedRouteUseCase에서 이미 저장했으므로 중복 전송 방지)
-                ParticipantRoute(
-                    etaInSeconds = routeProgress.remainingTimeInSeconds,
-                    distanceInMeters = routeProgress.remainingDistance.toInt(),
-                    polyline = "",
-                    updatedAt = System.currentTimeMillis()
-                )
-            } else null
+        val roomInfo = roomRepository.getRoomInfo(roomId).getOrNull()
+        if (roomInfo == null) {
+            return false
+        }
+
+        // 이동 상태 계산
+        val movementStatus = calculateMovementStatus(
+            currentLocation = location,
+            selectedRoute = selectedRoute,
+            destination = roomInfo.destination
+        )
+
+        // 경로가 있으면 ETA 계산
+        val routeProgress = if (selectedRoute != null) {
+            calculateRouteProgress(location, selectedRoute)
         } else null
 
-        if (participantRoute != null) {
-            roomRepository.updateMyRoute(userId, participantRoute)
-        }
-
-        // 이동 상태 계산 및 업데이트
-        val roomId = roomRepository.getCurrentRoomId()
-        if (roomId != null) {
-            val roomInfo = roomRepository.getRoomInfo(roomId).getOrNull()
-            if (roomInfo != null) {
-                val movementStatus = calculateMovementStatus(
-                    currentLocation = location,
-                    selectedRoute = selectedRoute,
-                    destination = roomInfo.destination
-                )
-                roomRepository.updateMyMovementStatus(userId, movementStatus)
-            }
-        }
+        // 🚀 최적화: 위치, ETA/거리, 이동 상태를 한 번에 업데이트 (3번 → 1번)
+        roomRepository.updateMyLocationAndStatus(
+            userId = userId,
+            location = location,
+            movementStatus = movementStatus,
+            etaInSeconds = routeProgress?.remainingTimeInSeconds,
+            distanceInMeters = routeProgress?.remainingDistance?.toInt()
+        )
 
         // 업데이트 후 Repository에 상태 저장
         locationRepository.setLastUpdatedLocation(location)
