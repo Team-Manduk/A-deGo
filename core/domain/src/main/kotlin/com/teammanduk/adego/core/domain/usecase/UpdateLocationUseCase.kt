@@ -59,22 +59,21 @@ class UpdateLocationUseCase @Inject constructor(
         roomRepository.updateMyLocation(userId, location)
 
         // 경로가 있으면 ETA 계산 및 업데이트
-        if (selectedRoute != null) {
+        val participantRoute = if (selectedRoute != null) {
             val routeProgress = calculateRouteProgress(location, selectedRoute)
-
             if (routeProgress != null) {
-                // polyline은 SaveSelectedRouteUseCase에서 이미 저장했으므로 재사용
-                val polyline = PolylineEncoder.encode(selectedRoute)
-
-                val participantRoute = ParticipantRoute(
+                // polyline은 빈 문자열로 (SaveSelectedRouteUseCase에서 이미 저장했으므로 중복 전송 방지)
+                ParticipantRoute(
                     etaInSeconds = routeProgress.remainingTimeInSeconds,
                     distanceInMeters = routeProgress.remainingDistance.toInt(),
-                    polyline = polyline,
+                    polyline = "",
                     updatedAt = System.currentTimeMillis()
                 )
+            } else null
+        } else null
 
-                roomRepository.updateMyRoute(userId, participantRoute)
-            }
+        if (participantRoute != null) {
+            roomRepository.updateMyRoute(userId, participantRoute)
         }
 
         // 이동 상태 계산 및 업데이트

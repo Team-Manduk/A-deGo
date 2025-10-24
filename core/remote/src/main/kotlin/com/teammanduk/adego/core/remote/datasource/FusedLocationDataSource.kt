@@ -14,9 +14,14 @@ import com.google.android.gms.location.Priority
 import com.teammanduk.adego.core.data_api.datasource.LocationDataSource
 import com.teammanduk.adego.core.data_api.model.ParticipantLocationDto
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,6 +36,19 @@ class FusedLocationDataSource @Inject constructor(
         LocationServices.getFusedLocationProviderClient(context)
 
     private var locationCallback: LocationCallback? = null
+
+    // Flow를 공유하기 위한 CoroutineScope
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    // 공유된 위치 업데이트 Flow (단일 GPS 리스너)
+    private val sharedLocationFlow: Flow<ParticipantLocationDto> by lazy {
+        createLocationFlow()
+            .shareIn(
+                scope = scope,
+                started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5000),
+                replay = 1 // 마지막 위치를 캐시하여 새 구독자에게 즉시 제공
+            )
+    }
 
     @SuppressLint("MissingPermission")
     override suspend fun getCurrentLocation(): Result<ParticipantLocationDto> {
@@ -60,8 +78,23 @@ class FusedLocationDataSource @Inject constructor(
         }
     }
 
+    /**
+     * 공유된 위치 업데이트 Flow 반환
+     * 여러 곳에서 구독해도 단일 GPS 리스너만 생성됨
+     */
+    override fun getLocationUpdates(): Flow<ParticipantLocationDto> {
+        Log.d(TAG, "getLocationUpdates() called - returning shared flow")
+        return sharedLocationFlow
+    }
+
+    /**
+     * 실제 위치 업데이트를 생성하는 내부 메서드
+     * shareIn으로 공유되어 단일 GPS 리스너만 생성됨
+     */
     @SuppressLint("MissingPermission")
-    override fun getLocationUpdates(): Flow<ParticipantLocationDto> = callbackFlow {
+    private fun createLocationFlow(): Flow<ParticipantLocationDto> = callbackFlow {
+        Log.d(TAG, "createLocationFlow() - creating new GPS listener")
+
         // 1. 먼저 lastLocation을 즉시 emit (있다면)
         fusedLocationClient.lastLocation
             .addOnSuccessListener { location: Location? ->
@@ -105,7 +138,7 @@ class FusedLocationDataSource @Inject constructor(
         awaitClose {
             fusedLocationClient.removeLocationUpdates(callback)
             locationCallback = null
-            Log.d(TAG, "Location updates stopped")
+            Log.d(TAG, "Location updates stopped - GPS listener removed")
         }
     }
 
