@@ -15,7 +15,6 @@ import com.teammanduk.adego.core.model.Place
 import com.teammanduk.adego.core.model.Room
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,24 +31,20 @@ class RoomRepositoryImpl @Inject constructor(
     private var cachedDestination: Place? = null
 
     // ===== 세션 관리 =====
-    override fun setCurrentRoom(roomId: String) {
+    override suspend fun setCurrentRoom(roomId: String) {
         currentRoomId = roomId
-        runBlocking {
-            sessionDataSource.saveRoomId(roomId)
-            // roomName은 joinRoom이나 createRoom에서 저장
-        }
+        sessionDataSource.saveRoomId(roomId)
+        // roomName은 joinRoom이나 createRoom에서 저장
         Log.d(TAG, "[Repository] 현재 방 세션 설정: $roomId")
     }
 
     override fun getCurrentRoomId(): String? = currentRoomId
 
-    override fun clearCurrentRoom() {
+    override suspend fun clearCurrentRoom() {
         Log.d(TAG, "[Repository] 현재 방 세션 종료: $currentRoomId")
         currentRoomId = null
         cachedDestination = null
-        runBlocking {
-            sessionDataSource.clearSession()
-        }
+        sessionDataSource.clearSession()
     }
 
     override fun getCachedDestination(): Place? = cachedDestination
