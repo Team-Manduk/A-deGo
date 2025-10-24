@@ -246,21 +246,41 @@ class FirebaseRoomDataSource @Inject constructor() : RoomDataSource {
         timestamp: Long
     ): Result<Unit> {
         return try {
-            val routeMap = mapOf(
-                "etaInSeconds" to etaInSeconds,
-                "distanceInMeters" to distanceInMeters,
-                "polyline" to polyline,
-                "updatedAt" to timestamp
-            )
+            // polyline이 비어있으면 ETA/거리만 업데이트 (최적화)
+            if (polyline.isEmpty()) {
+                val updates = mapOf<String, Any>(
+                    "etaInSeconds" to etaInSeconds,
+                    "distanceInMeters" to distanceInMeters,
+                    "updatedAt" to timestamp
+                )
 
-            database.child("participants")
-                .child(roomId)
-                .child(userId)
-                .child("route")
-                .setValue(routeMap)
-                .await()
+                database.child("participants")
+                    .child(roomId)
+                    .child(userId)
+                    .child("route")
+                    .updateChildren(updates)
+                    .await()
 
-            Log.d(TAG, "Route updated for user $userId in room $roomId (ETA: ${etaInSeconds}s, Distance: ${distanceInMeters}m)")
+                Log.d(TAG, "Route ETA/distance updated for user $userId in room $roomId (ETA: ${etaInSeconds}s, Distance: ${distanceInMeters}m)")
+            } else {
+                // polyline이 있으면 전체 저장
+                val routeMap = mapOf(
+                    "etaInSeconds" to etaInSeconds,
+                    "distanceInMeters" to distanceInMeters,
+                    "polyline" to polyline,
+                    "updatedAt" to timestamp
+                )
+
+                database.child("participants")
+                    .child(roomId)
+                    .child(userId)
+                    .child("route")
+                    .setValue(routeMap)
+                    .await()
+
+                Log.d(TAG, "Route updated (full) for user $userId in room $roomId (ETA: ${etaInSeconds}s, Distance: ${distanceInMeters}m, polyline length: ${polyline.length})")
+            }
+
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update route", e)
