@@ -28,6 +28,9 @@ class RoomRepositoryImpl @Inject constructor(
     // 현재 참여 중인 방 ID (세션 정보)
     private var currentRoomId: String? = null
 
+    // 현재 방의 목적지 캐시 (observeRoom으로 자동 업데이트)
+    private var cachedDestination: Place? = null
+
     // ===== 세션 관리 =====
     override fun setCurrentRoom(roomId: String) {
         currentRoomId = roomId
@@ -43,10 +46,13 @@ class RoomRepositoryImpl @Inject constructor(
     override fun clearCurrentRoom() {
         Log.d(TAG, "[Repository] 현재 방 세션 종료: $currentRoomId")
         currentRoomId = null
+        cachedDestination = null
         runBlocking {
             sessionDataSource.clearSession()
         }
     }
+
+    override fun getCachedDestination(): Place? = cachedDestination
 
     override suspend fun restoreRoomSession(): String? {
         val roomId = sessionDataSource.getRoomId()
@@ -269,6 +275,13 @@ class RoomRepositoryImpl @Inject constructor(
             .map { roomDto ->
                 Log.d(TAG, "[Repository] observeRoom - RoomDto 수신: ${roomDto?.roomId}")
                 val room = roomDto?.toModel()
+
+                // 🚀 최적화: 목적지를 캐시하여 getRoomInfo() 호출 제거
+                if (room != null && roomId == currentRoomId) {
+                    cachedDestination = room.destination
+                    Log.d(TAG, "[Repository] observeRoom - 목적지 캐시 업데이트: ${room.destination.name}")
+                }
+
                 Log.d(
                     TAG,
                     "[Repository] observeRoom - Room 변환 완료: roomId=${room?.roomId}, destination=${room?.destination?.name}"

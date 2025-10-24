@@ -4,9 +4,7 @@ import com.teammanduk.adego.core.domain.repository.LocationRepository
 import com.teammanduk.adego.core.domain.repository.RoomRepository
 import com.teammanduk.adego.core.domain.repository.SelectedRouteRepository
 import com.teammanduk.adego.core.domain.repository.UserRepository
-import com.teammanduk.adego.core.domain.util.PolylineEncoder
 import com.teammanduk.adego.core.model.ParticipantLocation
-import com.teammanduk.adego.core.model.ParticipantRoute
 import com.teammanduk.adego.core.model.Route
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -61,8 +59,10 @@ class UpdateLocationUseCase @Inject constructor(
             return false
         }
 
-        val roomInfo = roomRepository.getRoomInfo(roomId).getOrNull()
-        if (roomInfo == null) {
+        // 🚀 최적화: getRoomInfo() 대신 캐시된 목적지 사용
+        // observeRoom()을 구독하면 자동으로 캐시되므로 Firebase 호출 제거
+        val destination = roomRepository.getCachedDestination()
+        if (destination == null) {
             return false
         }
 
@@ -70,7 +70,7 @@ class UpdateLocationUseCase @Inject constructor(
         val movementStatus = calculateMovementStatus(
             currentLocation = location,
             selectedRoute = selectedRoute,
-            destination = roomInfo.destination
+            destination = destination
         )
 
         // 경로가 있으면 ETA 계산
