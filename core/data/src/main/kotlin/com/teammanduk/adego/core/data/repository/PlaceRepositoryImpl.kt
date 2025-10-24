@@ -1,5 +1,6 @@
 package com.teammanduk.adego.core.data.repository
 
+import com.teammanduk.adego.core.data.mapper.toModel
 import com.teammanduk.adego.core.data_api.datasource.PlaceDataSource
 import com.teammanduk.adego.core.domain.repository.PlaceRepository
 import com.teammanduk.adego.core.model.Place
@@ -31,27 +32,13 @@ class PlaceRepositoryImpl @Inject constructor(
 
     override suspend fun searchPlaceByCoordinates(latitude: Double, longitude: Double): Place? {
         val placeDto = placeDataSource.searchPlaceByCoordinates(latitude, longitude)
-        val place = placeDto?.let {
-            Place(
-                name = it.name,
-                address = it.address,
-                latitude = it.latitude,
-                longitude = it.longitude
-            )
-        }
+        val place = placeDto?.toModel()
         _currentSearchResult.emit(place)
         return place
     }
 
     override suspend fun searchPlacesByText(query: String): List<Place> {
         val placeDtos = placeDataSource.searchPlaces(query)
-        return placeDtos.map { dto ->
-            Place(
-                name = dto.name,
-                address = dto.address,
-                latitude = dto.latitude,
-                longitude = dto.longitude
-            )
-        }
+        return placeDtos.map { it.toModel() }
     }
 }
