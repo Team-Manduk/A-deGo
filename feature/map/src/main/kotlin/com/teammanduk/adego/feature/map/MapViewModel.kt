@@ -91,19 +91,20 @@ class MapViewModel @Inject constructor(
             )
         }
 
-        // Repository 상태 설정
-        userRepository.setCurrentUser(userId)
-        roomRepository.setCurrentRoom(roomId)
-
-        // 위치 상태 초기화 (첫 위치를 즉시 업로드하기 위해)
-        locationRepository.clearLocationState()
-
-        // 위치 추적 시작
-        startLocationTracking()
-
-        // 방 정보 및 참가자 구독
-        // 🚀 최적화: 중복 fetch 제거 - joinRoom()의 첫 emission이 초기 데이터를 포함
+        // Repository 상태 설정 및 방 정보 구독
         viewModelScope.launch {
+            // Repository 상태 설정
+            userRepository.setCurrentUser(userId)
+            roomRepository.setCurrentRoom(roomId)
+
+            // 위치 상태 초기화 (첫 위치를 즉시 업로드하기 위해)
+            locationRepository.clearLocationState()
+
+            // 위치 추적 시작
+            startLocationTracking()
+
+            // 방 정보 및 참가자 구독
+            // 🚀 최적화: 중복 fetch 제거 - joinRoom()의 첫 emission이 초기 데이터를 포함
             var firstParticipantsUpdate = true
             joinRoom(roomId, userId, userName)
                 .catch { e ->
