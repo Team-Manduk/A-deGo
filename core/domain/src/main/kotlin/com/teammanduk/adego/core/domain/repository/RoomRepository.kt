@@ -30,6 +30,13 @@ interface RoomRepository {
      */
     suspend fun restoreRoomSession(): String?
 
+    /**
+     * 캐시된 현재 방의 목적지 조회
+     * observeCurrentRoom()을 구독하면 자동으로 캐시됨
+     * @return 캐시된 목적지 (없으면 null)
+     */
+    fun getCachedDestination(): com.teammanduk.adego.core.model.Place?
+
     // ===== 현재 방 기준 작업 (세션 기반) =====
     /**
      * 현재 방 정보 실시간 구독
