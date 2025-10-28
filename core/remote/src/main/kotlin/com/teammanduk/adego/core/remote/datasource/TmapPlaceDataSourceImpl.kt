@@ -4,9 +4,10 @@ import android.content.Context
 import android.location.Geocoder
 import android.os.Build
 import android.util.Log
-import com.teammanduk.adego.core.remote.model.TmapReverseGeocodingResponse
 import com.teammanduk.adego.core.data_api.datasource.PlaceDataSource
 import com.teammanduk.adego.core.data_api.model.PlaceDto
+import com.teammanduk.adego.core.remote.model.TmapPoiResponse
+import com.teammanduk.adego.core.remote.model.TmapReverseGeocodingResponse
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
@@ -18,12 +19,10 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
-import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.Locale
 import javax.inject.Inject
@@ -34,58 +33,6 @@ import kotlin.math.cos
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
-
-// TMAP POI API Response Models
-@Serializable
-private data class TmapPoiResponse(
-    val searchPoiInfo: TmapSearchPoiInfo? = null
-)
-
-@Serializable
-private data class TmapSearchPoiInfo(
-    val totalCount: String? = null,
-    val count: String? = null,
-    val page: String? = null,
-    val pois: TmapPois? = null
-)
-
-@Serializable
-private data class TmapPois(
-    val poi: List<TmapPoi> = emptyList()
-)
-
-@Serializable
-private data class TmapPoi(
-    val id: String? = null,
-    val name: String? = null,
-    val telNo: String? = null,
-    val frontLat: String? = null, // 위도
-    val frontLon: String? = null, // 경도
-    val noorLat: String? = null,
-    val noorLon: String? = null,
-    val upperAddrName: String? = null,
-    val middleAddrName: String? = null,
-    val lowerAddrName: String? = null,
-    val detailAddrName: String? = null,
-    val mlClass: String? = null,
-    val firstNo: String? = null,
-    val secondNo: String? = null,
-    val roadName: String? = null,
-    val firstBuildNo: String? = null,
-    val secondBuildNo: String? = null,
-    val radius: String? = null,
-    val bizName: String? = null,
-    val upperBizName: String? = null,
-    val middleBizName: String? = null,
-    val lowerBizName: String? = null,
-    val detailBizName: String? = null,
-    val rpFlag: String? = null,
-    val parkFlag: String? = null,
-    val detailInfoFlag: String? = null,
-    val navSeq: String? = null,
-    val analyticGoods: String? = null,
-    val roadNameYn: String? = null
-)
 
 @Singleton
 class TmapPlaceDataSourceImpl @Inject constructor(
@@ -124,7 +71,10 @@ class TmapPlaceDataSourceImpl @Inject constructor(
 
             // 1단계: TMAP 역지오코딩 시도
             val tmapPlace = searchUsingTmapReverseGeocoding(latitude, longitude)
-            if (tmapPlace != null && !tmapPlace.name.contains("알 수 없는") && !tmapPlace.name.contains("위도:")) {
+            if (tmapPlace != null && !tmapPlace.name.contains("알 수 없는") && !tmapPlace.name.contains(
+                    "위도:"
+                )
+            ) {
                 Log.d(TAG, "TMAP 역지오코딩 성공: ${tmapPlace.name}")
                 return tmapPlace
             }
@@ -186,6 +136,7 @@ class TmapPlaceDataSourceImpl @Inject constructor(
                 !addressInfo?.buildingName.isNullOrEmpty() -> addressInfo?.buildingName!!
                 !addressInfo?.roadName.isNullOrEmpty() && !addressInfo?.buildingIndex.isNullOrEmpty() ->
                     "${addressInfo?.roadName} ${addressInfo?.buildingIndex}"
+
                 !addressInfo?.adminDong.isNullOrEmpty() -> addressInfo?.adminDong!!
                 !addressInfo?.legalDong.isNullOrEmpty() -> addressInfo?.legalDong!!
                 else -> null
@@ -246,8 +197,10 @@ class TmapPlaceDataSourceImpl @Inject constructor(
             val nearestPoi = pois
                 .filter { it.frontLat != null && it.frontLon != null }
                 .minByOrNull { poi ->
-                    val poiLat = poi.frontLat!!.toDoubleOrNull() ?: return@minByOrNull Double.MAX_VALUE
-                    val poiLon = poi.frontLon!!.toDoubleOrNull() ?: return@minByOrNull Double.MAX_VALUE
+                    val poiLat =
+                        poi.frontLat!!.toDoubleOrNull() ?: return@minByOrNull Double.MAX_VALUE
+                    val poiLon =
+                        poi.frontLon!!.toDoubleOrNull() ?: return@minByOrNull Double.MAX_VALUE
                     calculateDistance(latitude, longitude, poiLat, poiLon)
                 }
 
@@ -324,63 +277,64 @@ class TmapPlaceDataSourceImpl @Inject constructor(
     /**
      * TMAP POI API를 사용하여 텍스트 쿼리로 장소를 검색합니다.
      */
-    private suspend fun searchPlacesByText(query: String): List<PlaceDto> = withContext(Dispatchers.IO) {
-        return@withContext try {
-            if (query.isBlank()) {
-                return@withContext emptyList()
-            }
-
-            val apiKey = getTmapApiKey()
-            if (apiKey.isEmpty() || apiKey == "YOUR_TMAP_API_KEY_HERE") {
-                Log.e(TAG, "TMAP API 키를 찾을 수 없습니다")
-                return@withContext emptyList()
-            }
-
-            val response = httpClient.get("https://apis.openapi.sk.com/tmap/pois") {
-                header("appKey", apiKey)
-                parameter("version", "1")
-                parameter("searchKeyword", query)
-                parameter("resCoordType", "WGS84GEO")
-                parameter("reqCoordType", "WGS84GEO")
-                parameter("count", "20")
-            }
-
-            if (response.status.value !in 200..299) {
-                Log.e(TAG, "TMAP POI 통합 검색 요청 실패: ${response.status.value}")
-                return@withContext emptyList()
-            }
-
-            val poiResponse = response.body<TmapPoiResponse>()
-            val pois = poiResponse.searchPoiInfo?.pois?.poi ?: emptyList()
-
-            pois.mapNotNull { poi ->
-                val name = poi.name
-                val lat = poi.frontLat?.toDoubleOrNull()
-                val lon = poi.frontLon?.toDoubleOrNull()
-
-                val address = buildString {
-                    poi.upperAddrName?.let { append(it).append(" ") }
-                    poi.middleAddrName?.let { append(it).append(" ") }
-                    poi.lowerAddrName?.let { append(it).append(" ") }
-                    poi.detailAddrName?.let { append(it) }
-                }.trim().ifEmpty { "주소 정보 없음" }
-
-                if (name != null && lat != null && lon != null) {
-                    PlaceDto(
-                        name = name,
-                        address = address,
-                        latitude = lat,
-                        longitude = lon
-                    )
-                } else {
-                    null
+    private suspend fun searchPlacesByText(query: String): List<PlaceDto> =
+        withContext(Dispatchers.IO) {
+            return@withContext try {
+                if (query.isBlank()) {
+                    return@withContext emptyList()
                 }
+
+                val apiKey = getTmapApiKey()
+                if (apiKey.isEmpty() || apiKey == "YOUR_TMAP_API_KEY_HERE") {
+                    Log.e(TAG, "TMAP API 키를 찾을 수 없습니다")
+                    return@withContext emptyList()
+                }
+
+                val response = httpClient.get("https://apis.openapi.sk.com/tmap/pois") {
+                    header("appKey", apiKey)
+                    parameter("version", "1")
+                    parameter("searchKeyword", query)
+                    parameter("resCoordType", "WGS84GEO")
+                    parameter("reqCoordType", "WGS84GEO")
+                    parameter("count", "20")
+                }
+
+                if (response.status.value !in 200..299) {
+                    Log.e(TAG, "TMAP POI 통합 검색 요청 실패: ${response.status.value}")
+                    return@withContext emptyList()
+                }
+
+                val poiResponse = response.body<TmapPoiResponse>()
+                val pois = poiResponse.searchPoiInfo?.pois?.poi ?: emptyList()
+
+                pois.mapNotNull { poi ->
+                    val name = poi.name
+                    val lat = poi.frontLat?.toDoubleOrNull()
+                    val lon = poi.frontLon?.toDoubleOrNull()
+
+                    val address = buildString {
+                        poi.upperAddrName?.let { append(it).append(" ") }
+                        poi.middleAddrName?.let { append(it).append(" ") }
+                        poi.lowerAddrName?.let { append(it).append(" ") }
+                        poi.detailAddrName?.let { append(it) }
+                    }.trim().ifEmpty { "주소 정보 없음" }
+
+                    if (name != null && lat != null && lon != null) {
+                        PlaceDto(
+                            name = name,
+                            address = address,
+                            latitude = lat,
+                            longitude = lon
+                        )
+                    } else {
+                        null
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "TMAP POI Text Search failed", e)
+                emptyList()
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "TMAP POI Text Search failed", e)
-            emptyList()
         }
-    }
 
     private fun getTmapApiKey(): String {
         return try {
@@ -410,7 +364,12 @@ class TmapPlaceDataSourceImpl @Inject constructor(
 
     private fun createFallbackPlace(latitude: Double, longitude: Double): PlaceDto {
         return PlaceDto(
-            name = "위도: ${String.format("%.6f", latitude)}, 경도: ${String.format("%.6f", longitude)}",
+            name = "위도: ${String.format("%.6f", latitude)}, 경도: ${
+                String.format(
+                    "%.6f",
+                    longitude
+                )
+            }",
             address = "주소를 가져올 수 없습니다",
             latitude = latitude,
             longitude = longitude
@@ -433,7 +392,12 @@ class TmapPlaceDataSourceImpl @Inject constructor(
         address.locality?.let { return it }
 
         // 마지막: 좌표 정보
-        return "위도: ${String.format("%.6f", address.latitude)}, 경도: ${String.format("%.6f", address.longitude)}"
+        return "위도: ${String.format("%.6f", address.latitude)}, 경도: ${
+            String.format(
+                "%.6f",
+                address.longitude
+            )
+        }"
     }
 
     companion object {
