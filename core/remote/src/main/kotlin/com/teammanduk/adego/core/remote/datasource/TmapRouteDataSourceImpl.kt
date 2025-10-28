@@ -9,6 +9,16 @@ import com.teammanduk.adego.core.data_api.model.StationDto
 import com.teammanduk.adego.core.data_api.model.SubPathDto
 import com.teammanduk.adego.core.data_api.model.TrafficTypeDto
 import com.teammanduk.adego.core.remote.model.TmapReverseGeocodingResponse
+import com.teammanduk.adego.core.remote.model.TmapTransitResponse
+import com.teammanduk.adego.core.remote.model.TmapItinerary
+import com.teammanduk.adego.core.remote.model.TmapLeg
+import com.teammanduk.adego.core.remote.model.TmapPlace
+import com.teammanduk.adego.core.remote.model.TmapStep
+import com.teammanduk.adego.core.remote.model.TmapPassStopList
+import com.teammanduk.adego.core.remote.model.TmapStation
+import com.teammanduk.adego.core.remote.model.TmapPassShape
+import com.teammanduk.adego.core.remote.model.TmapPedestrianRequest
+import com.teammanduk.adego.core.remote.model.TmapPedestrianResponse
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -27,183 +37,10 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.doubleOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
-
-// TMAP Transit API Response Models
-// 최상위 응답 구조: { metaData: { requestParameters: {...}, plan: { itineraries: [...] } } }
-@Serializable
-private data class TmapTransitResponse(
-    val metaData: TmapTransitMetaData? = null
-)
-
-@Serializable
-private data class TmapTransitMetaData(
-    val requestParameters: TmapRequestParameters? = null,
-    val plan: TmapPlan? = null
-)
-
-@Serializable
-private data class TmapRequestParameters(
-    val reqDttm: String? = null, // 요청 일시
-    val startX: String? = null, // 출발지 경도
-    val startY: String? = null, // 출발지 위도
-    val endX: String? = null, // 도착지 경도
-    val endY: String? = null, // 도착지 위도
-    val locale: String? = null, // 언어 설정
-    val busCount: Int? = null, // 버스 경로 개수
-    val expressbusCount: Int? = null, // 고속버스 경로 개수
-    val subwayCount: Int? = null, // 지하철 경로 개수
-    val airplaneCount: Int? = null, // 비행기 경로 개수
-    val ferryCount: Int? = null, // 배 경로 개수
-    val trainCount: Int? = null // 기차 경로 개수
-)
-
-@Serializable
-private data class TmapPlan(
-    val itineraries: List<TmapItinerary> = emptyList()
-)
-
-@Serializable
-private data class TmapItinerary(
-    val fare: TmapFare? = null,
-    val totalTime: Int? = null, // 총 소요 시간 (초)
-    val totalDistance: Double? = null, // 총 거리 (미터)
-    val totalWalkTime: Int? = null, // 총 도보 시간 (초)
-    val totalWalkDistance: Double? = null, // 총 도보 거리 (미터)
-    val legs: List<TmapLeg> = emptyList(),
-    val pathType: Int? = null // 경로 타입
-)
-
-@Serializable
-private data class TmapFare(
-    val regular: TmapFareDetail? = null
-)
-
-@Serializable
-private data class TmapFareDetail(
-    val totalFare: Int? = null, // 총 요금
-    val currency: TmapCurrency? = null
-)
-
-@Serializable
-private data class TmapCurrency(
-    val symbol: String? = null,
-    val currency: String? = null,
-    val currencyCode: String? = null
-)
-
-@Serializable
-private data class TmapLeg(
-    val mode: String? = null, // "WALK", "BUS", "SUBWAY", etc.
-    val sectionTime: Int? = null, // 구간 시간 (초)
-    val distance: Double? = null, // 거리 (미터)
-    val start: TmapPlace? = null,
-    val end: TmapPlace? = null,
-    val steps: List<TmapStep>? = null, // 도보 구간의 경우
-    val route: String? = null, // 노선명 (대중교통)
-    val routeColor: String? = null, // 노선 색상
-    val routeId: String? = null, // 노선 ID
-    val service: Int? = null, // 노선 타입
-    val passStopList: TmapPassStopList? = null, // 경유 정류장 목록
-    val passShape: TmapPassShape? = null // 경로 좌표
-)
-
-@Serializable
-private data class TmapPlace(
-    val name: String? = null,
-    val lon: Double? = null,
-    val lat: Double? = null
-)
-
-@Serializable
-private data class TmapStep(
-    val streetName: String? = null,
-    val distance: Double? = null,
-    val description: String? = null,
-    val linestring: String? = null // 경로 좌표 (WKT 형식)
-)
-
-@Serializable
-private data class TmapPassStopList(
-    @SerialName("stationList")
-    val stations: List<TmapStation>? = null
-)
-
-@Serializable
-private data class TmapStation(
-    val index: Int? = null,
-    val stationName: String? = null,
-    val lon: String? = null, // API에서 문자열로 옴
-    val lat: String? = null, // API에서 문자열로 옴
-    val stationID: String? = null
-)
-
-@Serializable
-private data class TmapPassShape(
-    val linestring: String? = null // WKT LINESTRING 형식
-)
-
-// TMAP Pedestrian Route API Request Model
-@Serializable
-private data class TmapPedestrianRequest(
-    val startX: Double, // 출발지 경도
-    val startY: Double, // 출발지 위도
-    val endX: Double,   // 도착지 경도
-    val endY: Double,   // 도착지 위도
-    val reqCoordType: String = "WGS84GEO",
-    val resCoordType: String = "WGS84GEO",
-    val startName: String = "출발지",
-    val endName: String = "도착지"
-)
-
-// TMAP Pedestrian Route API Response Models
-@Serializable
-private data class TmapPedestrianResponse(
-    val type: String? = null, // "FeatureCollection"
-    val features: List<TmapFeature> = emptyList()
-)
-
-@Serializable
-private data class TmapFeature(
-    val type: String? = null, // "Feature"
-    val geometry: TmapGeometry? = null,
-    val properties: TmapProperties? = null
-)
-
-@Serializable
-private data class TmapGeometry(
-    val type: String? = null, // "Point" or "LineString"
-    val coordinates: kotlinx.serialization.json.JsonElement? = null // Can be array of numbers or array of arrays
-)
-
-@Serializable
-private data class TmapProperties(
-    val totalDistance: Int? = null,
-    val totalTime: Int? = null,
-    val index: Int? = null,
-    val pointIndex: Int? = null,
-    val name: String? = null,
-    val description: String? = null,
-    val direction: String? = null,
-    val nearPoiName: String? = null,
-    val nearPoiX: String? = null,
-    val nearPoiY: String? = null,
-    val intersectionName: String? = null,
-    val facilityType: String? = null,
-    val facilityName: String? = null,
-    val turnType: Int? = null,
-    val pointType: String? = null,
-    val lineIndex: Int? = null,
-    val distance: Int? = null,
-    val time: Int? = null,
-    val roadType: Int? = null,
-    val categoryRoadType: Int? = null
-)
 
 @Singleton
 class TmapRouteDataSourceImpl @Inject constructor() : RouteDataSource {
